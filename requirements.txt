@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+requests
+ddgs
+trafilatura
+faster-whisper
+python-multipart
