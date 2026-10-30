@@ -68,9 +68,12 @@
   .kopie:hover { opacity:1; color:var(--fg); }
 
   /* Recherche, Modus, Vorschläge */
-  .modus { display:flex; gap:6px; align-items:center; margin:0 0 8px 6px; font-family:var(--mono); font-size:10px; letter-spacing:.12em; }
-  .modus button { background:none; border:1px solid var(--rand); color:var(--dim); border-radius:999px; padding:4px 12px;
+  .modus { display:flex; gap:0; align-items:center; margin:0 0 10px 6px; font-family:var(--mono); font-size:10px; letter-spacing:.14em; }
+  .modus button { background:var(--feld); border:1px solid var(--rand); color:var(--dim); padding:6px 16px;
                   font:inherit; cursor:pointer; transition:.2s; }
+  .modus button:first-of-type { border-radius:999px 0 0 999px; }
+  .modus button:nth-of-type(2) { border-radius:0 999px 999px 0; border-left:0; }
+  .modus button:hover:not(.aktiv) { color:var(--fg); }
   .modus button.aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
   #modushinweis { color:var(--dim); margin-left:6px; letter-spacing:.04em; }
   .recherche { width:100%; border:1px dashed var(--rand); border-radius:12px; padding:8px 12px; margin:0 0 8px;
@@ -91,8 +94,9 @@
 
   /* Eingabeleiste */
   #form { max-width:780px; width:100%; margin:0 auto; padding:10px 18px 20px; }
-  .leiste { display:flex; align-items:flex-end; gap:6px; background:var(--feld); border:1px solid var(--rand);
-            border-radius:32px; padding:7px 7px 7px 22px; transition:border-color .2s, box-shadow .2s; }
+  .leiste { display:flex; align-items:flex-end; gap:4px; background:var(--feld); border:1px solid var(--rand);
+            border-radius:32px; padding:7px 7px 7px 22px; transition:border-color .2s, box-shadow .2s;
+            box-shadow:0 8px 30px rgba(0,0,0,.25); }
   .leiste:focus-within { border-color:var(--dim); box-shadow:0 0 0 4px var(--line); }
   .leiste textarea { flex:1; min-width:0; background:none; border:0; outline:0; color:var(--fg); font:inherit;
                   font-size:16px; line-height:1.5; padding:9px 0; resize:none; max-height:180px;
@@ -106,10 +110,33 @@
   .mic.aufnahme { color:var(--rot); border-color:var(--rot); animation:puls 1.2s infinite; }
   .mic:disabled { opacity:.4; cursor:default; }
   @keyframes puls { 0% { box-shadow:0 0 0 0 rgba(255,90,90,.5); } 100% { box-shadow:0 0 0 12px rgba(255,90,90,0); } }
+  .anhang { background:none; color:var(--dim); }
+  .anhang:hover:not(:disabled) { color:var(--fg); border-color:var(--rand); }
   .senden { background:var(--btn); color:var(--btnfg); }
   .senden:hover:not(:disabled) { transform:scale(1.07); }
   .senden:active:not(:disabled) { transform:scale(.94); }
   .senden:disabled { background:none; color:var(--dim); border-color:var(--rand); cursor:default; }
+  /* Während Hermes antwortet, wird der Pfeil zum Stopp-Knopf */
+  .senden .ico-stopp { display:none; }
+  .senden.stopp .ico-senden { display:none; }
+  .senden.stopp .ico-stopp { display:block; }
+
+  /* Bilder anhängen */
+  #vorschau { display:flex; gap:8px; flex-wrap:wrap; padding:0 6px 8px; }
+  #vorschau .bild { position:relative; width:56px; height:56px; border-radius:10px; overflow:hidden; border:1px solid var(--rand); }
+  #vorschau img { width:100%; height:100%; object-fit:cover; display:block; }
+  #vorschau button { position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; border:0; padding:0;
+                     background:rgba(0,0,0,.7); color:#fff; font-size:11px; line-height:18px; cursor:pointer; }
+  .user .bilder { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:6px; }
+  .user .bilder img { max-width:160px; max-height:160px; border-radius:12px; border:1px solid var(--rand); display:block; }
+  .leiste.ziehen { border-color:var(--fg); }
+  #vorschau .pdf { display:flex; align-items:center; gap:8px; height:56px; max-width:220px; padding:0 30px 0 12px; position:relative;
+                   border:1px solid var(--rand); border-radius:10px; background:var(--karte); font-size:12px; }
+  #vorschau .pdf b { font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--rot); }
+  #vorschau .pdf span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #vorschau .pdf small { display:block; color:var(--dim); font-size:10px; }
+  .user .dateien { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:6px; font-size:12px; color:var(--dim); }
+  .user .dateien span { border:1px solid var(--rand); border-radius:10px; padding:4px 10px; }
 
   /* Seitenleiste */
   #schleier { position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(3px); opacity:0;
@@ -130,12 +157,22 @@
                border-radius:14px; border:1px dashed var(--dim); background:none; color:var(--fg);
                font-family:var(--mono); font-size:12px; letter-spacing:.2em; cursor:pointer; transition:.2s; }
   .neuerchat:hover { background:var(--btn); color:var(--btnfg); border-style:solid; border-color:var(--btn); }
-  .segment { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:4px; border:1px solid var(--rand);
-             border-radius:14px; background:var(--feld); }
-  .seg { border:0; background:none; color:var(--dim); border-radius:10px; padding:9px 2px; font-family:var(--mono);
-         font-size:10px; letter-spacing:.08em; cursor:pointer; transition:.2s; }
-  .seg:hover { color:var(--fg); }
-  .seg.aktiv { background:var(--btn); color:var(--btnfg); }
+  .kopfknoepfe { display:flex; gap:4px; align-items:center; }
+  .kopfknoepfe .leise { display:grid; place-items:center; width:34px; height:34px; padding:0; border-radius:50%; }
+  .kopfknoepfe .leise svg { width:20px; height:20px; }
+  .zahnrad { color:var(--fg); opacity:.85; }
+  .zahnrad svg { transition:transform .4s; }
+  .zahnrad:hover svg, .zahnrad.aktiv svg { transform:rotate(60deg); }
+  .zahnrad.aktiv { opacity:1; }
+  .zurueck { align-self:flex-start; background:none; border:0; color:var(--dim); cursor:pointer;
+             font-family:var(--mono); font-size:11px; letter-spacing:.2em; padding:4px 0; }
+  .zurueck:hover { color:var(--fg); }
+  .einst { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:22px; padding-right:2px; }
+  .einst .listen { flex:none; overflow:visible; }
+  .abschnitt { margin:0 0 10px; font-family:var(--mono); font-size:11px; letter-spacing:.25em; color:var(--dim); font-weight:600; }
+  .gefahr { width:100%; padding:12px; border-radius:14px; border:1px dashed var(--rot); background:none; color:var(--rot);
+            font-family:var(--mono); font-size:12px; letter-spacing:.15em; cursor:pointer; transition:.2s; }
+  .gefahr:hover { background:var(--rot); color:#000; border-style:solid; }
   .suche { width:100%; background:var(--feld); border:1px solid var(--rand); color:var(--fg); border-radius:12px;
            padding:10px 14px; font-size:14px; outline:none; }
   .suche:focus { border-color:var(--dim); }
@@ -172,6 +209,64 @@
   .fuss i { width:8px; height:8px; border-radius:50%; border:1px solid var(--dim); flex-shrink:0; }
   .fuss i.an { background:var(--fg); border-color:var(--fg); animation:atmen 2.4s ease-in-out infinite; }
   @keyframes atmen { 50% { opacity:.35; } }
+
+  /* ---- Seitenleiste: Feinschliff (klarere Struktur) ---- */
+  #seite { border-right:1px solid var(--rand); padding:20px 18px 16px; gap:16px; box-shadow:12px 0 40px rgba(0,0,0,.25); }
+  #seite::before { height:90px; }
+  .seitenkopf { padding-bottom:16px; border-bottom:1px solid var(--line); }
+  .neuerchat { background:var(--btn); color:var(--btnfg); border:0; border-radius:14px; padding:13px; font-weight:600; }
+  .neuerchat span { font-size:16px; line-height:1; }
+  .neuerchat:hover { background:var(--btn); color:var(--btnfg); transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.3); }
+  .suche { border-radius:999px; padding:10px 18px; background:var(--feld); }
+  .abschnitt { display:flex; align-items:center; gap:12px; margin:0 0 12px; }
+  .abschnitt::after { content:""; flex:1; height:1px; background:var(--line); }
+  .titel { border-radius:10px; padding:11px 12px; }
+  .titel::before { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; border:1px solid var(--dim);
+                   background:none; margin-right:12px; vertical-align:middle; font-size:0; }
+  .titel.aktiv::before { content:""; background:var(--fg); border-color:var(--fg); }
+  .titel.aktiv { background:var(--karte); border-color:var(--rand); }
+  @media (hover:hover) {
+    .listen li .leise { opacity:0; }
+    .listen li:hover .leise { opacity:.7; }
+    .listen li .leise:hover { opacity:1; }
+  }
+  .einst { gap:14px; }
+  .einst section { background:var(--karte); border:1px solid var(--rand); border-radius:16px; padding:16px 14px 14px; }
+  .einst .hinweis { font-size:12.5px; margin-bottom:12px; }
+  .einst .listen { gap:6px; }
+  #neu { border-top:0; padding-top:8px; }
+  .kachel { height:72px; }
+  .gefahr { border-style:solid; border-color:rgba(255,90,90,.45); }
+  .zurueck { padding:6px 14px 6px 10px; border:1px solid var(--rand); border-radius:999px; }
+  .zurueck:hover { border-color:var(--dim); }
+  .fuss { border-top:1px solid var(--line); }
+  .kopfknoepfe .zahnrad { opacity:1; color:var(--fg); }
+  .kopfknoepfe #zu { opacity:.7; }
+  .kopfknoepfe #zu:hover { opacity:1; color:var(--fg); }
+  #ansicht-chats .abschnitt { margin:8px 0 2px; }
+
+  /* ---- Einstellungen: flacher, ohne Kartenrahmen ---- */
+  .einst { gap:0; }
+  .einst section { background:none; border:0; border-radius:0; padding:20px 2px; border-top:1px solid var(--line); }
+  .einst section:first-child { border-top:0; padding-top:6px; }
+  .einst .abschnitt::after { display:none; }
+  .einst .abschnitt { margin:0 0 10px; }
+  .einst .hinweis { margin-bottom:8px; }
+  #liste { gap:0; }
+  #liste li { gap:6px; align-items:flex-start; border-bottom:1px solid var(--line); }
+  #liste textarea { flex:1; min-width:0; background:none; border:0; outline:0; resize:none; overflow:hidden;
+                    color:var(--fg); font:inherit; font-size:14px; line-height:1.45; padding:11px 4px; border-radius:8px; }
+  #liste textarea:focus { background:var(--feld); box-shadow:0 0 0 1px var(--rand); padding-left:10px; }
+  #liste li .leise { margin-top:6px; width:28px; height:28px; padding:0; }
+  #liste li.leer { border-bottom:0; padding:6px 0; }
+  #neu { margin-top:14px; padding:4px 4px 4px 16px; border:1px solid var(--rand); border-radius:999px; background:var(--feld); align-items:center; }
+  #neu:focus-within { border-color:var(--dim); }
+  #neu input { background:none; border:0; padding:8px 0; font-family:inherit; }
+  #neu .leise { width:34px; height:34px; border-radius:50%; background:var(--btn); color:var(--btnfg); opacity:1; font-size:20px; padding:0; line-height:1; }
+  .kachel { height:64px; border-radius:12px; }
+  .gefahr { padding:10px; font-size:11px; }
+  .abmelden { margin-top:8px; border-color:var(--rand); color:var(--dim); }
+  .abmelden:hover { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
 </style>
 </head>
 <body>
@@ -187,8 +282,15 @@
 
 <form id="form" autocomplete="off">
   <div class="modus" id="modus"><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span></div>
+  <div id="vorschau" hidden></div>
+  <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
     <textarea id="eingabe" rows="1" placeholder="Schreib Hermes etwas ..." autocomplete="off" autofocus></textarea>
+    <button type="button" class="rund anhang" id="bildKnopf" title="Bild oder PDF anhängen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+      </svg>
+    </button>
     <button type="button" class="rund mic" id="mic" title="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
@@ -197,41 +299,62 @@
       </svg>
     </button>
     <button class="rund senden" id="senden" title="Senden" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="ico-senden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>
       </svg>
+      <svg class="ico-stopp" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
     </button>
   </div>
 </form>
 
 <div id="schleier"></div>
 <aside id="seite">
-  <div class="seitenkopf"><span class="seitenlogo">HERMES</span><button class="leise" id="zu">✕</button></div>
-  <button class="neuerchat" id="neuerChat"><span>+</span>NEUER CHAT</button>
-
-  <div class="segment">
-    <button class="seg aktiv" data-tab="chats">CHATS</button>
-    <button class="seg" data-tab="erinnerungen">ERINNERUNGEN</button>
-    <button class="seg" data-tab="design">DESIGN</button>
+  <div class="seitenkopf">
+    <span class="seitenlogo">HERMES</span>
+    <div class="kopfknoepfe">
+      <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg></button>
+      <button class="leise" id="zu" title="Schließen" aria-label="Schließen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
   </div>
 
-  <div class="bereich" id="tab-chats">
+  <!-- Ansicht 1: Chats -->
+  <div class="bereich" id="ansicht-chats">
+    <button class="neuerchat" id="neuerChat"><span>+</span>NEUER CHAT</button>
     <input class="suche" id="suche" placeholder="Chats durchsuchen ..." autocomplete="off">
+    <h3 class="abschnitt">CHATS</h3>
     <ul class="listen" id="chatListe"></ul>
   </div>
 
-  <div class="bereich" id="tab-erinnerungen" hidden>
-    <p class="hinweis">Das weiß Hermes über dich (<span id="zaehler">0</span>). Klick auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
-    <ul class="listen" id="liste"></ul>
-    <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
-  </div>
+  <!-- Ansicht 2: Einstellungen (Zahnrad) -->
+  <div class="bereich" id="ansicht-einstellungen" hidden>
+    <button class="zurueck" id="zurueck">← ZURÜCK</button>
+    <div class="einst">
+      <section>
+        <h3 class="abschnitt">ERINNERUNGEN</h3>
+        <p class="hinweis">Das weiß Hermes über dich (<span id="zaehler">0</span>). Klick auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
+        <ul class="listen" id="liste"></ul>
+        <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
+      </section>
 
-  <div class="bereich" id="tab-design" hidden>
-    <p class="hinweis">Wähl dein Design.</p>
-    <div class="kacheln">
-      <button class="kachel" data-design="dunkel">DUNKEL</button>
-      <button class="kachel" data-design="grau">GRAU</button>
-      <button class="kachel" data-design="hell">HELL</button>
+      <section>
+        <h3 class="abschnitt">DESIGN</h3>
+        <div class="kacheln">
+          <button class="kachel" data-design="dunkel">DUNKEL</button>
+          <button class="kachel" data-design="grau">GRAU</button>
+          <button class="kachel" data-design="hell">HELL</button>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="abschnitt">DATEN</h3>
+        <button class="gefahr" id="alleLoeschen">ALLE CHATS LÖSCHEN</button>
+        <button class="gefahr abmelden" id="abmelden" hidden>ABMELDEN</button>
+      </section>
     </div>
   </div>
 
@@ -243,6 +366,7 @@
   window.hermesSucht = false;
   let aktuellerChat = null;
   let beschaeftigt = false;
+  let abbruch = null;  // AbortController der laufenden Antwort (für den Stopp-Knopf)
   let chatsAlle = [];
   const STANDARD = "Schreib Hermes etwas ...";
 
@@ -262,7 +386,15 @@
   const statustext = document.getElementById("statustext");
 
   // ---------- Senden-Button ----------
-  function sendeStatus() { senden.disabled = beschaeftigt || !eingabe.value.trim(); }
+  function sendeStatus() {
+    // Während einer Antwort ist der Knopf ein Stopp-Knopf und bleibt klickbar
+    senden.disabled = !beschaeftigt && !eingabe.value.trim() && !anhang.length && !pdfs.length;
+    senden.classList.toggle("stopp", beschaeftigt);
+    senden.title = beschaeftigt ? "Stopp" : "Senden";
+  }
+  senden.addEventListener("click", (e) => {
+    if (beschaeftigt) { e.preventDefault(); if (abbruch) abbruch.abort(); }
+  });
   function wachse() { eingabe.style.height = "auto"; eingabe.style.height = Math.min(eingabe.scrollHeight, 180) + "px"; }
   eingabe.addEventListener("input", () => { wachse(); sendeStatus(); });
   eingabe.addEventListener("keydown", (e) => {
@@ -273,6 +405,99 @@
     eingabe.placeholder = text;
     if (dauer) setTimeout(() => { eingabe.placeholder = STANDARD; }, dauer);
   }
+
+  // ---------- Bilder anhängen ----------
+  // Bilder werden im Browser verkleinert (max. 1280 px, JPEG), damit nichts Riesiges an Ollama geht.
+  const MAX_BILDER = 3, MAX_KANTE = 1280;
+  let anhang = [];  // verkleinerte Bilder als data:-URL
+  let pdfs = [];    // gelesene PDFs: { name, text, seiten, gekuerzt }
+  const MAX_PDFS = 2;
+  const bildDatei = document.getElementById("bilddatei");
+  const vorschau = document.getElementById("vorschau");
+
+  function bildVerkleinern(datei) {
+    return new Promise((ok, fehler) => {
+      const url = URL.createObjectURL(datei);
+      const img = new Image();
+      img.onload = () => {
+        const f = Math.min(1, MAX_KANTE / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(img.width * f));
+        cv.height = Math.max(1, Math.round(img.height * f));
+        const g = cv.getContext("2d");
+        g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);  // transparente PNGs bekommen weißen Grund
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        ok(cv.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error("kein Bild")); };
+      img.src = url;
+    });
+  }
+
+  async function pdfLesen(datei) {
+    if (pdfs.length >= MAX_PDFS) { platzhalter("Maximal " + MAX_PDFS + " PDFs.", 3000); return; }
+    platzhalter("Lese " + datei.name + " ...", 20000);
+    try {
+      const fd = new FormData(); fd.append("datei", datei);
+      const r = await (await fetch("/pdf-lesen", { method: "POST", body: fd })).json();
+      if (r.fehler) { platzhalter(r.fehler, 5000); return; }
+      pdfs.push(r);
+      platzhalter(r.gekuerzt ? "PDF ist lang: Hermes sieht nur den Anfang (ca. 9000 Zeichen)." : "PDF gelesen.", 4000);
+    } catch (e) { platzhalter("PDF konnte nicht gelesen werden (läuft der Server?).", 4000); }
+    zeichneVorschau();
+  }
+
+  async function bilderHinzufuegen(dateien) {
+    for (const d of dateien) {
+      if (d.type === "application/pdf" || /\.pdf$/i.test(d.name)) { await pdfLesen(d); continue; }
+      if (!d.type || !d.type.startsWith("image/")) continue;
+      if (anhang.length >= MAX_BILDER) { platzhalter("Maximal " + MAX_BILDER + " Bilder.", 3000); break; }
+      try { anhang.push(await bildVerkleinern(d)); }
+      catch (e) { platzhalter("Das Bild konnte nicht gelesen werden.", 3000); }
+    }
+    zeichneVorschau();
+  }
+
+  function zeichneVorschau() {
+    vorschau.innerHTML = "";
+    vorschau.hidden = !anhang.length && !pdfs.length;
+    pdfs.forEach((p, i) => {
+      const box = document.createElement("div"); box.className = "pdf";
+      const b = document.createElement("b"); b.textContent = "PDF";
+      const t = document.createElement("span"); t.textContent = p.name;
+      const k = document.createElement("small"); k.textContent = p.seiten + " Seiten"; t.appendChild(k);
+      const weg = document.createElement("button"); weg.type = "button"; weg.textContent = "✕"; weg.title = "Entfernen";
+      weg.style.cssText = "top:50%;transform:translateY(-50%);right:6px";
+      weg.addEventListener("click", () => { pdfs.splice(i, 1); zeichneVorschau(); });
+      box.append(b, t, weg); vorschau.appendChild(box);
+    });
+    anhang.forEach((url, i) => {
+      const box = document.createElement("div"); box.className = "bild";
+      const img = document.createElement("img"); img.src = url; img.alt = "Anhang " + (i + 1);
+      const weg = document.createElement("button"); weg.type = "button"; weg.textContent = "✕"; weg.title = "Entfernen";
+      weg.addEventListener("click", () => { anhang.splice(i, 1); zeichneVorschau(); });
+      box.append(img, weg); vorschau.appendChild(box);
+    });
+    sendeStatus();
+    if (typeof modusHinweis === "function") {
+      if (anhang.length) {
+        const i = modiInfo && modiInfo.gruendlich;
+        document.getElementById("modushinweis").textContent = "Mit Bild: " + (i ? i.name : "Gründlich-Modell") + " · braucht länger";
+      } else modusHinweis();
+    }
+  }
+
+  document.getElementById("bildKnopf").addEventListener("click", () => bildDatei.click());
+  bildDatei.addEventListener("change", () => { bilderHinzufuegen([...bildDatei.files]); bildDatei.value = ""; });
+  eingabe.addEventListener("paste", (e) => {
+    const bilder = [...(e.clipboardData ? e.clipboardData.files : [])].filter((f) => f.type.startsWith("image/"));
+    if (bilder.length) { e.preventDefault(); bilderHinzufuegen(bilder); }
+  });
+  const leiste = document.querySelector(".leiste");
+  ["dragover", "dragenter"].forEach((n) => form.addEventListener(n, (e) => { e.preventDefault(); leiste.classList.add("ziehen"); }));
+  ["dragleave", "drop"].forEach((n) => form.addEventListener(n, () => leiste.classList.remove("ziehen")));
+  form.addEventListener("drop", (e) => { e.preventDefault(); bilderHinzufuegen([...e.dataTransfer.files]); });
 
   // ---------- Text darstellen (Markdown und Formeln) ----------
   function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -380,20 +605,34 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = eingabe.value.trim();
+    const meineBilder = anhang.slice();
+    const meinePdfs = pdfs.slice();
+    const text = eingabe.value.trim() || (meinePdfs.length ? "Fasse das Dokument kurz zusammen." : meineBilder.length ? "Beschreibe, was auf dem Bild zu sehen ist." : "");
     if (!text || beschaeftigt) return;
     eingabe.value = "";
     wachse();
+    anhang = []; pdfs = []; zeichneVorschau();
     beschaeftigt = true;
     sendeStatus();
-    nachricht(text, "user");
+    const nutzerNachricht = nachricht(text, "user");
+    if (meineBilder.length) {
+      const reihe = document.createElement("div"); reihe.className = "bilder";
+      meineBilder.forEach((u) => { const im = document.createElement("img"); im.src = u; im.alt = "Bild"; reihe.appendChild(im); });
+      nutzerNachricht.insertBefore(reihe, nutzerNachricht.querySelector(".inhalt"));
+    }
+    if (meinePdfs.length) {
+      const reihe = document.createElement("div"); reihe.className = "dateien";
+      meinePdfs.forEach((p) => { const sp = document.createElement("span"); sp.textContent = "PDF · " + p.name; reihe.appendChild(sp); });
+      nutzerNachricht.insertBefore(reihe, nutzerNachricht.querySelector(".inhalt"));
+    }
     const huelle = nachricht("", "bot");
     const inhalt = huelle.querySelector(".inhalt");
     inhalt.classList.add("typing");
     inhalt.textContent = "denkt nach ...";
     window.hermesDenkt = true; window.hermesSucht = false;
     const warNeu = aktuellerChat === null;
-    let roh = "", karte = null, offen = null, schritte = 0, geplant = false;
+    let roh = "", karte = null, offen = null, schritte = 0, geplant = false, gestoppt = false;
+    abbruch = new AbortController();
     const zeige = () => {
       if (geplant) return; geplant = true;
       setTimeout(() => { geplant = false; aktualisiere(huelle, roh); fenster.scrollTop = fenster.scrollHeight; }, 120);
@@ -402,7 +641,9 @@
       const res = await fetch("/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, chat_id: aktuellerChat, modus }),
+        body: JSON.stringify({ text, chat_id: aktuellerChat, modus, bilder: meineBilder,
+          dokumente: meinePdfs.map((p) => ({ name: p.name, text: p.text })) }),
+        signal: abbruch.signal,
       });
       if (!res.ok) throw new Error("Serverfehler");
       const leser = res.body.getReader(), dek = new TextDecoder();
@@ -441,8 +682,11 @@
         fenster.scrollTop = fenster.scrollHeight;
       }
     } catch (fehler) {
-      if (!roh) roh = "Fehler: Läuft Ollama?";
+      if (fehler && fehler.name === "AbortError") gestoppt = true;
+      else if (!roh) roh = "Fehler: Läuft Ollama?";
     }
+    abbruch = null;
+    if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";
     inhalt.classList.remove("typing");
     if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
     if (karte) karte.open = false;
@@ -540,7 +784,7 @@
   });
 
   // ---------- Seitenleiste ----------
-  function oeffneSeite() { seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
+  function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
   function schliesseSeite() { seite.classList.remove("offen"); schleier.classList.remove("offen"); }
   document.getElementById("auge").addEventListener("click", () => {
     if (seite.classList.contains("offen")) schliesseSeite(); else oeffneSeite();
@@ -549,11 +793,32 @@
   document.getElementById("zu").addEventListener("click", schliesseSeite);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") schliesseSeite(); });
 
-  document.querySelectorAll(".seg").forEach((t) => t.addEventListener("click", () => {
-    document.querySelectorAll(".seg").forEach((x) => x.classList.toggle("aktiv", x === t));
-    document.querySelectorAll(".bereich").forEach((b) => { b.hidden = b.id !== "tab-" + t.dataset.tab; });
-    if (t.dataset.tab === "erinnerungen") ladeErinnerungen(true);
-  }));
+  // Zwei Ansichten in der Seitenleiste: Chats und Einstellungen (Zahnrad)
+  function zeigeAnsicht(name) {
+    const einst = name === "einstellungen";
+    document.getElementById("ansicht-chats").hidden = einst;
+    document.getElementById("ansicht-einstellungen").hidden = !einst;
+    document.getElementById("zahnrad").classList.toggle("aktiv", einst);
+    if (einst) ladeErinnerungen(true);
+  }
+  document.getElementById("zahnrad").addEventListener("click", () => {
+    zeigeAnsicht(document.getElementById("ansicht-einstellungen").hidden ? "einstellungen" : "chats");
+  });
+  document.getElementById("zurueck").addEventListener("click", () => zeigeAnsicht("chats"));
+
+  document.getElementById("alleLoeschen").addEventListener("click", async () => {
+    if (!chatsAlle.length) { alert("Es gibt keine Chats zum Löschen."); return; }
+    if (!confirm("Wirklich ALLE " + chatsAlle.length + " Chats löschen? Das kann nicht rückgängig gemacht werden.")) return;
+    if (abbruch) abbruch.abort();  // läuft gerade eine Antwort, wird sie zuerst gestoppt
+    try {
+      const res = await fetch("/chats", { method: "DELETE" });
+      if (!res.ok) throw new Error("Serverfehler");
+    } catch (e) {
+      alert("Löschen hat nicht geklappt. Hast du die neue server.py gestartet?");
+      return;
+    }
+    neuerChat();
+  });
 
   async function ladeStatus() {
     try {
@@ -652,15 +917,20 @@
     daten.forEach((eintrag, index) => {
       const li = document.createElement("li");
       li.style.setProperty("--i", index);
-      const feld = document.createElement("input");
+      const feld = document.createElement("textarea");  // Textarea statt Input: lange Einträge brechen um statt abgeschnitten zu werden
+      feld.rows = 1;
       feld.value = eintrag.text;
-      feld.addEventListener("change", () => schicke("PUT", "/erinnerungen/" + eintrag.id, feld.value));
+      const passe = () => { feld.style.height = "auto"; feld.style.height = feld.scrollHeight + "px"; };
+      feld.addEventListener("input", passe);
+      feld.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); feld.blur(); } });
+      feld.addEventListener("change", () => schicke("PUT", "/erinnerungen/" + eintrag.id, feld.value.replace(/\s+/g, " ")));
       const weg = document.createElement("button");
       weg.className = "leise";
       weg.textContent = "✕";
       weg.addEventListener("click", () => schicke("DELETE", "/erinnerungen/" + eintrag.id));
       li.append(feld, weg);
       liste.appendChild(li);
+      passe();
     });
   }
 
@@ -669,6 +939,15 @@
     const feld = document.getElementById("neuText");
     if (feld.value.trim()) schicke("POST", "/erinnerungen", feld.value);
     feld.value = "";
+  });
+
+  // ---------- Abmelden (nur sichtbar, wenn der Server ein Passwort hat) ----------
+  fetch("/auth-status").then((r) => r.json()).then((d) => {
+    if (d.passwort) document.getElementById("abmelden").hidden = false;
+  }).catch(() => {});
+  document.getElementById("abmelden").addEventListener("click", async () => {
+    await fetch("/logout", { method: "POST" });
+    location.reload();
   });
 
   // ---------- Design ----------

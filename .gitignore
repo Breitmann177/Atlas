@@ -1,4 +1,6 @@
 .venv/
 .idea/
 __pycache__/
-hermes.db
+hermes.db*
+pdfs/
+.env
