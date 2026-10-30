@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hermes</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root { --bg:#050505; --fg:#e6e6e6; --dim:#8a8a8a; --line:#242424; --karte:#161616; --rand:#2b2b2b;
+          --feld:#0c0c0c; --punkt:#d4d4d4; --raster:rgba(255,255,255,.2); --btn:#f2f2f2; --btnfg:#000;
+          --panel:#0b0b0b; --rot:#ff5a5a; --mono:Consolas,"Cascadia Mono",monospace; }
+  [data-theme="hell"] { --bg:#f4f4f2; --fg:#151515; --dim:#6f6f6f; --line:#d9d9d6; --karte:#e9e9e6; --rand:#cfcfca;
+          --feld:#ffffff; --punkt:#2a2a2a; --raster:rgba(0,0,0,.16); --btn:#151515; --btnfg:#ffffff; --panel:#ffffff; }
+  [data-theme="grau"] { --bg:#2a2b2e; --fg:#ececed; --dim:#a2a3aa; --line:#3d3e43; --karte:#36373b; --rand:#4b4c52;
+          --feld:#232427; --punkt:#d8d8da; --raster:rgba(255,255,255,.14); --btn:#ececed; --btnfg:#222; --panel:#2f3033; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; height:100dvh; display:flex; flex-direction:column; background:var(--bg); color:var(--fg);
+         font-family:"Segoe UI",system-ui,sans-serif; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+         background-image:radial-gradient(circle, var(--raster) 0.8px, transparent 1.1px);
+         background-size:7px 7px;
+         -webkit-mask-image:linear-gradient(180deg,#000 0,transparent 150px);
+                 mask-image:linear-gradient(180deg,#000 0,transparent 150px); }
+  header, main, #form { position:relative; z-index:1; }
+  header { height:64px; flex-shrink:0; display:flex; align-items:center; padding:0 22px 0 108px; }
+  .logo { font-family:var(--mono); letter-spacing:.45em; font-size:14px; font-weight:600; }
+
+  /* Auge: groß in der Mitte, nach der ersten Nachricht klein oben links */
+  #auge { position:fixed; z-index:20; cursor:pointer; top:84px; left:50%; width:min(380px,80vw); height:auto;
+          transform:translateX(-50%);
+          transition:top .8s ease, left .8s ease, width .8s ease, transform .8s ease; }
+  body.klein #auge { top:12px; left:18px; width:72px; transform:translateX(0); }
+
+  main { flex:1; overflow-y:auto; overflow-x:hidden; }
+  #chat { max-width:780px; margin:0 auto; padding:0 18px 12px; display:flex; flex-direction:column; gap:20px; }
+  #hero { text-align:center; margin-top:20px; overflow:hidden; max-height:420px;
+          padding-top:calc(min(380px,80vw) * .5526 + 8px);
+          transition:opacity .6s ease, max-height .8s ease, margin-top .8s ease, padding-top .8s ease; }
+  body.klein #hero { opacity:0; max-height:0; margin-top:0; padding-top:0; }
+  #hero p { margin:10px 0 0; font-family:var(--mono); font-size:12px; letter-spacing:.3em; color:var(--dim); }
+
+  /* Nachrichten */
+  .msg { display:flex; flex-direction:column; min-width:0; }
+  .msg.user { align-self:flex-end; align-items:flex-end; max-width:82%; }
+  .msg.bot { align-self:flex-start; align-items:flex-start; width:100%; }
+  .inhalt { max-width:100%; min-width:0; overflow-wrap:anywhere; }
+  .user .inhalt { padding:10px 16px; background:var(--karte); border:1px solid var(--rand);
+                  border-radius:18px 18px 4px 18px; white-space:pre-wrap; }
+  .bot .inhalt { width:100%; padding-left:14px; border-left:2px dotted var(--dim); line-height:1.6; }
+  .bot p { margin:.4em 0; }
+  .bot a { color:var(--fg); text-underline-offset:3px; }
+  .bot hr { border:0; border-top:1px dashed var(--rand); margin:1.2em 0; }
+  .bot pre { max-width:100%; overflow-x:auto; background:var(--karte); border:1px solid var(--rand);
+             border-radius:10px; padding:10px 12px; }
+  .bot pre code { background:none; padding:0; overflow-wrap:normal; }
+  .bot code { background:var(--karte); padding:2px 6px; border-radius:6px; font-family:Consolas,monospace; }
+  .bot table { display:block; max-width:100%; overflow-x:auto; border-collapse:collapse; margin:8px 0; }
+  .bot td, .bot th { border:1px solid var(--line); padding:6px 10px; }
+  .bot .katex-display { overflow-x:auto; overflow-y:hidden; max-width:100%; }
+  .typing { color:var(--dim); animation:blink 1s infinite; }
+  @keyframes blink { 50% { opacity:.35; } }
+  .kopie { background:none; border:0; color:var(--dim); cursor:pointer; font-size:15px; padding:4px 6px; opacity:.55; }
+  .kopie:hover { opacity:1; color:var(--fg); }
+
+  /* Recherche, Modus, Vorschläge */
+  .modus { display:flex; gap:6px; align-items:center; margin:0 0 8px 6px; font-family:var(--mono); font-size:10px; letter-spacing:.12em; }
+  .modus button { background:none; border:1px solid var(--rand); color:var(--dim); border-radius:999px; padding:4px 12px;
+                  font:inherit; cursor:pointer; transition:.2s; }
+  .modus button.aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
+  #modushinweis { color:var(--dim); margin-left:6px; letter-spacing:.04em; }
+  .recherche { width:100%; border:1px dashed var(--rand); border-radius:12px; padding:8px 12px; margin:0 0 8px;
+               font-size:13.5px; background:var(--karte); }
+  .recherche summary { cursor:pointer; color:var(--dim); font-family:var(--mono); font-size:11px; letter-spacing:.15em; list-style:none; }
+  .recherche summary::-webkit-details-marker { display:none; }
+  .schritt { display:flex; gap:10px; align-items:baseline; padding:4px 0; min-width:0; }
+  .schritt b { font-family:var(--mono); font-size:10px; letter-spacing:.15em; color:var(--dim); flex:none; width:54px; }
+  .schritt span { overflow-wrap:anywhere; min-width:0; }
+  .schritt i { margin-left:auto; font-style:normal; color:var(--dim); flex:none; }
+  .schritt i.puls::after { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--fg); animation:blink 1s infinite; }
+  .vorschlag { display:flex; flex-wrap:wrap; gap:8px; align-items:center; border:1px dashed var(--rand); border-radius:12px;
+               padding:8px 12px; margin-top:8px; font-size:13.5px; max-width:100%; }
+  .vorschlag span { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .vorschlag button { border:1px solid var(--rand); background:none; color:var(--fg); border-radius:8px; padding:3px 10px;
+                      cursor:pointer; font:inherit; font-size:12.5px; }
+  .vorschlag button:hover { background:var(--btn); color:var(--btnfg); }
+
+  /* Eingabeleiste */
+  #form { max-width:780px; width:100%; margin:0 auto; padding:10px 18px 20px; }
+  .leiste { display:flex; align-items:flex-end; gap:6px; background:var(--feld); border:1px solid var(--rand);
+            border-radius:32px; padding:7px 7px 7px 22px; transition:border-color .2s, box-shadow .2s; }
+  .leiste:focus-within { border-color:var(--dim); box-shadow:0 0 0 4px var(--line); }
+  .leiste textarea { flex:1; min-width:0; background:none; border:0; outline:0; color:var(--fg); font:inherit;
+                  font-size:16px; line-height:1.5; padding:9px 0; resize:none; max-height:180px;
+                  overflow-wrap:anywhere; white-space:pre-wrap; }
+  .rund { flex-shrink:0; width:42px; height:42px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+          border:1px solid transparent; padding:0;
+          transition:transform .15s, background .2s, color .2s, border-color .2s, opacity .2s; }
+  .rund svg { width:20px; height:20px; }
+  .mic { background:none; color:var(--dim); }
+  .mic:hover:not(:disabled) { color:var(--fg); border-color:var(--rand); }
+  .mic.aufnahme { color:var(--rot); border-color:var(--rot); animation:puls 1.2s infinite; }
+  .mic:disabled { opacity:.4; cursor:default; }
+  @keyframes puls { 0% { box-shadow:0 0 0 0 rgba(255,90,90,.5); } 100% { box-shadow:0 0 0 12px rgba(255,90,90,0); } }
+  .senden { background:var(--btn); color:var(--btnfg); }
+  .senden:hover:not(:disabled) { transform:scale(1.07); }
+  .senden:active:not(:disabled) { transform:scale(.94); }
+  .senden:disabled { background:none; color:var(--dim); border-color:var(--rand); cursor:default; }
+
+  /* Seitenleiste */
+  #schleier { position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(3px); opacity:0;
+              pointer-events:none; transition:opacity .25s; z-index:25; }
+  #schleier.offen { opacity:1; pointer-events:auto; }
+  #seite { position:fixed; top:0; left:0; bottom:0; width:min(360px,92vw); background:var(--panel);
+           border-right:1px dashed var(--rand); transform:translateX(-102%);
+           transition:transform .3s cubic-bezier(.2,.8,.2,1); z-index:30; display:flex; flex-direction:column;
+           padding:18px; gap:14px; overflow:hidden; }
+  #seite.offen { transform:none; }
+  #seite::before { content:""; position:absolute; inset:0 0 auto 0; height:170px; pointer-events:none;
+           background-image:radial-gradient(circle, var(--raster) 0.9px, transparent 1.2px); background-size:6px 6px;
+           -webkit-mask-image:linear-gradient(180deg,#000,transparent); mask-image:linear-gradient(180deg,#000,transparent); }
+  #seite > * { position:relative; z-index:1; }
+  .seitenkopf { display:flex; justify-content:space-between; align-items:center; }
+  .seitenlogo { font-family:var(--mono); letter-spacing:.45em; font-size:14px; font-weight:600; }
+  .neuerchat { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:12px;
+               border-radius:14px; border:1px dashed var(--dim); background:none; color:var(--fg);
+               font-family:var(--mono); font-size:12px; letter-spacing:.2em; cursor:pointer; transition:.2s; }
+  .neuerchat:hover { background:var(--btn); color:var(--btnfg); border-style:solid; border-color:var(--btn); }
+  .segment { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; padding:4px; border:1px solid var(--rand);
+             border-radius:14px; background:var(--feld); }
+  .seg { border:0; background:none; color:var(--dim); border-radius:10px; padding:9px 2px; font-family:var(--mono);
+         font-size:10px; letter-spacing:.08em; cursor:pointer; transition:.2s; }
+  .seg:hover { color:var(--fg); }
+  .seg.aktiv { background:var(--btn); color:var(--btnfg); }
+  .suche { width:100%; background:var(--feld); border:1px solid var(--rand); color:var(--fg); border-radius:12px;
+           padding:10px 14px; font-size:14px; outline:none; }
+  .suche:focus { border-color:var(--dim); }
+  .bereich { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
+  .hinweis { color:var(--dim); font-size:13px; line-height:1.5; margin:0; }
+  .listen { list-style:none; padding:0; margin:0; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:4px; }
+  .listen li { display:flex; gap:4px; align-items:center; animation:rein .35s ease both;
+               animation-delay:calc(var(--i, 0) * 35ms); }
+  @keyframes rein { from { opacity:0; transform:translateX(-12px); } to { opacity:1; transform:none; } }
+  .listen li.leer { color:var(--dim); font-size:14px; }
+  .titel { flex:1; min-width:0; text-align:left; background:none; border:1px solid transparent; color:var(--fg);
+           border-radius:12px; padding:10px 12px; font-size:14px; cursor:pointer; white-space:nowrap;
+           overflow:hidden; text-overflow:ellipsis; transition:.15s; }
+  .titel::before { content:"○"; color:var(--dim); margin-right:10px; font-size:10px; }
+  .titel:hover { background:var(--karte); border-color:var(--rand); transform:translateX(3px); }
+  .titel.aktiv { background:var(--karte); border-color:var(--rand); }
+  .titel.aktiv::before { content:"●"; color:var(--fg); }
+  .listen input, #neu input { flex:1; min-width:0; background:var(--feld); border:1px solid var(--rand);
+                              color:var(--fg); border-radius:10px; padding:9px 12px; font-size:14px; outline:none; }
+  .listen input:focus, #neu input:focus { border-color:var(--dim); }
+  #neu { display:flex; gap:6px; padding-top:10px; border-top:1px dashed var(--line); }
+  .leise { background:none; border:0; color:var(--dim); cursor:pointer; font-size:18px; opacity:.45; transition:.15s; }
+  .listen li:hover .leise, .leise:hover { opacity:1; color:var(--fg); }
+  .kacheln { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .kachel { height:84px; border-radius:14px; border:1px solid var(--rand); cursor:pointer; font-family:var(--mono);
+            font-size:10px; letter-spacing:.12em; display:flex; align-items:flex-end; padding:10px; transition:.2s;
+            background-image:radial-gradient(circle, rgba(128,128,128,.5) .9px, transparent 1.2px); background-size:7px 7px; }
+  .kachel[data-design="dunkel"] { background-color:#050505; color:#e6e6e6; }
+  .kachel[data-design="hell"] { background-color:#f4f4f2; color:#151515; }
+  .kachel[data-design="grau"] { background-color:#2a2b2e; color:#ececed; }
+  .kachel.aktiv { border:2px solid var(--fg); }
+  .fuss { display:flex; align-items:center; gap:10px; padding-top:12px; border-top:1px dashed var(--line);
+          font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--dim); }
+  .fuss i { width:8px; height:8px; border-radius:50%; border:1px solid var(--dim); flex-shrink:0; }
+  .fuss i.an { background:var(--fg); border-color:var(--fg); animation:atmen 2.4s ease-in-out infinite; }
+  @keyframes atmen { 50% { opacity:.35; } }
+</style>
+</head>
+<body>
+<canvas id="auge" title="Menü"></canvas>
+
+<header><div class="logo">HERMES</div></header>
+
+<main id="fenster">
+  <div id="chat">
+    <div id="hero"><p>BEREIT</p></div>
+  </div>
+</main>
+
+<form id="form" autocomplete="off">
+  <div class="modus" id="modus"><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span></div>
+  <div class="leiste">
+    <textarea id="eingabe" rows="1" placeholder="Schreib Hermes etwas ..." autocomplete="off" autofocus></textarea>
+    <button type="button" class="rund mic" id="mic" title="Sprechen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
+        <path d="M19 11a7 7 0 0 1-14 0"/>
+        <path d="M12 18v3"/>
+      </svg>
+    </button>
+    <button class="rund senden" id="senden" title="Senden" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>
+      </svg>
+    </button>
+  </div>
+</form>
+
+<div id="schleier"></div>
+<aside id="seite">
+  <div class="seitenkopf"><span class="seitenlogo">HERMES</span><button class="leise" id="zu">✕</button></div>
+  <button class="neuerchat" id="neuerChat"><span>+</span>NEUER CHAT</button>
+
+  <div class="segment">
+    <button class="seg aktiv" data-tab="chats">CHATS</button>
+    <button class="seg" data-tab="erinnerungen">ERINNERUNGEN</button>
+    <button class="seg" data-tab="design">DESIGN</button>
+  </div>
+
+  <div class="bereich" id="tab-chats">
+    <input class="suche" id="suche" placeholder="Chats durchsuchen ..." autocomplete="off">
+    <ul class="listen" id="chatListe"></ul>
+  </div>
+
+  <div class="bereich" id="tab-erinnerungen" hidden>
+    <p class="hinweis">Das weiß Hermes über dich (<span id="zaehler">0</span>). Klick auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
+    <ul class="listen" id="liste"></ul>
+    <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
+  </div>
+
+  <div class="bereich" id="tab-design" hidden>
+    <p class="hinweis">Wähl dein Design.</p>
+    <div class="kacheln">
+      <button class="kachel" data-design="dunkel">DUNKEL</button>
+      <button class="kachel" data-design="grau">GRAU</button>
+      <button class="kachel" data-design="hell">HELL</button>
+    </div>
+  </div>
+
+  <div class="fuss"><i id="statuspunkt"></i><span id="statustext">...</span></div>
+</aside>
+
+<script>
+  window.hermesDenkt = false;
+  window.hermesSucht = false;
+  let aktuellerChat = null;
+  let beschaeftigt = false;
+  let chatsAlle = [];
+  const STANDARD = "Schreib Hermes etwas ...";
+
+  const chat = document.getElementById("chat");
+  const fenster = document.getElementById("fenster");
+  const form = document.getElementById("form");
+  const eingabe = document.getElementById("eingabe");
+  const senden = document.getElementById("senden");
+  const mic = document.getElementById("mic");
+  const seite = document.getElementById("seite");
+  const schleier = document.getElementById("schleier");
+  const chatListe = document.getElementById("chatListe");
+  const suche = document.getElementById("suche");
+  const liste = document.getElementById("liste");
+  const zaehler = document.getElementById("zaehler");
+  const statuspunkt = document.getElementById("statuspunkt");
+  const statustext = document.getElementById("statustext");
+
+  // ---------- Senden-Button ----------
+  function sendeStatus() { senden.disabled = beschaeftigt || !eingabe.value.trim(); }
+  function wachse() { eingabe.style.height = "auto"; eingabe.style.height = Math.min(eingabe.scrollHeight, 180) + "px"; }
+  eingabe.addEventListener("input", () => { wachse(); sendeStatus(); });
+  eingabe.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+
+  function platzhalter(text, dauer) {
+    eingabe.placeholder = text;
+    if (dauer) setTimeout(() => { eingabe.placeholder = STANDARD; }, dauer);
+  }
+
+  // ---------- Text darstellen (Markdown und Formeln) ----------
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function rendern(el, text) {
+    if (!window.marked || !window.DOMPurify) { el.textContent = text; return; }
+    const mathe = [];
+    const muster = /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$/g;
+    const geschuetzt = text.replace(muster, (m) => { mathe.push(m); return "@@M" + (mathe.length - 1) + "@@"; });
+    // Keine Bilder/Formulare aus Modelltext: sonst könnte eine präparierte Webseite Daten "nach Hause funken"
+    let html = DOMPurify.sanitize(marked.parse(geschuetzt, { breaks: true }), { FORBID_TAGS: ["img", "form", "style", "iframe"] });
+    html = html.replace(/@@M(\d+)@@/g, (_, i) => esc(mathe[i]));
+    el.innerHTML = html;
+    if (window.renderMathInElement) {
+      renderMathInElement(el, { delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "$", right: "$", display: false },
+      ]});
+    }
+  }
+
+  DOMPurify.addHook && DOMPurify.addHook("afterSanitizeAttributes", (n) => {
+    if (n.tagName === "A") { n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer"); }
+  });
+
+  // ---------- Kopieren ----------
+  function kopieren(text, knopf) {
+    const fertig = () => { knopf.textContent = "✓"; setTimeout(() => { knopf.textContent = "⧉"; }, 1500); };
+    const notloesung = () => {
+      const feld = document.createElement("textarea");
+      feld.value = text;
+      document.body.appendChild(feld);
+      feld.select();
+      document.execCommand("copy");
+      feld.remove();
+      fertig();
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(fertig).catch(notloesung);
+    } else {
+      notloesung();
+    }
+  }
+
+  // ---------- Nachrichten ----------
+  function nachricht(text, art) {
+    document.body.classList.add("klein");
+    const huelle = document.createElement("div");
+    huelle.className = "msg " + art;
+    huelle.dataset.roh = text;
+    const inhalt = document.createElement("div");
+    inhalt.className = "inhalt";
+    if (art === "user") inhalt.textContent = text; else rendern(inhalt, text);
+    const knopf = document.createElement("button");
+    knopf.className = "kopie";
+    knopf.title = "Kopieren";
+    knopf.textContent = "⧉";
+    knopf.addEventListener("click", () => kopieren(huelle.dataset.roh, knopf));
+    huelle.append(inhalt, knopf);
+    chat.appendChild(huelle);
+    fenster.scrollTop = fenster.scrollHeight;
+    return huelle;
+
+  }
+
+  function aktualisiere(huelle, text) {
+    huelle.dataset.roh = text;
+    rendern(huelle.querySelector(".inhalt"), text);
+  }
+
+  // ---------- Modus ----------
+  let modus = "schnell", modiInfo = null;
+  try { if (localStorage.getItem("hermes-modus") === "gruendlich") modus = "gruendlich"; } catch (e) {}
+  function modusHinweis() {
+    const i = modiInfo && modiInfo[modus];
+    document.getElementById("modushinweis").textContent = !i ? "" : i.da
+      ? i.name + (modus === "gruendlich" ? " · denkt länger" : "")
+      : "Modell fehlt: ollama pull " + i.name;
+  }
+  function setzeModus(m) {
+    modus = m;
+    try { localStorage.setItem("hermes-modus", m); } catch (e) {}
+    document.querySelectorAll("#modus button").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
+    modusHinweis();
+  }
+  document.querySelectorAll("#modus button").forEach((b) => b.addEventListener("click", () => setzeModus(b.dataset.m)));
+
+  function vorschlaege(huelle, fakten) {
+    fakten.forEach((f) => {
+      const d = document.createElement("div"); d.className = "vorschlag";
+      const t = document.createElement("span"); t.textContent = "Soll ich mir merken: „" + f + "“?";
+      const ja = document.createElement("button"); ja.type = "button"; ja.textContent = "Merken";
+      const nein = document.createElement("button"); nein.type = "button"; nein.textContent = "Nein";
+      ja.addEventListener("click", async () => {
+        await fetch("/erinnerungen", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: f }) });
+        d.textContent = "Gespeichert ✓"; setTimeout(() => d.remove(), 1500); ladeErinnerungen(true);
+      });
+      nein.addEventListener("click", () => d.remove());
+      d.append(t, ja, nein); huelle.appendChild(d);
+    });
+    fenster.scrollTop = fenster.scrollHeight;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = eingabe.value.trim();
+    if (!text || beschaeftigt) return;
+    eingabe.value = "";
+    wachse();
+    beschaeftigt = true;
+    sendeStatus();
+    nachricht(text, "user");
+    const huelle = nachricht("", "bot");
+    const inhalt = huelle.querySelector(".inhalt");
+    inhalt.classList.add("typing");
+    inhalt.textContent = "denkt nach ...";
+    window.hermesDenkt = true; window.hermesSucht = false;
+    const warNeu = aktuellerChat === null;
+    let roh = "", karte = null, offen = null, schritte = 0, geplant = false;
+    const zeige = () => {
+      if (geplant) return; geplant = true;
+      setTimeout(() => { geplant = false; aktualisiere(huelle, roh); fenster.scrollTop = fenster.scrollHeight; }, 120);
+    };
+    try {
+      const res = await fetch("/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, chat_id: aktuellerChat, modus }),
+      });
+      if (!res.ok) throw new Error("Serverfehler");
+      const leser = res.body.getReader(), dek = new TextDecoder();
+      let puffer = "";
+      while (true) {
+        const { value, done } = await leser.read();
+        if (done) break;
+        puffer += dek.decode(value, { stream: true });
+        let n;
+        while ((n = puffer.indexOf("\n")) >= 0) {
+          const zeile = puffer.slice(0, n); puffer = puffer.slice(n + 1);
+          if (!zeile.trim()) continue;
+          const ev = JSON.parse(zeile);
+          if (ev.typ === "start") aktuellerChat = ev.chat_id;
+          else if (ev.typ === "status" && ev.detail !== undefined) {
+            schritte++; window.hermesSucht = true;
+            if (!karte) {
+              karte = document.createElement("details"); karte.className = "recherche"; karte.open = true;
+              karte.innerHTML = "<summary></summary>"; huelle.insertBefore(karte, inhalt);
+            }
+            karte.querySelector("summary").textContent = "RECHERCHE · " + schritte + (schritte === 1 ? " SCHRITT" : " SCHRITTE");
+            offen = document.createElement("div"); offen.className = "schritt";
+            offen.innerHTML = "<b>" + (ev.text === "liest" ? "LIEST" : "SUCHT") + "</b><span></span><i class=\"puls\"></i>";
+            offen.querySelector("span").textContent = ev.detail;
+            karte.appendChild(offen);
+          } else if (ev.typ === "status") {
+            if (!offen) window.hermesSucht = false;
+          } else if (ev.typ === "ergebnis" && offen) {
+            const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen = null; window.hermesSucht = false;
+          } else if (ev.typ === "token") {
+            inhalt.classList.remove("typing"); window.hermesDenkt = false; window.hermesSucht = false;
+            roh += ev.text; zeige();
+          } else if (ev.typ === "vorschlag") vorschlaege(huelle, ev.fakten);
+          else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); }
+        }
+        fenster.scrollTop = fenster.scrollHeight;
+      }
+    } catch (fehler) {
+      if (!roh) roh = "Fehler: Läuft Ollama?";
+    }
+    inhalt.classList.remove("typing");
+    if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
+    if (karte) karte.open = false;
+    window.hermesDenkt = false; window.hermesSucht = false;
+    beschaeftigt = false;
+    sendeStatus();
+    eingabe.focus();
+    fenster.scrollTop = fenster.scrollHeight;
+    if (warNeu) ladeChats();
+  });
+
+  // ---------- Mikrofon (Sprache zu Text) ----------
+  let aufnahme = null, stuecke = [], mikroStream = null;
+
+  async function transkribieren(blob) {
+    mic.disabled = true;
+    window.hermesDenkt = true;
+    platzhalter("Schreibe mit ...");
+    try {
+      const daten = new FormData();
+      daten.append("datei", blob, "aufnahme.webm");
+      const res = await fetch("/stt", { method: "POST", body: daten });
+      if (!res.ok) throw new Error("Serverfehler (läuft faster-whisper?)");
+      const antwort = await res.json();
+      if (antwort.fehler) {
+        platzhalter("Fehler: " + antwort.fehler.slice(0, 80), 6000);
+      } else if (!antwort.text) {
+        platzhalter("Ich habe nichts verstanden. Nochmal?", 4000);
+      } else {
+        eingabe.value = (eingabe.value + " " + antwort.text).trim();
+        eingabe.dispatchEvent(new Event("input"));
+        platzhalter(STANDARD);
+      }
+    } catch (e) {
+      platzhalter("Fehler: Server nicht erreichbar.", 5000);
+    }
+    window.hermesDenkt = false;
+    mic.disabled = false;
+    eingabe.focus();
+  }
+
+  // Bevorzugt: Spracherkennung des Browsers (Chrome/Edge): Text erscheint live im Feld, du schickst selbst ab.
+  // Hinweis: Chrome/Edge schicken dafür Audio an Google. Fallback (z.B. Firefox): Whisper lokal über /stt.
+  // Opera/Opera GX: Browser-Spracherkennung geht dort nicht zuverlässig -> direkt Whisper nehmen
+  const SR = /OPR\/|Opera/.test(navigator.userAgent) ? null : (window.SpeechRecognition || window.webkitSpeechRecognition);
+  let sr = null;
+  mic.addEventListener("click", async () => {
+    if (sr) { sr.stop(); return; }
+    if (aufnahme && aufnahme.state === "recording") { aufnahme.stop(); return; }
+    if (SR) {
+      const basis = eingabe.value ? eingabe.value.trimEnd() + " " : "";
+      let fertig = "";
+      sr = new SR(); sr.lang = "de-DE"; sr.interimResults = true; sr.continuous = true;
+      sr.onresult = (ev) => {
+        let live = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          if (ev.results[i].isFinal) fertig += ev.results[i][0].transcript; else live += ev.results[i][0].transcript;
+        }
+        eingabe.value = basis + fertig + live;
+        eingabe.dispatchEvent(new Event("input"));
+      };
+      sr.onerror = (ev) => {
+        if (ev.error === "not-allowed") platzhalter("Mikrofon nicht erlaubt. Erlaube es in der Adressleiste.", 6000);
+        else if (ev.error === "network") platzhalter("Spracherkennung braucht Internet.", 6000);
+        else if (ev.error !== "no-speech" && ev.error !== "aborted") platzhalter("Mikro-Fehler: " + ev.error, 6000);
+      };
+      sr.onend = () => { sr = null; mic.classList.remove("aufnahme"); platzhalter(STANDARD); eingabe.focus(); };
+      try { sr.start(); mic.classList.add("aufnahme"); platzhalter("Ich höre zu ... (nochmal klicken zum Beenden)"); }
+      catch (e) { sr = null; }
+      return;
+    }
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      platzhalter("Mikrofon geht nur über localhost oder HTTPS.", 6000);
+      return;
+    }
+    try {
+      mikroStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      platzhalter("Mikrofon nicht erlaubt. Erlaube es in der Adressleiste.", 6000);
+      return;
+    }
+    stuecke = [];
+    aufnahme = new MediaRecorder(mikroStream);
+    aufnahme.ondataavailable = (ev) => { if (ev.data.size) stuecke.push(ev.data); };
+    aufnahme.onstop = async () => {
+      mikroStream.getTracks().forEach((t) => t.stop());
+      mic.classList.remove("aufnahme");
+      const blob = new Blob(stuecke, { type: aufnahme.mimeType || "audio/webm" });
+      if (blob.size < 2000) { platzhalter("Zu kurz. Nochmal?", 3000); return; }
+      await transkribieren(blob);
+    };
+    aufnahme.start();
+    mic.classList.add("aufnahme");
+    platzhalter("Ich höre zu ... (nochmal aufs Mikro klicken zum Beenden)");
+  });
+
+  // ---------- Seitenleiste ----------
+  function oeffneSeite() { seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
+  function schliesseSeite() { seite.classList.remove("offen"); schleier.classList.remove("offen"); }
+  document.getElementById("auge").addEventListener("click", () => {
+    if (seite.classList.contains("offen")) schliesseSeite(); else oeffneSeite();
+  });
+  schleier.addEventListener("click", schliesseSeite);
+  document.getElementById("zu").addEventListener("click", schliesseSeite);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") schliesseSeite(); });
+
+  document.querySelectorAll(".seg").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll(".seg").forEach((x) => x.classList.toggle("aktiv", x === t));
+    document.querySelectorAll(".bereich").forEach((b) => { b.hidden = b.id !== "tab-" + t.dataset.tab; });
+    if (t.dataset.tab === "erinnerungen") ladeErinnerungen(true);
+  }));
+
+  async function ladeStatus() {
+    try {
+      const s = await (await fetch("/status")).json();
+      modiInfo = s.modi; modusHinweis();
+      statuspunkt.className = s.ollama ? "an" : "aus";
+      statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
+    } catch (e) {
+      statuspunkt.className = "aus";
+      statustext.textContent = "SERVER NICHT ERREICHBAR";
+    }
+  }
+
+  // ---------- Chats ----------
+  function neuerChat() {
+    aktuellerChat = null;
+    chat.querySelectorAll(".msg").forEach((m) => m.remove());
+    document.body.classList.remove("klein");
+    schliesseSeite();
+    ladeChats();
+  }
+  document.getElementById("neuerChat").addEventListener("click", neuerChat);
+
+  async function oeffneChat(id) {
+    const res = await fetch("/chats/" + id);
+    const daten = await res.json();
+    chat.querySelectorAll(".msg").forEach((m) => m.remove());
+    aktuellerChat = id;
+    document.body.classList.add("klein");
+    for (const n of daten) nachricht(n.text, n.rolle === "user" ? "user" : "bot");
+    schliesseSeite();
+    zeichneChats();
+    fenster.scrollTop = fenster.scrollHeight;
+  }
+
+  function zeichneChats() {
+    const filter = suche.value.trim().toLowerCase();
+    const treffer = chatsAlle.filter((c) => c.titel.toLowerCase().includes(filter));
+    chatListe.innerHTML = "";
+    if (!treffer.length) {
+      const leer = document.createElement("li");
+      leer.className = "leer";
+      leer.textContent = chatsAlle.length ? "Nichts gefunden." : "Noch keine Chats.";
+      chatListe.appendChild(leer);
+      return;
+    }
+    treffer.forEach((c, index) => {
+      const zeile = document.createElement("li");
+      zeile.style.setProperty("--i", index);
+      const titel = document.createElement("button");
+      titel.className = "titel" + (c.id === aktuellerChat ? " aktiv" : "");
+      titel.textContent = c.titel;
+      titel.addEventListener("click", () => oeffneChat(c.id));
+      const weg = document.createElement("button");
+      weg.className = "leise";
+      weg.textContent = "✕";
+      weg.addEventListener("click", async () => {
+        if (!confirm("Diesen Chat löschen?")) return;
+        await fetch("/chats/" + c.id, { method: "DELETE" });
+        if (c.id === aktuellerChat) neuerChat(); else ladeChats();
+      });
+      zeile.append(titel, weg);
+      chatListe.appendChild(zeile);
+    });
+  }
+  suche.addEventListener("input", zeichneChats);
+
+  async function ladeChats() {
+    try { chatsAlle = await (await fetch("/chats")).json(); } catch (e) { return; }
+    zeichneChats();
+  }
+
+  // ---------- Erinnerungen ----------
+  async function schicke(methode, pfad, text) {
+    await fetch(pfad, {
+      method: methode,
+      headers: { "Content-Type": "application/json" },
+      body: text === undefined ? undefined : JSON.stringify({ text }),
+    });
+    ladeErinnerungen(true);
+  }
+
+  async function ladeErinnerungen(erzwingen) {
+    if (!erzwingen && document.activeElement && document.activeElement.closest("#liste")) return;
+    let daten = [];
+    try { daten = await (await fetch("/erinnerungen")).json(); } catch (e) { return; }
+    zaehler.textContent = daten.length;
+    liste.innerHTML = "";
+    if (!daten.length) {
+      const leer = document.createElement("li");
+      leer.className = "leer";
+      leer.textContent = "Noch nichts gespeichert.";
+      liste.appendChild(leer);
+      return;
+    }
+    daten.forEach((eintrag, index) => {
+      const li = document.createElement("li");
+      li.style.setProperty("--i", index);
+      const feld = document.createElement("input");
+      feld.value = eintrag.text;
+      feld.addEventListener("change", () => schicke("PUT", "/erinnerungen/" + eintrag.id, feld.value));
+      const weg = document.createElement("button");
+      weg.className = "leise";
+      weg.textContent = "✕";
+      weg.addEventListener("click", () => schicke("DELETE", "/erinnerungen/" + eintrag.id));
+      li.append(feld, weg);
+      liste.appendChild(li);
+    });
+  }
+
+  document.getElementById("neu").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const feld = document.getElementById("neuText");
+    if (feld.value.trim()) schicke("POST", "/erinnerungen", feld.value);
+    feld.value = "";
+  });
+
+  // ---------- Design ----------
+  function setzeDesign(name) {
+    const gewaehlt = (name === "hell" || name === "grau") ? name : "dunkel";
+    document.documentElement.dataset.theme = gewaehlt;
+    try { localStorage.setItem("hermes-design", gewaehlt); } catch (e) {}
+    document.querySelectorAll(".kachel").forEach((k) => k.classList.toggle("aktiv", k.dataset.design === gewaehlt));
+    if (window.augeFarbe) window.augeFarbe();
+  }
+  document.querySelectorAll(".kachel").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
+
+  // ---------- Halftone-Auge ----------
+  (function () {
+    const canvas = document.getElementById("auge");
+    const c = canvas.getContext("2d");
+    const W = 380, H = 210, R = 6;
+    canvas.width = W; canvas.height = H;
+    const quelle = document.createElement("canvas");
+    quelle.width = W; quelle.height = H;
+    const q = quelle.getContext("2d", { willReadFrequently: true });
+
+    let farbe = "#d4d4d4";
+    window.augeFarbe = () => {
+      farbe = getComputedStyle(document.documentElement).getPropertyValue("--punkt").trim() || farbe;
+    };
+
+    const ziel = { x: 0, y: 0 }, pos = { x: 0, y: 0 };
+    let blinzelStart = 0, naechstes = performance.now() + 2500;
+
+    // Kein Maus-Folgen mehr: Das Auge schaut geradeaus. Nur beim Suchen schaut es umher.
+    let kneif = 1, naechsterUmblick = 0;
+    const UMHER = [[-1, -.3], [1, -.2], [.7, .6], [-.7, .5], [0, -.7], [1, .1], [-1, .2]];
+
+    function zeichne(t) {
+      if (t > naechstes) { blinzelStart = t; naechstes = t + 3000 + Math.random() * 3000; }
+      const b = t - blinzelStart;
+      const lid = b < 220 ? 1 - 0.92 * Math.sin((b / 220) * Math.PI) : 1;
+      let kz = 1;
+      if (window.hermesSucht) {
+        kz = 0.66;
+        if (t > naechsterUmblick) {
+          const z = UMHER[Math.floor(Math.random() * UMHER.length)];
+          ziel.x = z[0] * 44; ziel.y = z[1] * 18; naechsterUmblick = t + 700 + Math.random() * 700;
+        }
+      } else if (window.hermesDenkt) { kz = 0.5; ziel.x = 0; ziel.y = -4; }
+      else { ziel.x = 0; ziel.y = 0; }
+      kneif += (kz - kneif) * 0.08;
+      pos.x += (ziel.x - pos.x) * 0.12;
+      pos.y += (ziel.y - pos.y) * 0.12;
+
+      const cx = W / 2, cy = H / 2;
+      q.filter = "none";
+      q.fillStyle = "#000"; q.fillRect(0, 0, W, H);
+      q.filter = "blur(4px)";
+      q.save();
+      q.beginPath();
+      q.ellipse(cx, cy, 150, Math.max(3, 64 * lid * kneif), 0, 0, Math.PI * 2);
+      const g = q.createRadialGradient(cx, cy, 10, cx, cy, 150);
+      g.addColorStop(0, "#c8c8c8"); g.addColorStop(1, "#555");
+      q.fillStyle = g; q.fill(); q.clip();
+      const ix = cx + pos.x, iy = cy + pos.y;
+      const pupille = 13 + (window.hermesDenkt ? Math.sin(t / 400) * 2 : 0);
+      const ig = q.createRadialGradient(ix, iy, pupille * 0.5, ix, iy, 40);
+      ig.addColorStop(0, "#000"); ig.addColorStop(0.45, "#2c2c2c"); ig.addColorStop(1, "#6a6a6a");
+      q.fillStyle = ig; q.beginPath(); q.arc(ix, iy, 40, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#000"; q.beginPath(); q.arc(ix, iy, pupille, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#fff"; q.beginPath(); q.arc(ix - 12, iy - 12, 5, 0, Math.PI * 2); q.fill();
+      q.restore();
+      q.filter = "none";
+
+      const daten = q.getImageData(0, 0, W, H).data;
+      c.clearRect(0, 0, W, H);
+      c.fillStyle = farbe;
+      let reihe = 0;
+      for (let y = R / 2; y < H; y += R * 0.87, reihe++) {
+        const versatz = reihe % 2 ? R / 2 : 0;
+        for (let x = R / 2 + versatz; x < W; x += R) {
+          const i = (Math.floor(y) * W + Math.floor(x)) * 4;
+          const hell = daten[i] / 255;
+          if (hell < 0.05) continue;
+          c.beginPath();
+          c.arc(x, y, (R / 2) * Math.pow(hell, 0.8), 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+      requestAnimationFrame(zeichne);
+    }
+    requestAnimationFrame(zeichne);
+  })();
+
+  // ---------- Start ----------
+  let gespeichert = "dunkel";
+  try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
+  setzeDesign(gespeichert);
+  setzeModus(modus);
+  sendeStatus();
+  ladeChats();
+  ladeErinnerungen(true);
+  ladeStatus();
+</script>
+</body>
+</html>
