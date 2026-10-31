@@ -390,11 +390,12 @@
         <h3 class="abschnitt">STIMME</h3>
         <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Online-Stimmen klingen natürlich, brauchen aber Internet (der Text geht dafür an Microsoft). „Lokal“ läuft komplett auf dem Laptop.</p>
         <div class="stimmen">
-          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>Butler, leichter Akzent</small></button>
+          <button type="button" class="stimme" data-stimme="george" id="stimmeGeorge" hidden>GEORGE<small>ElevenLabs, sehr natürlich</small></button>
           <button type="button" class="stimme" data-stimme="florian">FLORIAN<small>ruhig, natürlich</small></button>
           <button type="button" class="stimme" data-stimme="conrad">CONRAD<small>tief, ernst</small></button>
           <button type="button" class="stimme" data-stimme="killian">KILLIAN<small>tief, gelassen</small></button>
           <button type="button" class="stimme" data-stimme="jonas">JONAS<small>österreichisch</small></button>
+          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>leichter Akzent</small></button>
           <button type="button" class="stimme" data-stimme="lokal">LOKAL<small>offline, Piper</small></button>
         </div>
       </section>
@@ -912,15 +913,13 @@
     } catch (e) { return ""; }
   }
 
-  // In Sätze teilen: der erste Satz wird schon vorgelesen, während die nächsten noch erzeugt werden
+  // Der erste Satz wird einzeln erzeugt (damit es schnell losgeht), der Rest am Stück: so bleibt die
+  // Satzmelodie über die Sätze hinweg natürlich, statt dass jeder Satz einzeln neu ansetzt.
   function saetze(text) {
-    const teile = text.split("\n---\n**Quellen**")[0].split(/(?<=[.!?:])\s+|\n+/), stuecke = [];
-    let akt = "";
-    for (const s of teile) {
-      if ((akt + " " + s).length > 220 && akt) { stuecke.push(akt); akt = s; } else akt = (akt + " " + s).trim();
-    }
-    if (akt) stuecke.push(akt);
-    return stuecke;
+    const t = text.split("\n---\n**Quellen**")[0].replace(/\s*\n+\s*/g, " ").trim();
+    const m = t.match(/^.{20,}?[.!?](?=\s)/);
+    if (!m || t.length < 160) return t ? [t] : [];
+    return [m[0], t.slice(m[0].length).trim()].filter(Boolean);
   }
   async function holeAudio(text) {
     try {
@@ -947,14 +946,14 @@
   }
 
   // Stimmenauswahl (Einstellungen)
-  let stimmeWahl = "william";
-  try { stimmeWahl = localStorage.getItem("hermes-stimme") || "william"; } catch (e) {}
+  let stimmeWahl = "florian";
+  try { stimmeWahl = localStorage.getItem("hermes-stimme2") || "florian"; } catch (e) {}
   function stimmeAnzeigen() {
     document.querySelectorAll("[data-stimme]").forEach((b) => b.classList.toggle("aktiv", b.dataset.stimme === stimmeWahl));
   }
   document.querySelectorAll("[data-stimme]").forEach((b) => b.addEventListener("click", async () => {
     stimmeWahl = b.dataset.stimme;
-    try { localStorage.setItem("hermes-stimme", stimmeWahl); } catch (e) {}
+    try { localStorage.setItem("hermes-stimme2", stimmeWahl); } catch (e) {}
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
@@ -982,7 +981,7 @@
       liveBeenden(); return;
     }
     let frage = ersteFrage, leer = 0;
-    if (!frage) await sagen("Ja, Sir?", lauf);
+    if (!frage) await sagen("Ja?", lauf);
     while (liveAn && lauf === lauschLauf) {
       if (!frage) {
         platzhalter("Live · Ich höre zu ... (Knopf beendet)");
@@ -1099,6 +1098,7 @@
       modiInfo = s.modi; modusHinweis();
       statuspunkt.className = s.ollama ? "an" : "aus";
       statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
+      document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
       statuspunkt.className = "aus";
       statustext.textContent = "SERVER NICHT ERREICHBAR";

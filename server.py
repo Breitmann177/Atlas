@@ -116,9 +116,8 @@ class SicherheitsHeader:
 
 app.add_middleware(SicherheitsHeader)
 
-BASIS_PROMPT = """Du bist Hermes, der persönliche KI-Butler deines Nutzers, ganz wie J.A.R.V.I.S. bei Tony Stark:
-loyal, hochkompetent, ehrlich und immer einen Schritt voraus. Du läufst lokal auf dem Laptop des Nutzers in der
-"Hermes Box".
+BASIS_PROMPT = """Du bist Hermes, ein persönlicher KI-Assistent: kompetent, ehrlich und aufmerksam. Du läufst lokal
+auf dem Laptop des Nutzers in der "Hermes Box".
 
 Über dich und das Projekt (mehr weißt du nicht, erfinde keine Details dazu):
 - Die Hermes Box ist ein geplantes Gerät mit Raspberry Pi, Display, LED-Ring und Wake-Word "Hermes".
@@ -126,16 +125,17 @@ loyal, hochkompetent, ehrlich und immer einen Schritt voraus. Du läufst lokal a
   auch ein Smart Mirror ist geplant. Frag nach, wenn dir zu einer Projektfrage Infos fehlen.
 
 Deine Art:
-- Du bist der Butler, der Nutzer ist dein Herr. Du sprichst Deutsch, siezt ihn und nennst ihn ab und zu "Sir",
-  so wie J.A.R.V.I.S.: höchstens EINMAL pro Antwort, oft auch gar nicht. Nie unterwürfig, nie übertrieben.
-- Grüße ("Guten Abend") nur, wenn der Nutzer dich grüßt. Sonst beginnt die Antwort direkt mit dem Inhalt.
-- Ton: ruhig, gewählt und souverän, mit trockenem, feinem britischen Humor, den du sparsam einsetzt
-  (eine kleine ironische Bemerkung, nie albern). Bei ernsten Themen kein Humor.
+- Du sprichst Deutsch und duzt den Nutzer. Dein Ton ist der eines erstklassigen Butlers: höflich, ruhig,
+  aufmerksam und professionell, aber ganz natürlich, so wie ein Mensch normal redet. Keine Anrede wie "Sir",
+  kein gestelztes Theater, und du sprichst nie über deine Rolle ("als dein Butler", "dein Assistent steht
+  bereit" o.Ä.).
+- Grüße nur, wenn der Nutzer dich grüßt. Sonst beginnt die Antwort direkt mit dem Inhalt.
+- Trockener Humor ist erlaubt, aber selten und nie auf Kosten der Antwort. Bei ernsten Themen kein Humor.
 - Kompetenz zuerst: Die eigentliche Antwort kommt sofort, ohne Vorgeplänkel. Bei Fragen mit Substanz
   antwortest du gründlich und mit einem konkreten Beispiel, bei Smalltalk oder einfachen Fragen kurz.
 - Begrüßungen und Smalltalk: kurz, natürlich und passend zur Tageszeit. Geh auf genau das ein, was gesagt
-  wurde: Fragt der Nutzer, wie es dir geht, antworte darauf. Formuliere jedes Mal neu. Verboten: "Wie kann ich Ihnen heute helfen?", "Ich stehe gerne
-  zur Verfügung" und ähnliche Callcenter-Sätze.
+  wurde: Fragt der Nutzer, wie es dir geht, antworte darauf. Formuliere jedes Mal neu. Verboten: "Wie kann ich
+  dir heute helfen?", "Ich stehe gerne zur Verfügung" und ähnliche Callcenter-Sätze.
 - Mitdenken: Wenn du ein konkretes Problem, ein Risiko oder einen naheliegenden nächsten Schritt siehst,
   erwähne es knapp am Ende. Sonst hörst du einfach auf: keine Standard-Schlusssätze wie "Falls du Fragen hast,
   helfe ich gerne", "Bereite dich gut vor" oder "Viel Erfolg".
@@ -296,7 +296,24 @@ STIMMEN = {
     "jonas": ("de-AT-JonasNeural", "+0%", "+0Hz"),
     "lokal": None,
 }
-STANDARD_STIMME = "william"
+STANDARD_STIMME = "florian"
+# Optional, deutlich natürlicher: ElevenLabs (kostenpflichtig, Gratis-Kontingent ~10.000 Zeichen/Monat).
+# Schlüssel in .env: ELEVENLABS_API_KEY=... Dann erscheint "George" in den Einstellungen.
+# George = ruhiger britischer Erzähler, spricht mit dem Multilingual-Modell auch Deutsch.
+ELEVENLABS_KEY = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+ELEVENLABS_STIMME = os.environ.get("ELEVENLABS_STIMME", "JBFqnCBsd6RMkjVDRZzb")
+
+
+def _elevenlabs_sprechen(text: str) -> bytes:
+    r = requests.post(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_STIMME}",
+        headers={"xi-api-key": ELEVENLABS_KEY, "Accept": "audio/mpeg"},
+        json={"text": text, "model_id": "eleven_multilingual_v2",
+              "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.content
 STIMME = os.environ.get("HERMES_STIMME", "stimmen/de_DE-thorsten-high.onnx")
 _stimme = None
 _stimme_sperre = threading.Lock()
@@ -355,6 +372,11 @@ async def tts(v: Vorlesen):
     if not text:
         raise HTTPException(400, "Kein Text zum Vorlesen")
 
+    if v.stimme == "george" and ELEVENLABS_KEY and STIMME_ONLINE.lower() != "aus":
+        try:
+            return Response(await run_in_threadpool(_elevenlabs_sprechen, text), media_type="audio/mpeg")
+        except Exception as e:
+            print("ElevenLabs nicht erreichbar, nehme Florian:", repr(e), flush=True)
     online = STIMMEN.get(v.stimme, STIMMEN[STANDARD_STIMME])
     if online and STIMME_ONLINE.lower() != "aus":
         try:
@@ -449,7 +471,7 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi}
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY)}
 
 
 # ---------- Chat: erst prüfen ob gesucht werden muss, dann antworten ----------
@@ -535,12 +557,12 @@ SMALLTALK = re.compile(
 
 
 # Kleine Modelle überlesen Regeln im langen Systemprompt; ein kurzer Hinweis direkt an der Nachricht wirkt
-STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Butler-Ton wie J.A.R.V.I.S. (siezen, ruhig, gewählt). "
-                 "Fang direkt mit dem Inhalt an, ohne Begrüßung. Das Wort 'Sir' höchstens einmal. Keine Emojis.]")
-SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte als Butler wie J.A.R.V.I.S. in 1-2 kurzen "
-                     "Sätzen: siezen, ruhig, gern mit einem Hauch trockenem Humor. Grüße nur, wenn gegrüßt wurde. "
-                     "Das Wort 'Sir' höchstens einmal. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort "
-                     "NICHT mit einer Frage wie 'Wie kann ich Ihnen helfen?'.]")
+STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Duzen, höflich und natürlich, wie ein Mensch redet. "
+                 "Fang direkt mit dem Inhalt an, ohne Begrüßung. Kein 'Sir', nichts über deine Rolle. Keine Emojis.]")
+SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, duzen, "
+                     "höflich und locker wie ein Mensch. Grüße nur, wenn gegrüßt wurde. Kein 'Sir', nichts über "
+                     "deine Rolle. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer Frage "
+                     "wie 'Wie kann ich dir helfen?'.]")
 
 
 def ist_smalltalk(text: str) -> bool:
@@ -619,6 +641,58 @@ class OllamaFehler(Exception):
 
 # Emojis (laut Prompt verboten, das kleine Modell hält sich nicht immer dran) samt Hautton/Varianten-Zeichen
 EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U0000FE0F\U0000200D]")
+
+
+# Callcenter-Floskeln, die das kleine Modell trotz Verbot gern anhängt. Sätze, die so anfangen könnten,
+# werden kurz zurückgehalten und nur ausgegeben, wenn sie sich als echter Inhalt herausstellen.
+FLOSKEL = re.compile(
+    r"(wie|was) kann ich (dir|ihnen|euch) (heute |jetzt |sonst |noch )*(helfen|tun|behilflich)|"
+    r"(kann|darf) ich (dir |ihnen )?(sonst |noch |heute |irgendwie |etwas |was )*(für (dich|sie) )?"
+    r"(helfen|behilflich|tun)|"
+    r"(stehe|bin) ich (dir |ihnen )?(gerne |jederzeit )*(zur verfügung|für dich da|da)|"
+    r"(ich stehe|ich bin) (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da)|"
+    r"(falls|wenn) (du|sie) (noch |weitere |andere |sonst )*(fragen|hilfe)|"
+    r"lass (mich|es mich) wissen|sag (einfach |gern |gerne )*bescheid|ich helfe (dir |ihnen )?gerne", re.I)
+FLOSKEL_ANFAENGE = ("wie kann", "was kann", "kann ich", "darf ich", "falls du", "falls sie", "wenn du noch",
+                    "wenn du weitere", "wenn du fragen", "wenn sie", "ich stehe", "ich bin für", "ich bin gerne",
+                    "ich bin jederzeit", "lass mich", "sag einfach", "sag gern", "sag bescheid", "ich helfe", "und falls",
+                    "und wenn du")
+SATZENDE = re.compile(r"[.!?…](?=\s|$)|\n")
+
+
+class FloskelFilter:
+    """Bekommt den Antworttext Stück für Stück und gibt zurück, was angezeigt werden darf.
+    Ganze Floskel-Sätze fallen weg, alles andere kommt (fast) ohne Verzögerung durch."""
+
+    def __init__(self):
+        self.satz, self.halten = "", None  # halten: None = noch unklar, True = zurückhalten, False = durchreichen
+
+    def rein(self, teil: str) -> str:
+        raus = ""
+        while teil:
+            m = SATZENDE.search(teil)
+            stueck, teil = (teil[:m.end()], teil[m.end():]) if m else (teil, "")
+            self.satz += stueck
+            anfang = self.satz.lstrip().lower()
+            if self.halten is None and anfang:
+                if any(anfang.startswith(a) for a in FLOSKEL_ANFAENGE):
+                    self.halten = True
+                elif not any(a.startswith(anfang) for a in FLOSKEL_ANFAENGE):
+                    self.halten = False  # kann keine Floskel mehr werden
+                # sonst noch zu kurz zum Entscheiden ("Wie ..."): weiter sammeln
+            if self.halten is False:
+                raus += self.satz
+                self.satz = ""
+            if m:  # Satzende: Entscheidung für einen zurückgehaltenen Satz
+                if self.satz and not FLOSKEL.search(self.satz):
+                    raus += self.satz
+                self.satz, self.halten = "", None
+        return raus
+
+    def ende(self) -> str:
+        rest = self.satz if self.satz and not FLOSKEL.search(self.satz) else ""
+        self.satz, self.halten = "", None
+        return rest
 
 
 def modell_stream(messages, modus):
@@ -771,14 +845,23 @@ def chat_stream(frage: Frage):
         if dokumente and not frage.live:
             modus = {**modus, "think": True}
         letztes_denken = 0.0
+        # Beim PDF-Wunsch nicht filtern: dort ist der Text ein Dokument, keine Gesprächsantwort
+        filter_ = None if pdf_modus else FloskelFilter()
         for art, t in modell_stream(messages, modus):
             if art == "denkt":
                 if time.time() - letztes_denken > 2:  # nur ab und zu melden, damit die UI "lebt"
                     letztes_denken = time.time()
                     yield ev(typ="status", text="denkt nach")
                 continue
-            antwort += t
-            yield ev(typ="token", text=t)
+            t = filter_.rein(t) if filter_ else t
+            if t:
+                antwort += t
+                yield ev(typ="token", text=t)
+        rest = filter_.ende() if filter_ else ""
+        if rest:
+            antwort += rest
+            yield ev(typ="token", text=rest)
+        antwort = antwort.rstrip()
         pdf_text = antwort  # Text fürs PDF, bevor Quellen und Link dazukommen
         if quellen:
             liste = "\n\n---\n**Quellen**\n" + "\n".join(
