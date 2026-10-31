@@ -284,17 +284,17 @@ def whisper():
 # Text geht dafür an Microsoft).
 # Ohne Internet oder mit HERMES_STIMME_ONLINE=aus in .env: Piper, komplett lokal.
 STIMME_ONLINE = os.environ.get("HERMES_STIMME_ONLINE", "an")
-# Auswahl in den Einstellungen. Alle etwas langsamer und tiefer als normal: ruhiger Butler-Ton.
+# Auswahl in den Einstellungen. Normales Tempo, etwas tiefer als normal: ruhiger Butler-Ton.
 # "lokal" = Piper, ohne Internet.
 STIMMEN = {
-    "florian": ("de-DE-FlorianMultilingualNeural", "-10%", "-10Hz"),
-    "conrad": ("de-DE-ConradNeural", "-12%", "-10Hz"),
-    "killian": ("de-DE-KillianNeural", "-12%", "-12Hz"),
-    "jonas": ("de-AT-JonasNeural", "-10%", "-8Hz"),
-    "william": ("en-AU-WilliamMultilingualNeural", "-8%", "-6Hz"),
+    "william": ("en-AU-WilliamMultilingualNeural", "+0%", "-6Hz"),
+    "florian": ("de-DE-FlorianMultilingualNeural", "+0%", "-10Hz"),
+    "conrad": ("de-DE-ConradNeural", "+0%", "-10Hz"),
+    "killian": ("de-DE-KillianNeural", "+0%", "-12Hz"),
+    "jonas": ("de-AT-JonasNeural", "+0%", "-8Hz"),
     "lokal": None,
 }
-STANDARD_STIMME = "florian"
+STANDARD_STIMME = "william"
 STIMME = os.environ.get("HERMES_STIMME", "stimmen/de_DE-thorsten-high.onnx")
 _stimme = None
 _stimme_sperre = threading.Lock()

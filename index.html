@@ -390,11 +390,11 @@
         <h3 class="abschnitt">STIMME</h3>
         <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Online-Stimmen klingen natürlich, brauchen aber Internet (der Text geht dafür an Microsoft). „Lokal“ läuft komplett auf dem Laptop.</p>
         <div class="stimmen">
+          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>Butler, leichter Akzent</small></button>
           <button type="button" class="stimme" data-stimme="florian">FLORIAN<small>ruhig, natürlich</small></button>
           <button type="button" class="stimme" data-stimme="conrad">CONRAD<small>tief, ernst</small></button>
           <button type="button" class="stimme" data-stimme="killian">KILLIAN<small>tief, gelassen</small></button>
           <button type="button" class="stimme" data-stimme="jonas">JONAS<small>österreichisch</small></button>
-          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>leichter Akzent</small></button>
           <button type="button" class="stimme" data-stimme="lokal">LOKAL<small>offline, Piper</small></button>
         </div>
       </section>
@@ -947,8 +947,8 @@
   }
 
   // Stimmenauswahl (Einstellungen)
-  let stimmeWahl = "florian";
-  try { stimmeWahl = localStorage.getItem("hermes-stimme") || "florian"; } catch (e) {}
+  let stimmeWahl = "william";
+  try { stimmeWahl = localStorage.getItem("hermes-stimme") || "william"; } catch (e) {}
   function stimmeAnzeigen() {
     document.querySelectorAll("[data-stimme]").forEach((b) => b.classList.toggle("aktiv", b.dataset.stimme === stimmeWahl));
   }
