@@ -973,6 +973,29 @@
     });
   }
 
+  // Eigener Butler-Gong (kein fremdes Audio): drei weiche Glockentöne G-C-E, live im Browser erzeugt.
+  // Glocken-Klang = Grundton plus leicht verstimmte Obertöne, die schneller ausklingen.
+  function gong() {
+    return new Promise((fertig) => {
+      try {
+        const ctx = new AudioContext(), t0 = ctx.currentTime + 0.03;
+        const master = ctx.createGain(); master.gain.value = 0.16; master.connect(ctx.destination);
+        [[783.99, 0], [1046.5, 0.13], [1318.5, 0.26]].forEach(([ton, start]) => {
+          [[1, 1], [2.01, 0.3], [3.98, 0.1]].forEach(([faktor, staerke]) => {
+            const o = ctx.createOscillator(), g = ctx.createGain(), t = t0 + start;
+            o.type = "sine"; o.frequency.value = ton * faktor;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(staerke, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5 / faktor);
+            o.connect(g).connect(master); o.start(t); o.stop(t + 1.6);
+          });
+        });
+        setTimeout(fertig, 650);  // "Ja?" darf schon kommen, während der letzte Ton ausklingt
+        setTimeout(() => ctx.close(), 2200);
+      } catch (e) { fertig(); }
+    });
+  }
+
   async function liveStarten(ersteFrage) {
     if (liveAn) return;
     liveAn = true; liveAnzeige(true);
@@ -982,7 +1005,8 @@
       liveBeenden(); return;
     }
     let frage = ersteFrage, leer = 0;
-    if (!frage) await sagen("Ja?", lauf);
+    const klang = gong();
+    if (!frage) { await klang; await sagen("Ja?", lauf); }
     while (liveAn && lauf === lauschLauf) {
       if (!frage) {
         platzhalter("Live · Ich höre zu ... (Knopf beendet)");

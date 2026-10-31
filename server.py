@@ -284,14 +284,14 @@ def whisper():
 # Text geht dafür an Microsoft).
 # Ohne Internet oder mit HERMES_STIMME_ONLINE=aus in .env: Piper, komplett lokal.
 STIMME_ONLINE = os.environ.get("HERMES_STIMME_ONLINE", "an")
-# Auswahl in den Einstellungen. Normales Tempo, etwas tiefer als normal: ruhiger Butler-Ton.
+# Auswahl in den Einstellungen. Normales Tempo und natürliche Stimmlage.
 # "lokal" = Piper, ohne Internet.
 STIMMEN = {
-    "william": ("en-AU-WilliamMultilingualNeural", "+0%", "-6Hz"),
-    "florian": ("de-DE-FlorianMultilingualNeural", "+0%", "-10Hz"),
-    "conrad": ("de-DE-ConradNeural", "+0%", "-10Hz"),
-    "killian": ("de-DE-KillianNeural", "+0%", "-12Hz"),
-    "jonas": ("de-AT-JonasNeural", "+0%", "-8Hz"),
+    "william": ("en-AU-WilliamMultilingualNeural", "+0%", "+0Hz"),
+    "florian": ("de-DE-FlorianMultilingualNeural", "+0%", "+0Hz"),
+    "conrad": ("de-DE-ConradNeural", "+0%", "+0Hz"),
+    "killian": ("de-DE-KillianNeural", "+0%", "+0Hz"),
+    "jonas": ("de-AT-JonasNeural", "+0%", "+0Hz"),
     "lokal": None,
 }
 STANDARD_STIMME = "william"
