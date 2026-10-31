@@ -8,3 +8,4 @@ python-multipart
 fpdf2
 pypdf
 piper-tts
+edge-tts

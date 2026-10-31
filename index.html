@@ -108,6 +108,15 @@
   .mic { background:none; color:var(--dim); }
   .mic:hover:not(:disabled) { color:var(--fg); border-color:var(--rand); }
   .mic.aufnahme { color:var(--rot); border-color:var(--rot); animation:puls 1.2s infinite; }
+  /* Live-Gespräch an: rot gefüllt, die Wellen bewegen sich */
+  #live.an { background:var(--rot); color:#fff; border-color:var(--rot); animation:puls 1.6s infinite; }
+  #live.an path { transform-box:fill-box; transform-origin:center; animation:welle .9s ease-in-out infinite; }
+  #live.an path:nth-child(2), #live.an path:nth-child(4) { animation-delay:.2s; }
+  #live.an path:nth-child(3) { animation-delay:.4s; }
+  @keyframes welle { 50% { transform:scaleY(.35); } }
+  #livestatus { margin-left:10px; color:var(--rot); letter-spacing:.14em; }
+  #livestatus i { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--rot);
+                  margin-right:6px; animation:blink 1s infinite; }
   .mic:disabled { opacity:.4; cursor:default; }
   @keyframes puls { 0% { box-shadow:0 0 0 0 rgba(255,90,90,.5); } 100% { box-shadow:0 0 0 12px rgba(255,90,90,0); } }
   .anhang { background:none; color:var(--dim); }
@@ -205,8 +214,19 @@
   .kachel[data-design="grau"] { background-color:#2a2b2e; color:#ececed; }
   .kachel.aktiv { border:2px solid var(--fg); }
   /* Wake-Word: die aktive Kachel ist voll gefüllt, damit man An/Aus sofort sieht */
-  .kachel[data-wake] { height:48px; background-image:none; justify-content:center; align-items:center; color:var(--dim); }
-  .kachel[data-wake].aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); font-weight:700; }
+  /* An/Aus-Schalter (Wake-Word): man sieht am Knopf-Ort UND an der Farbe, ob er an ist */
+  .schalter-zeile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px;
+                    border:1px solid var(--rand); border-radius:14px; }
+  .schalter-zeile b { font-family:var(--mono); font-size:11px; letter-spacing:.12em; font-weight:400; color:var(--dim); }
+  .schalter-zeile.an b { color:var(--fg); }
+  .schalter { position:relative; flex-shrink:0; width:58px; height:30px; border-radius:999px; cursor:pointer; padding:0;
+              border:1px solid var(--rand); background:var(--feld); transition:background .2s, border-color .2s; }
+  .schalter::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
+                     background:var(--dim); transition:transform .2s, background .2s; }
+  .schalter[aria-checked="true"] { background:#34c759; border-color:#34c759; }
+  .schalter[aria-checked="true"]::after { transform:translateX(28px); background:#fff; }
+  .schalter-zeile.an { border-color:#34c759; }
+  .schalter-zeile.an b { color:#34c759; }
   .fuss { display:flex; align-items:center; gap:10px; padding-top:12px; border-top:1px dashed var(--line);
           font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--dim); }
   .fuss i { width:8px; height:8px; border-radius:50%; border:1px solid var(--dim); flex-shrink:0; }
@@ -284,7 +304,7 @@
 </main>
 
 <form id="form" autocomplete="off">
-  <div class="modus" id="modus"><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span></div>
+  <div class="modus" id="modus"><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span></div>
   <div id="vorschau" hidden></div>
   <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
@@ -361,9 +381,9 @@
       <section>
         <h3 class="abschnitt">WAKE-WORD</h3>
         <p class="hinweis">Sag „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
-        <div class="kacheln">
-          <button class="kachel" data-wake="an">AN</button>
-          <button class="kachel" data-wake="aus">AUS</button>
+        <div class="schalter-zeile" id="wakeZeile">
+          <b id="wakeText">AUS</b>
+          <button type="button" class="schalter" id="wakeSchalter" role="switch" aria-checked="false" aria-label="Wake-Word an/aus"></button>
         </div>
       </section>
 
@@ -713,6 +733,7 @@
     eingabe.focus();
     fenster.scrollTop = fenster.scrollHeight;
     if (warNeu) ladeChats();
+    if (roh && !gestoppt) window.hermesFroh = performance.now();
     if (antwortWarter) { const w = antwortWarter; antwortWarter = null; w(gestoppt ? "" : roh); }
   });
 
@@ -888,10 +909,10 @@
   }
   function abspielen(url) {
     return new Promise((fertig) => {
-      sprecher = new Audio(url);
+      sprecher = new Audio(url); window.hermesSpricht = true;
       sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
       sprecher.play().catch(fertig);
-    }).finally(() => { URL.revokeObjectURL(url); sprecher = null; });
+    }).finally(() => { URL.revokeObjectURL(url); sprecher = null; window.hermesSpricht = false; });
   }
   async function sagen(text, lauf) {
     const stuecke = saetze(text);
@@ -915,7 +936,7 @@
 
   async function liveStarten(ersteFrage) {
     if (liveAn) return;
-    liveAn = true; liveKnopf.classList.add("aufnahme");
+    liveAn = true; liveAnzeige(true);
     const lauf = ++lauschLauf;  // beendet ein laufendes Wake-Word-Lauschen
     try { await ohrOeffnen(); } catch (e) {
       platzhalter("Mikrofon nicht erlaubt (geht nur über localhost oder HTTPS).", 6000);
@@ -926,7 +947,9 @@
     while (liveAn && lauf === lauschLauf) {
       if (!frage) {
         platzhalter("Live · Ich höre zu ... (Knopf beendet)");
+        window.hermesHoert = true;
         const blob = await aeusserung(lauf, { maxWarten: 15000 });
+        window.hermesHoert = false;
         if (!liveAn || lauf !== lauschLauf) break;
         if (!blob) { if (++leer >= 2) break; continue; }  // 30 s Ruhe: Gespräch endet von selbst
         platzhalter("Live · Schreibe mit ...");
@@ -951,12 +974,17 @@
     liveAn = false; lauschLauf++;
     if (sprecher) sprecher.pause();
     if (antwortWarter && abbruch) abbruch.abort();
-    liveKnopf.classList.remove("aufnahme");
-    window.hermesDenkt = false;
+    liveAnzeige(false);
+    window.hermesDenkt = false; window.hermesHoert = false;
     platzhalter(STANDARD);
     if (wache) wachLauschen(); else ohrSchliessen();
   }
 
+  function liveAnzeige(an) {
+    liveKnopf.classList.toggle("an", an);
+    liveKnopf.title = an ? "Live-Gespräch beenden" : "Live-Gespräch starten (oder „Hey Hermes“ sagen)";
+    document.getElementById("livestatus").hidden = !an;
+  }
   liveKnopf.addEventListener("click", () => { if (liveAn) liveBeenden(); else liveStarten(""); });
 
   async function wachLauschen() {
@@ -981,11 +1009,13 @@
   function wakeSetzen(an) {
     wache = an;
     try { localStorage.setItem("hermes-wake", an ? "an" : "aus"); } catch (e) {}
-    document.querySelectorAll("[data-wake]").forEach((b) => b.classList.toggle("aktiv", b.dataset.wake === (an ? "an" : "aus")));
+    document.getElementById("wakeSchalter").setAttribute("aria-checked", an ? "true" : "false");
+    document.getElementById("wakeZeile").classList.toggle("an", an);
+    document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY HERMES“" : "AUS";
     if (liveAn) return;
     if (an) wachLauschen(); else { lauschLauf++; ohrSchliessen(); }
   }
-  document.querySelectorAll("[data-wake]").forEach((b) => b.addEventListener("click", () => wakeSetzen(b.dataset.wake === "an")));
+  document.getElementById("wakeSchalter").addEventListener("click", () => wakeSetzen(!wache));
 
   // ---------- Seitenleiste ----------
   function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
@@ -1159,10 +1189,10 @@
     const gewaehlt = (name === "hell" || name === "grau") ? name : "dunkel";
     document.documentElement.dataset.theme = gewaehlt;
     try { localStorage.setItem("hermes-design", gewaehlt); } catch (e) {}
-    document.querySelectorAll(".kachel").forEach((k) => k.classList.toggle("aktiv", k.dataset.design === gewaehlt));
+    document.querySelectorAll(".kachel[data-design]").forEach((k) => k.classList.toggle("aktiv", k.dataset.design === gewaehlt));
     if (window.augeFarbe) window.augeFarbe();
   }
-  document.querySelectorAll(".kachel").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
+  document.querySelectorAll(".kachel[data-design]").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
 
   // ---------- Halftone-Auge ----------
   (function () {
@@ -1179,48 +1209,94 @@
       farbe = getComputedStyle(document.documentElement).getPropertyValue("--punkt").trim() || farbe;
     };
 
+    // Freundliches Auge mit Stimmungen. Jede Stimmung setzt Zielwerte, das Auge gleitet weich dorthin:
+    //   ruhe     – offen, schaut ab und zu kurz umher, lächelt manchmal
+    //   hoert    – Live-Modus hört zu: weit offen, große Pupille
+    //   denkt    – schaut nach oben zur Seite, leicht zusammengekniffen
+    //   sucht    – schaut schnell umher
+    //   spricht  – lächelt und wippt im Rhythmus
+    //   froh     – kurz nach einer Antwort: lächelt ("^"-Auge)
     const ziel = { x: 0, y: 0 }, pos = { x: 0, y: 0 };
     let blinzelStart = 0, naechstes = performance.now() + 2500;
-
-    // Kein Maus-Folgen mehr: Das Auge schaut geradeaus. Nur beim Suchen schaut es umher.
-    let kneif = 1, naechsterUmblick = 0;
+    let offen = 1, freude = 0, pupilleR = 24, naechsterUmblick = 0, naechstesLaecheln = performance.now() + 9000;
     const UMHER = [[-1, -.3], [1, -.2], [.7, .6], [-.7, .5], [0, -.7], [1, .1], [-1, .2]];
 
+    function stimmung(t) {
+      if (window.hermesSucht) return "sucht";
+      if (window.hermesSpricht) return "spricht";
+      if (window.hermesDenkt) return "denkt";
+      if (window.hermesHoert) return "hoert";
+      if (window.hermesFroh && t - window.hermesFroh < 1800) return "froh";
+      return "ruhe";
+    }
+
     function zeichne(t) {
-      if (t > naechstes) { blinzelStart = t; naechstes = t + 3000 + Math.random() * 3000; }
+      if (t > naechstes) { blinzelStart = t; naechstes = t + 2500 + Math.random() * 3500; }
       const b = t - blinzelStart;
-      const lid = b < 220 ? 1 - 0.92 * Math.sin((b / 220) * Math.PI) : 1;
-      let kz = 1;
-      if (window.hermesSucht) {
-        kz = 0.66;
+      const lid = b < 160 ? 1 - 0.95 * Math.sin((b / 160) * Math.PI) : 1;
+
+      const s = stimmung(t);
+      let zOffen = 1, zFreude = 0, zPupille = 24;
+      if (s === "sucht") {
+        zOffen = 0.85; zPupille = 20;
         if (t > naechsterUmblick) {
           const z = UMHER[Math.floor(Math.random() * UMHER.length)];
-          ziel.x = z[0] * 44; ziel.y = z[1] * 18; naechsterUmblick = t + 700 + Math.random() * 700;
+          ziel.x = z[0] * 46; ziel.y = z[1] * 20; naechsterUmblick = t + 450 + Math.random() * 450;
         }
-      } else if (window.hermesDenkt) { kz = 0.5; ziel.x = 0; ziel.y = -4; }
-      else { ziel.x = 0; ziel.y = 0; }
-      kneif += (kz - kneif) * 0.08;
-      pos.x += (ziel.x - pos.x) * 0.12;
-      pos.y += (ziel.y - pos.y) * 0.12;
+      } else if (s === "denkt") {
+        zOffen = 0.8; zPupille = 22 + Math.sin(t / 300) * 2; ziel.x = 26; ziel.y = -16;
+      } else if (s === "hoert") {
+        zOffen = 1.12; zPupille = 29; ziel.x = 0; ziel.y = 0;
+      } else if (s === "spricht") {
+        zOffen = 0.95; zFreude = 0.35 + Math.abs(Math.sin(t / 180)) * 0.25; zPupille = 26;
+        ziel.x = 0; ziel.y = Math.sin(t / 180) * 3;
+      } else if (s === "froh") {
+        zFreude = 0.85; zPupille = 26; ziel.x = 0; ziel.y = 0;
+      } else {
+        // Ruhe: ab und zu ein kurzer Blick zur Seite und ein kleines Lächeln, damit es lebendig wirkt
+        if (t > naechsterUmblick) {
+          const r = Math.random();
+          ziel.x = r < 0.5 ? 0 : (Math.random() - 0.5) * 50; ziel.y = r < 0.5 ? 0 : (Math.random() - 0.5) * 16;
+          naechsterUmblick = t + 1800 + Math.random() * 2500;
+        }
+        if (t > naechstesLaecheln) naechstesLaecheln = t + 9000 + Math.random() * 8000;
+        if (naechstesLaecheln - t > 7600 && naechstesLaecheln - t < 9000) zFreude = 0.6;
+      }
+      offen += (zOffen - offen) * 0.15;
+      freude += (zFreude - freude) * 0.15;
+      pupilleR += (zPupille - pupilleR) * 0.15;
+      pos.x += (ziel.x - pos.x) * 0.2;
+      pos.y += (ziel.y - pos.y) * 0.2;
 
       const cx = W / 2, cy = H / 2;
+      const ry = Math.max(3, 74 * lid * offen);
       q.filter = "none";
       q.fillStyle = "#000"; q.fillRect(0, 0, W, H);
-      q.filter = "blur(4px)";
+      q.filter = "blur(3px)";
       q.save();
       q.beginPath();
-      q.ellipse(cx, cy, 150, Math.max(3, 64 * lid * kneif), 0, 0, Math.PI * 2);
-      const g = q.createRadialGradient(cx, cy, 10, cx, cy, 150);
-      g.addColorStop(0, "#c8c8c8"); g.addColorStop(1, "#555");
+      q.ellipse(cx, cy, 128, ry, 0, 0, Math.PI * 2);
+      const g = q.createRadialGradient(cx, cy, 10, cx, cy, 140);
+      g.addColorStop(0, "#e2e2e2"); g.addColorStop(1, "#8a8a8a");
       q.fillStyle = g; q.fill(); q.clip();
       const ix = cx + pos.x, iy = cy + pos.y;
-      const pupille = 13 + (window.hermesDenkt ? Math.sin(t / 400) * 2 : 0);
-      const ig = q.createRadialGradient(ix, iy, pupille * 0.5, ix, iy, 40);
-      ig.addColorStop(0, "#000"); ig.addColorStop(0.45, "#2c2c2c"); ig.addColorStop(1, "#6a6a6a");
-      q.fillStyle = ig; q.beginPath(); q.arc(ix, iy, 40, 0, Math.PI * 2); q.fill();
-      q.fillStyle = "#000"; q.beginPath(); q.arc(ix, iy, pupille, 0, Math.PI * 2); q.fill();
-      q.fillStyle = "#fff"; q.beginPath(); q.arc(ix - 12, iy - 12, 5, 0, Math.PI * 2); q.fill();
+      const ig = q.createRadialGradient(ix, iy, pupilleR * 0.6, ix, iy, 52);
+      ig.addColorStop(0, "#000"); ig.addColorStop(0.5, "#262626"); ig.addColorStop(1, "#5c5c5c");
+      q.fillStyle = ig; q.beginPath(); q.arc(ix, iy, 52, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#000"; q.beginPath(); q.arc(ix, iy, pupilleR, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#fff";
+      q.beginPath(); q.arc(ix - 17, iy - 17, 9, 0, Math.PI * 2); q.fill();
+      q.beginPath(); q.arc(ix + 14, iy + 13, 4, 0, Math.PI * 2); q.fill();
       q.restore();
+      // Lächeln: das Unterlid schiebt sich als Bogen von unten ins Auge -> freundliche "^"-Form.
+      // Ohne Clip gezeichnet, damit es auch den weichen Rand des Auges abdeckt.
+      if (freude > 0.02) {
+        const oben = cy + ry - freude * ry * 1.05;
+        q.fillStyle = "#000";
+        q.beginPath();
+        q.ellipse(cx, oben + 120, 142, 120, 0, 0, Math.PI * 2);
+        q.fill();
+      }
       q.filter = "none";
 
       const daten = q.getImageData(0, 0, W, H).data;

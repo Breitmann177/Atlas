@@ -14,6 +14,7 @@ import operator
 import re
 import socket
 import time
+from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -163,6 +164,12 @@ def _auswerten(k):
 def rechnen(ausdruck: str) -> str:
     """Rechnet einen Ausdruck wie '17.5 * 3 + sqrt(16)' aus. Gibt das Ergebnis oder 'FEHLER: ...' zurück."""
     a = ausdruck.replace("^", "**").replace("×", "*").replace("÷", "/")[:200]
+    # Daten wie 19.11.2026 werden zu Tageszahlen, damit "19.11.2026 - 31.10.2026" die Tage dazwischen ergibt
+    try:
+        a = re.sub(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b",
+                   lambda m: str(date(int(m.group(3)), int(m.group(2)), int(m.group(1))).toordinal()), a)
+    except ValueError:
+        return "FEHLER: ungültiges Datum"
     a = re.sub(r"(?<![\d.])(\d+),(\d+)", r"\1.\2", a)  # deutsches Komma "3,5" -> "3.5"
     try:
         ergebnis = _auswerten(ast.parse(a, mode="eval").body)
