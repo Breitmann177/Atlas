@@ -204,6 +204,9 @@
   .kachel[data-design="hell"] { background-color:#f4f4f2; color:#151515; }
   .kachel[data-design="grau"] { background-color:#2a2b2e; color:#ececed; }
   .kachel.aktiv { border:2px solid var(--fg); }
+  /* Wake-Word: die aktive Kachel ist voll gefüllt, damit man An/Aus sofort sieht */
+  .kachel[data-wake] { height:48px; background-image:none; justify-content:center; align-items:center; color:var(--dim); }
+  .kachel[data-wake].aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); font-weight:700; }
   .fuss { display:flex; align-items:center; gap:10px; padding-top:12px; border-top:1px dashed var(--line);
           font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--dim); }
   .fuss i { width:8px; height:8px; border-radius:50%; border:1px solid var(--dim); flex-shrink:0; }
