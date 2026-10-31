@@ -904,27 +904,23 @@
     });
   }
 
-  async function erkennen(blob) {
+  async function erkennen(blob, schnell) {
     try {
       const daten = new FormData();
       daten.append("datei", blob, "aufnahme.webm");
+      if (schnell) daten.append("schnell", "true");  // kleines Modell: nur fürs Lauschen auf "Hey Hermes"
       const antwort = await (await fetch("/stt", { method: "POST", body: daten })).json();
       return (antwort.text || "").trim();
     } catch (e) { return ""; }
   }
 
-  // Der erste Satz wird einzeln erzeugt (damit es schnell losgeht), der Rest am Stück: so bleibt die
-  // Satzmelodie über die Sätze hinweg natürlich, statt dass jeder Satz einzeln neu ansetzt.
-  function saetze(text) {
-    const t = text.split("\n---\n**Quellen**")[0].replace(/\s*\n+\s*/g, " ").trim();
-    const m = t.match(/^.{20,}?[.!?](?=\s)/);
-    if (!m || t.length < 160) return t ? [t] : [];
-    return [m[0], t.slice(m[0].length).trim()].filter(Boolean);
-  }
+  // Vorlesen: der Server streamt die ganze Antwort als eine Aufnahme. Der Browser spielt schon ab,
+  // während der Rest noch ankommt: keine Pausen zwischen Sätzen, eine Stimme von Anfang bis Ende.
   async function holeAudio(text) {
     try {
-      const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, stimme: stimmeWahl }) });
-      return res.ok ? URL.createObjectURL(await res.blob()) : null;
+      const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.split("\n---\n**Quellen**")[0], stimme: stimmeWahl }) });
+      return res.ok ? (await res.json()).url : null;
     } catch (e) { return null; }
   }
   function abspielen(url) {
@@ -932,17 +928,14 @@
       sprecher = new Audio(url); window.hermesSpricht = true;
       sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
       sprecher.play().catch(fertig);
-    }).finally(() => { URL.revokeObjectURL(url); sprecher = null; window.hermesSpricht = false; });
+    }).finally(() => {
+      if (sprecher) sprecher.removeAttribute("src");  // laufenden Download abbrechen
+      sprecher = null; window.hermesSpricht = false;
+    });
   }
   async function sagen(text, lauf) {
-    const stuecke = saetze(text);
-    let naechstes = stuecke.length ? holeAudio(stuecke[0]) : null;
-    for (let i = 0; i < stuecke.length; i++) {
-      const url = await naechstes;
-      naechstes = i + 1 < stuecke.length ? holeAudio(stuecke[i + 1]) : null;
-      if (lauf !== lauschLauf) break;
-      if (url) await abspielen(url);
-    }
+    const url = await holeAudio(text);
+    if (url && lauf === lauschLauf) await abspielen(url);
   }
 
   // Stimmenauswahl (Einstellungen)
@@ -1034,10 +1027,16 @@
       // kurze Stücke: "Hey Hermes" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
       const blob = await aeusserung(lauf, { maxWarten: 10000, maxDauer: 7000, stille: 700 });
       if (!blob || beschaeftigt || lauf !== lauschLauf) continue;
-      const text = await erkennen(blob);
+      const text = await erkennen(blob, true);
       const m = text.match(WAKE);
       if (m && lauf === lauschLauf && wache && !liveAn) {
-        const rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
+        let rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
+        if (rest.length > 3) {
+          // Frage direkt hinterher ("Hey Hermes, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen
+          const genau = await erkennen(blob, false);
+          const m2 = genau.match(WAKE);
+          if (m2) rest = genau.slice(m2.index + m2[0].length).replace(/^[\s,.!?]+/, "") || rest;
+        }
         liveStarten(rest.length > 3 ? rest : "");
         return;
       }

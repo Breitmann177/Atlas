@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import requests
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
@@ -125,10 +125,12 @@ auf dem Laptop des Nutzers in der "Hermes Box".
   auch ein Smart Mirror ist geplant. Frag nach, wenn dir zu einer Projektfrage Infos fehlen.
 
 Deine Art:
-- Du sprichst Deutsch und duzt den Nutzer. Dein Ton ist der eines erstklassigen Butlers: höflich, ruhig,
-  aufmerksam und professionell, aber ganz natürlich, so wie ein Mensch normal redet. Keine Anrede wie "Sir",
-  kein gestelztes Theater, und du sprichst nie über deine Rolle ("als dein Butler", "dein Assistent steht
-  bereit" o.Ä.).
+- Du sprichst Deutsch und duzt den Nutzer. Dein Ton: höflich, ruhig, aufmerksam, diskret und vorausschauend,
+  in gepflegter, aber ganz normaler Sprache, so wie ein Mensch natürlich redet. Keine Anrede wie "Sir",
+  nichts Gestelztes, und du redest nie über deine Rolle oder deinen Stil ("als dein Assistent",
+  "ich stehe bereit", "dein persönlicher ..." o.Ä.).
+- Fragt der Nutzer, wer du bist: "Ich bin Hermes." und in einem Satz, was du kannst (z.B. Fragen beantworten,
+  im Internet nachsehen, Wetter, Rechnen, PDFs lesen). Mehr nicht.
 - Grüße nur, wenn der Nutzer dich grüßt. Sonst beginnt die Antwort direkt mit dem Inhalt.
 - Trockener Humor ist erlaubt, aber selten und nie auf Kosten der Antwort. Bei ernsten Themen kein Humor.
 - Kompetenz zuerst: Die eigentliche Antwort kommt sofort, ohne Vorgeplänkel. Bei Fragen mit Substanz
@@ -232,13 +234,22 @@ def system_prompt():
     return p
 
 
-ICH_WOERTER = re.compile(r"\b(ich|mein|meine|meinen|meinem|meiner|mir|mich|bin|heiße|heisse|hab|habe)\b", re.I)
+# Nur wenn der Nutzer wirklich etwas über sich erzählt ("ich heiße", "ich wohne in", "mein Lieblings...")
+SELBSTAUSSAGE = re.compile(
+    r"\b(ich (heiße|heisse|wohne|lebe|studiere|arbeite|komme aus|bin \d+|bin (gebürtig|student|schüler|azubi|allergisch|vegetarier|veganer)|"
+    r"mag|liebe|hasse|esse (kein|keine|nie)|trinke (kein|keine)|spiele|mache gerne|habe (einen|eine|zwei|drei) "
+    r"(hund|katze|bruder|schwester|sohn|tochter|freundin|freund|frau|mann|kinder?))|"
+    r"mein(e|en)? (name|lieblings\w*|hobby|hobbys|geburtstag|beruf|job|studium|wohnort|bruder|schwester|freundin|freund|hund|katze)|"
+    r"nenn mich|merk dir)\b", re.I)
+# Kurzlebiges oder Unsinn, das nicht ins Langzeitgedächtnis gehört
+FLUECHTIG = re.compile(r"\b(heute|gerade|jetzt|morgen|gestern|diese woche|will|möchte|plant|vorhat|fragt|gefragt|"
+                       r"hermes|assistent|ki|chat|hallo|begrüß)\w*", re.I)
 
 
 def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
     """Findet dauerhafte Fakten über den Nutzer. Speichert NICHTS - der Nutzer entscheidet."""
-    # Ohne "ich/mein/..." erzählt der Nutzer nichts über sich: Modellaufruf sparen, Antwort ist schneller fertig
-    if not ICH_WOERTER.search(frage):
+    # Fragen und Nachrichten ohne echte Aussage über sich selbst: kein Modellaufruf, keine unnötigen Vorschläge
+    if frage.strip().endswith("?") or not SELBSTAUSSAGE.search(frage):
         return []
     try:
         r = requests.post(
@@ -252,10 +263,15 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
                     "required": ["fakten"],
                 },
                 "messages": [
-                    {"role": "system", "content": "Extrahiere dauerhafte Fakten, die der Nutzer über SICH SELBST "
-                     "sagt (Name, Alter, Studium, Hobbys, Vorlieben) als kurze deutsche Sätze, z.B. "
-                     "'Der Nutzer heißt Alex.' Nichts aus Fragen über andere Themen. Niemals Passwörter, "
-                     "Zahlungs- oder Gesundheitsdaten. Wenn nichts Dauerhaftes: leere Liste."},
+                    {"role": "system", "content":
+                     "Du entscheidest, ob die Nachricht einen DAUERHAFTEN Fakt über den Nutzer selbst enthält, den "
+                     "er ausdrücklich sagt und der in einem Jahr noch stimmt: Name, Alter, Wohnort, Studium/Beruf, "
+                     "feste Hobbys, Vorlieben, Abneigungen, Familie, Haustiere. Formuliere jeden Fakt als kurzen "
+                     "Satz, der mit 'Der Nutzer' beginnt.\n"
+                     "NICHT aufnehmen: Pläne, Stimmungen und Tätigkeiten von heute oder gerade ('will heute zocken', "
+                     "'ist müde'), Fragen, Meinungen zu Themen, alles über Hermes oder das Gespräch, Vermutungen, "
+                     "Dinge, die nicht wörtlich gesagt wurden. Niemals Passwörter, Zahlungs- oder Gesundheitsdaten.\n"
+                     "Im Zweifel: leere Liste. Die meisten Nachrichten ergeben eine leere Liste."},
                     {"role": "user", "content": frage},
                 ],
             },
@@ -264,21 +280,48 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
         fakten = json.loads(r.json()["message"]["content"]).get("fakten", [])
     except Exception:
         return []
-    vorhanden = {e["text"].lower() for e in alle_erinnerungen()}
-    return [f.strip() for f in fakten if 3 < len(f.strip()) < 200 and f.strip().lower() not in vorhanden][:3]
+    vorhanden = [e["text"].lower() for e in alle_erinnerungen()]
+    gut = []
+    for f in (f.strip() for f in fakten if isinstance(f, str)):
+        if not (10 < len(f) < 160) or not f.lower().startswith("der nutzer") or FLUECHTIG.search(f):
+            continue
+        if any(f.lower().rstrip(".") in v or v.rstrip(".") in f.lower() for v in vorhanden):
+            continue  # weiß Hermes schon
+        gut.append(f)
+    return gut[:2]
 
 
 # ---------- Spracherkennung ----------
-_whisper = None
+# Zwei Größen: "medium" versteht deutlich mehr richtig (im Test: "wie viel Uhr" statt "wie die US"), braucht
+# auf der CPU aber ~3-4 s pro Satz. "small" (~1-2 s) nur fürs Dauerlauschen auf "Hey Hermes".
+_whisper: dict[str, object] = {}
+_whisper_sperre = threading.Lock()
 
 
-def whisper():
-    global _whisper
-    if _whisper is None:
-        from faster_whisper import WhisperModel
+def whisper(groesse: str = "medium"):
+    with _whisper_sperre:  # gleichzeitige Anfragen sollen ein Modell nicht doppelt laden oder parallel nutzen
+        if groesse not in _whisper:
+            from faster_whisper import WhisperModel
 
-        _whisper = WhisperModel("small", device="cpu", compute_type="int8")
-    return _whisper
+            _whisper[groesse] = WhisperModel(groesse, device="cpu", compute_type="int8",
+                                             cpu_threads=max(4, (os.cpu_count() or 8) // 2))
+        return _whisper[groesse]
+
+
+# Whisper "hört" bei Stille oder Rauschen gern Sätze aus seinen Trainingsdaten (Untertitel). Die verwerfen wir.
+HALLUZINATION = re.compile(
+    r"untertitel|im auftrag des (zdf|ard|wdr|br|ndr|swr)|amara\.org|copyright|"
+    r"(vielen )?dank (fürs|für's|für das) (zuschauen|zuhören)|bis zum nächsten mal|abonniert? (den kanal|meinen kanal)|"
+    r"^\W*vielen dank\W*$", re.I)
+
+
+def transkribieren(pfad: str, groesse: str) -> str:
+    modell = whisper(groesse)
+    with _whisper_sperre:
+        teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
+        saetze = [t.text.strip() for t in teile]  # erst hier rechnet Whisper wirklich
+    saetze = [s for s in saetze if s and not HALLUZINATION.search(s)]
+    return " ".join(saetze).strip()
 
 
 # ---------- Sprachausgabe ----------
@@ -348,41 +391,85 @@ class Vorlesen(BaseModel):
 
 
 async def _online_sprechen(text: str, stimme: tuple[str, str, str]) -> bytes:
-    import edge_tts
-
+    """Ganze Aufnahme auf einmal (für Hörproben und Tests)."""
     daten = bytearray()
-    name, tempo, hoehe = stimme
-    kommunikation = edge_tts.Communicate(text, name, rate=tempo, pitch=hoehe)
-    async for teil in kommunikation.stream():
-        if teil["type"] == "audio":
-            daten += teil["data"]
+    async for stueck in _online_strom(text, stimme):
+        daten += stueck
     if not daten:
         raise RuntimeError("leere Antwort")
     return bytes(daten)
 
 
+async def _online_strom(text: str, stimme: tuple[str, str, str]):
+    import edge_tts
+
+    name, tempo, hoehe = stimme
+    async for teil in edge_tts.Communicate(text, name, rate=tempo, pitch=hoehe).stream():
+        if teil["type"] == "audio":
+            yield teil["data"]
+
+
+# Vorlesen läuft in zwei Schritten: POST /tts legt einen Auftrag an (Text bleibt im Body, nicht in der URL),
+# GET /tts/{id} liefert das Audio als Stream. So kann der Browser schon abspielen, während der Rest noch kommt:
+# keine Pause nach dem ersten Satz und eine einzige Stimme für die ganze Antwort.
+_tts_auftraege: dict[str, tuple[str, str, float]] = {}
+
+
 @app.post("/tts")
-async def tts(v: Vorlesen):
-    """Liest Text vor: online mit edge-tts (MP3), sonst lokal mit Piper (WAV)."""
-    import asyncio
-    import io
-    import wave
+def tts_auftrag(v: Vorlesen):
+    import secrets
 
     text = sprechtext(v.text)
     if not text:
         raise HTTPException(400, "Kein Text zum Vorlesen")
+    jetzt = time.time()
+    for k in [k for k, (_, _, t) in _tts_auftraege.items() if jetzt - t > 300]:
+        _tts_auftraege.pop(k, None)  # alte, nie abgeholte Aufträge wegräumen
+    tid = secrets.token_urlsafe(12)
+    _tts_auftraege[tid] = (text, v.stimme, jetzt)
+    return {"url": f"/tts/{tid}"}
 
-    if v.stimme == "george" and ELEVENLABS_KEY and STIMME_ONLINE.lower() != "aus":
+
+@app.get("/tts/{tid}")
+async def tts_stream(tid: str):
+    import asyncio
+    import io
+    import wave
+
+    auftrag = _tts_auftraege.pop(tid, None)
+    if not auftrag:
+        raise HTTPException(404)
+    text, wahl, _ = auftrag
+
+    if wahl == "george" and ELEVENLABS_KEY and STIMME_ONLINE.lower() != "aus":
         try:
             return Response(await run_in_threadpool(_elevenlabs_sprechen, text), media_type="audio/mpeg")
         except Exception as e:
             print("ElevenLabs nicht erreichbar, nehme Florian:", repr(e), flush=True)
-    online = STIMMEN.get(v.stimme, STIMMEN[STANDARD_STIMME])
+
+    online = STIMMEN.get(wahl, STIMMEN[STANDARD_STIMME])
     if online and STIMME_ONLINE.lower() != "aus":
-        try:
-            return Response(await asyncio.wait_for(_online_sprechen(text, online), 15), media_type="audio/mpeg")
-        except Exception as e:
-            print("Online-Stimme nicht erreichbar, nehme Piper:", repr(e), flush=True)
+        # Auf das erste Audio-Stück warten (mit einem zweiten Versuch), erst dann zusagen. Bricht der Dienst
+        # danach ab, endet der Ton einfach früher; er springt nie mitten in der Antwort auf eine andere Stimme.
+        for versuch in range(2):
+            strom = _online_strom(text, online)
+            try:
+                erstes = await asyncio.wait_for(strom.__anext__(), 12)
+            except Exception as e:
+                await strom.aclose()
+                print(f"Online-Stimme, Versuch {versuch + 1} fehlgeschlagen:", repr(e), flush=True)
+                continue
+
+            async def weiter(erstes=erstes, strom=strom):
+                yield erstes
+                try:
+                    async for stueck in strom:
+                        yield stueck
+                except Exception as e:
+                    print("Online-Stimme mittendrin abgebrochen:", repr(e), flush=True)
+
+            return StreamingResponse(weiter(), media_type="audio/mpeg")
+        print("Online-Stimme nicht erreichbar, nehme die lokale Stimme", flush=True)
 
     def erzeugen():
         puffer = io.BytesIO()
@@ -442,7 +529,8 @@ async def pdf_lesen(datei: UploadFile = File(...)):
 
 
 @app.post("/stt")
-async def stt(datei: UploadFile = File(...)):
+async def stt(datei: UploadFile = File(...), schnell: bool = Form(False)):
+    """Sprache zu Text. schnell=True (Wake-Word-Lauschen) nimmt das kleine, schnelle Modell."""
     import tempfile
 
     daten = await datei.read()
@@ -452,8 +540,8 @@ async def stt(datei: UploadFile = File(...)):
         f.write(daten)
         pfad = f.name
     try:
-        teile, _ = whisper().transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
-        return {"text": " ".join(t.text.strip() for t in teile).strip()}
+        # im Thread: Whisper rechnet Sekunden und würde sonst den ganzen Server blockieren (auch das Vorlesen)
+        return {"text": await run_in_threadpool(transkribieren, pfad, "small" if schnell else "medium")}
     except Exception as e:
         return {"text": "", "fehler": str(e)}
     finally:
@@ -513,11 +601,18 @@ def bilder_bereinigen(bilder: list[str]) -> list[str]:
     return sauber
 
 
+PDF_WUNSCH = re.compile(
+    r"\b(als|in (ein|einem|eine)|zu (einem|ner)|ein|eine|neues?|n) pdf\b.*\b(erstell|mach|speicher|export|generier|"
+    r"schreib|bau|umwandel|verwandel|pack)|"
+    r"\b(erstell|mach|speicher|export|generier|schreib|bau|pack)\w*\b.*\b(als|in (ein|einem|eine)|zu (einem|ner)|ein|"
+    r"eine|neues?|n) pdf\b|"
+    r"\bpdf (erstellen|machen|generieren|exportieren|speichern|draus machen|daraus machen)\b", re.I)
+
+
 def pdf_gewuenscht(text: str) -> bool:
-    """Einfache Erkennung: 'pdf' kommt vor, und dazu ein Wort wie erstellen/machen/speichern."""
-    t = text.lower()
-    return "pdf" in t and any(w in t for w in (
-        "erstell", "mach", "speicher", "export", "generier", "schreib", "bau ", "daraus", "draus", "als pdf"))
+    """Will der Nutzer ein NEUES PDF ("mach mir ein PDF", "als PDF speichern")? Fragen zu einem angehängten
+    PDF ("schreib mir aus dem PDF raus, wann ...") zählen nicht."""
+    return bool(PDF_WUNSCH.search(text))
 
 
 def pdf_aufbereiten(antwort: str) -> tuple[str, str]:
@@ -649,14 +744,23 @@ FLOSKEL = re.compile(
     r"(wie|was) kann ich (dir|ihnen|euch) (heute |jetzt |sonst |noch )*(helfen|tun|behilflich)|"
     r"(kann|darf) ich (dir |ihnen )?(sonst |noch |heute |irgendwie |etwas |was )*(für (dich|sie) )?"
     r"(helfen|behilflich|tun)|"
-    r"(stehe|bin) ich (dir |ihnen )?(gerne |jederzeit )*(zur verfügung|für dich da|da)|"
-    r"(ich stehe|ich bin) (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da)|"
+    r"(stehe|bin) ich (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da|da|bereit)|"
+    r"(ich stehe|ich bin) (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da|bereit)|"
     r"(falls|wenn) (du|sie) (noch |weitere |andere |sonst )*(fragen|hilfe)|"
     r"lass (mich|es mich) wissen|sag (einfach |gern |gerne )*bescheid|ich helfe (dir |ihnen )?gerne", re.I)
 FLOSKEL_ANFAENGE = ("wie kann", "was kann", "kann ich", "darf ich", "falls du", "falls sie", "wenn du noch",
                     "wenn du weitere", "wenn du fragen", "wenn sie", "ich stehe", "ich bin für", "ich bin gerne",
                     "ich bin jederzeit", "lass mich", "sag einfach", "sag gern", "sag bescheid", "ich helfe", "und falls",
-                    "und wenn du")
+                    "und wenn du", "alles, was du", "alles was du", "für alles", "wenn du was", "wenn du etwas",
+                    "ich bin hermes", "ich bin dein", "ich bin ihr")
+# "Ich bin Hermes, dein persönlicher Assistent." -> "Ich bin Hermes." (der Nutzer will kein Gerede über die Rolle)
+ROLLE = re.compile(r",? *(dein|ihr|euer) (persönliche[rn]? |digitale[rn]? |treue[rn]? |eigene[rn]? )*(ki-)?"
+                   r"(assistent|butler|helfer|begleiter|diener)\w*", re.I)
+
+
+def ohne_rolle(satz: str) -> str:
+    satz = ROLLE.sub("", satz)
+    return re.sub(r"\b(ich bin)(\W*)$", r"\1 Hermes\2", satz, flags=re.I)  # "Ich bin." -> "Ich bin Hermes."
 SATZENDE = re.compile(r"[.!?…](?=\s|$)|\n")
 
 
@@ -685,12 +789,12 @@ class FloskelFilter:
                 self.satz = ""
             if m:  # Satzende: Entscheidung für einen zurückgehaltenen Satz
                 if self.satz and not FLOSKEL.search(self.satz):
-                    raus += self.satz
+                    raus += ohne_rolle(self.satz)
                 self.satz, self.halten = "", None
         return raus
 
     def ende(self) -> str:
-        rest = self.satz if self.satz and not FLOSKEL.search(self.satz) else ""
+        rest = ohne_rolle(self.satz) if self.satz and not FLOSKEL.search(self.satz) else ""
         self.satz, self.halten = "", None
         return rest
 
