@@ -35,6 +35,14 @@
           transform:translateX(-50%);
           transition:top .8s ease, left .8s ease, width .8s ease, transform .8s ease; }
   body.klein #auge { top:12px; left:18px; width:72px; transform:translateX(0); }
+  /* Timer: Restzeit unter dem Auge, Klick stoppt ihn */
+  #timeranzeige { position:fixed; z-index:21; left:50%; transform:translateX(-50%); cursor:pointer;
+                  top:calc(84px + min(380px,80vw) * 0.553 + 4px); background:none; border:0; padding:2px 8px;
+                  color:var(--fg); font-family:var(--mono); font-size:15px; letter-spacing:.2em;
+                  transition:top .8s ease, left .8s ease, transform .8s ease, font-size .8s ease; }
+  body.timer #hero p { visibility:hidden; }  /* sonst überlappt "BEREIT" die Restzeit */
+  body.klein #timeranzeige { top:54px; left:18px; transform:none; width:72px; padding:0; font-size:11px;
+                             letter-spacing:.06em; text-align:center; }
 
   main { flex:1; overflow-y:auto; overflow-x:hidden; }
   #chat { max-width:780px; margin:0 auto; padding:0 18px 12px; display:flex; flex-direction:column; gap:20px; }
@@ -302,6 +310,7 @@
 </head>
 <body>
 <canvas id="auge" title="Menü"></canvas>
+<button type="button" id="timeranzeige" title="Timer stoppen" hidden></button>
 
 <header><div class="logo">HERMES</div></header>
 
@@ -388,15 +397,11 @@
 
       <section>
         <h3 class="abschnitt">STIMME</h3>
-        <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Online-Stimmen klingen natürlich, brauchen aber Internet (der Text geht dafür an Microsoft). „Lokal“ läuft komplett auf dem Laptop.</p>
+        <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Stimmen brauchen Internet (der Text geht dafür an Microsoft); ohne Internet springt eine lokale Stimme ein.</p>
         <div class="stimmen">
           <button type="button" class="stimme" data-stimme="george" id="stimmeGeorge" hidden>GEORGE<small>ElevenLabs, sehr natürlich</small></button>
-          <button type="button" class="stimme" data-stimme="florian">FLORIAN<small>ruhig, natürlich</small></button>
-          <button type="button" class="stimme" data-stimme="conrad">CONRAD<small>tief, ernst</small></button>
-          <button type="button" class="stimme" data-stimme="killian">KILLIAN<small>tief, gelassen</small></button>
-          <button type="button" class="stimme" data-stimme="jonas">JONAS<small>österreichisch</small></button>
-          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>leichter Akzent</small></button>
-          <button type="button" class="stimme" data-stimme="lokal">LOKAL<small>offline, Piper</small></button>
+          <button type="button" class="stimme" data-stimme="alfred">ALFRED<small>männlich, ruhig</small></button>
+          <button type="button" class="stimme" data-stimme="frau">SERAPHINA<small>weiblich, angenehm</small></button>
         </div>
       </section>
 
@@ -736,6 +741,7 @@
             inhalt.classList.remove("typing"); window.hermesDenkt = false; window.hermesSucht = false;
             roh += ev.text; zeige();
           } else if (ev.typ === "vorschlag") vorschlaege(huelle, ev.fakten);
+          else if (ev.typ === "timer") timerStarten(ev.sekunden);
           else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); }
         }
         fenster.scrollTop = fenster.scrollHeight;
@@ -939,14 +945,14 @@
   }
 
   // Stimmenauswahl (Einstellungen)
-  let stimmeWahl = "florian";
-  try { stimmeWahl = localStorage.getItem("hermes-stimme2") || "florian"; } catch (e) {}
+  let stimmeWahl = "alfred";
+  try { stimmeWahl = localStorage.getItem("hermes-stimme3") || "alfred"; } catch (e) {}
   function stimmeAnzeigen() {
     document.querySelectorAll("[data-stimme]").forEach((b) => b.classList.toggle("aktiv", b.dataset.stimme === stimmeWahl));
   }
   document.querySelectorAll("[data-stimme]").forEach((b) => b.addEventListener("click", async () => {
     stimmeWahl = b.dataset.stimme;
-    try { localStorage.setItem("hermes-stimme2", stimmeWahl); } catch (e) {}
+    try { localStorage.setItem("hermes-stimme3", stimmeWahl); } catch (e) {}
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
@@ -955,6 +961,50 @@
     b.classList.remove("spielt");
   }));
   stimmeAnzeigen();
+
+  // ---------- Timer ----------
+  // Zählt im Browser herunter. Solange er läuft, wird die Pupille zur Uhr (siehe Auge), darunter steht die Restzeit.
+  const timerAnzeige = document.getElementById("timeranzeige");
+  let timerUhr = null;
+  function timerStarten(sekunden) {
+    timerStoppen();
+    if (!sekunden) return;  // 0 = "Timer stopp"
+    window.hermesTimer = { ende: Date.now() + sekunden * 1000, dauer: sekunden * 1000 };
+    timerAnzeige.hidden = false; document.body.classList.add("timer");
+    const tick = () => {
+      const rest = window.hermesTimer.ende - Date.now();
+      if (rest <= 0) { timerAbgelaufen(); return; }
+      const s = Math.ceil(rest / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      timerAnzeige.textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s % 60).padStart(2, "0");
+    };
+    tick();
+    timerUhr = setInterval(tick, 250);
+  }
+  function timerStoppen() {
+    clearInterval(timerUhr); timerUhr = null;
+    window.hermesTimer = null; timerAnzeige.hidden = true; document.body.classList.remove("timer");
+  }
+  function timerAbgelaufen() {
+    timerStoppen();
+    window.hermesFroh = performance.now();
+    platzhalter("Timer abgelaufen", 6000);
+    piepen();
+    setTimeout(() => sagen("Dein Timer ist abgelaufen.", lauschLauf), 1300);
+  }
+  function piepen() {  // drei kurze, weiche Pieptöne
+    try {
+      const ctx = new AudioContext(), t0 = ctx.currentTime + 0.05;
+      [0, 0.32, 0.64].forEach((start) => {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t = t0 + start;
+        o.type = "sine"; o.frequency.value = 880;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+        o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3);
+      });
+      setTimeout(() => ctx.close(), 1500);
+    } catch (e) {}
+  }
+  timerAnzeige.addEventListener("click", timerStoppen);
 
   function liveFragen(text) {
     return new Promise((fertig) => {
@@ -1257,6 +1307,7 @@
     const ziel = { x: 0, y: 0 }, pos = { x: 0, y: 0 };
     let blinzelStart = 0, naechstes = performance.now() + 2500;
     let offen = 1, freude = 0, pupilleR = 24, naechsterUmblick = 0, naechstesLaecheln = performance.now() + 9000;
+    let uhr = 0;  // 0 = normale Pupille, 1 = Uhr (Timer läuft)
     const UMHER = [[-1, -.3], [1, -.2], [.7, .6], [-.7, .5], [0, -.7], [1, .1], [-1, .2]];
 
     function stimmung(t) {
@@ -1264,6 +1315,7 @@
       if (window.hermesSpricht) return "spricht";
       if (window.hermesDenkt) return "denkt";
       if (window.hermesHoert) return "hoert";
+      if (window.hermesTimer) return "timer";
       if (window.hermesFroh && t - window.hermesFroh < 1800) return "froh";
       return "ruhe";
     }
@@ -1288,6 +1340,8 @@
       } else if (s === "spricht") {
         zOffen = 0.95; zFreude = 0.35 + Math.abs(Math.sin(t / 180)) * 0.25; zPupille = 26;
         ziel.x = 0; ziel.y = Math.sin(t / 180) * 3;
+      } else if (s === "timer") {
+        zOffen = 1.1; ziel.x = 0; ziel.y = 0;
       } else if (s === "froh") {
         zFreude = 0.85; zPupille = 26; ziel.x = 0; ziel.y = 0;
       } else {
@@ -1303,6 +1357,7 @@
       offen += (zOffen - offen) * 0.15;
       freude += (zFreude - freude) * 0.15;
       pupilleR += (zPupille - pupilleR) * 0.15;
+      uhr += ((window.hermesTimer ? 1 : 0) - uhr) * 0.12;
       pos.x += (ziel.x - pos.x) * 0.2;
       pos.y += (ziel.y - pos.y) * 0.2;
 
@@ -1325,6 +1380,23 @@
       q.fillStyle = "#fff";
       q.beginPath(); q.arc(ix - 17, iy - 17, 9, 0, Math.PI * 2); q.fill();
       q.beginPath(); q.arc(ix + 14, iy + 13, 4, 0, Math.PI * 2); q.fill();
+      // Timer: Die Pupille wird zur Uhr. Der helle Kuchen ist die Restzeit und schrumpft im Uhrzeigersinn.
+      if (uhr > 0.02) {
+        const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
+        q.globalAlpha = uhr;
+        q.fillStyle = "#0c0c0c"; q.beginPath(); q.arc(cx, cy, 60, 0, Math.PI * 2); q.fill();
+        if (rest > 0) {
+          q.fillStyle = "#d8d8d8"; q.beginPath(); q.moveTo(cx, cy);
+          q.arc(cx, cy, 52, -Math.PI / 2, -Math.PI / 2 + rest * Math.PI * 2); q.closePath(); q.fill();
+        }
+        q.fillStyle = "#fff";
+        for (let i = 0; i < 12; i++) {  // Stundenstriche als Punkte
+          const w = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          q.beginPath(); q.arc(cx + Math.cos(w) * 57, cy + Math.sin(w) * 57, i % 3 ? 2 : 3.5, 0, Math.PI * 2); q.fill();
+        }
+        q.fillStyle = "#000"; q.beginPath(); q.arc(cx, cy, 6, 0, Math.PI * 2); q.fill();
+        q.globalAlpha = 1;
+      }
       q.restore();
       // Lächeln: das Unterlid schiebt sich als Bogen von unten ins Auge -> freundliche "^"-Form.
       // Ohne Clip gezeichnet, damit es auch den weichen Rand des Auges abdeckt.

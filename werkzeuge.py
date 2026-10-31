@@ -132,6 +132,36 @@ def wetter(ort: str) -> str:
     return "\n".join(zeilen)
 
 
+# ---------- Nachrichten (Tagesschau-RSS: frei, seriös, ohne Konto) ----------
+NACHRICHTEN_URL = "https://www.tagesschau.de/index~rss2.xml"
+
+
+def nachrichten(n: int = 6) -> list[dict]:
+    """Die wichtigsten Schlagzeilen der Tagesschau-Startseite: [{titel, text, url}] (leer bei Fehlern)."""
+    import xml.etree.ElementTree as ET
+
+    try:
+        r = requests.get(NACHRICHTEN_URL, headers=HEADERS, timeout=10)
+        eintraege = ET.fromstring(r.content).findall(".//item")
+    except (requests.RequestException, ET.ParseError):
+        return []
+    liste, gesehen = [], set()
+    for e in eintraege:
+        titel = (e.findtext("title") or "").strip()
+        # Sendungen ("tagesschau 20:00 Uhr", "tagesthemen") sind keine Meldungen
+        if not titel or re.match(r"(tagesschau|tagesthemen|nachtmagazin)\b", titel, re.I):
+            continue
+        schluessel = titel.lower()[:30]
+        if schluessel in gesehen:
+            continue
+        gesehen.add(schluessel)
+        text = re.sub(r"<[^>]+>", "", e.findtext("description") or "").strip()
+        liste.append({"titel": titel, "text": text[:300], "url": (e.findtext("link") or "").strip()})
+        if len(liste) >= n:
+            break
+    return liste
+
+
 # ---------- Rechner (sicher: nur Zahlen, Operatoren und ein paar Funktionen, kein eval) ----------
 _FUNKTIONEN = {"sqrt": math.sqrt, "sin": math.sin, "cos": math.cos, "tan": math.tan, "log": math.log10,
                "ln": math.log, "abs": abs, "round": round, "exp": math.exp, "fakultaet": math.factorial}
