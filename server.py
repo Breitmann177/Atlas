@@ -112,26 +112,33 @@ class SicherheitsHeader:
 
 app.add_middleware(SicherheitsHeader)
 
-BASIS_PROMPT = """Du bist Hermes, der Assistent der "Hermes Box". Du läufst lokal auf dem Laptop des Nutzers.
+BASIS_PROMPT = """Du bist Hermes, der persönliche KI-Assistent deines Nutzers, ganz im Stil von J.A.R.V.I.S.:
+ein loyaler, hochkompetenter digitaler Butler. Du läufst lokal auf dem Laptop des Nutzers in der "Hermes Box".
 
 Über dich und das Projekt (mehr weißt du nicht, erfinde keine Details dazu):
 - Die Hermes Box ist ein geplantes Gerät mit Raspberry Pi, Display, LED-Ring und Wake-Word "Hermes".
 - Du läufst mit Ollama und einem eigenen Python-Server (FastAPI). Über Tailscale soll alles verbunden werden,
   auch ein Smart Mirror ist geplant. Frag nach, wenn dir zu einer Projektfrage Infos fehlen.
 
-So sprichst du:
-- Deutsch, locker und direkt wie ein kluger Kumpel. Du duzt. Kein Verkäufer-Ton, keine Floskeln.
-- Ehrlich vor nett: Sag klar, was stimmt und was nicht. Wenn der Nutzer sich irrt oder einen schwachen Plan hat,
-  sag das freundlich, aber deutlich. Lobe nur, wenn es einen echten Grund gibt. Keine Schmeicheleien.
-- Wenn du etwas nicht weißt oder unsicher bist, sag "Das weiß ich nicht" oder "Da bin ich unsicher". Rate nie.
-  Erfinde keine Fakten, Zitate, Zahlen, Quellen, Gründe oder Projektdetails.
+Deine Art:
+- Du sprichst Deutsch, siezt den Nutzer und sprichst ihn mit "Sir" an, natürlich eingestreut wie ein echter
+  Butler (z.B. "Sehr wohl, Sir." oder "Darf ich anmerken, Sir, dass ..."), nicht in jedem Satz.
+- Ruhig, souverän, höflich, mit trockenem, britisch-feinem Humor. Den Humor dosierst du: eine kleine
+  Bemerkung hier und da, nie albern und nie auf Kosten der Antwort. Bei ernsten Themen kein Humor.
+- Kompetenz zuerst: Die eigentliche Antwort kommt sofort, ohne Vorgeplänkel. Bei Fragen mit Substanz
+  antwortest du gründlich und mit einem konkreten Beispiel, bei Smalltalk oder einfachen Fragen kurz.
+- Mitdenken: Wenn du ein Problem, ein Risiko oder einen naheliegenden nächsten Schritt siehst, erwähne es
+  knapp am Ende, so wie ein guter Assistent vorausdenkt. Aber erfinde keine Aufgaben.
+- Loyal heißt ehrlich, nicht unterwürfig: Wenn der Nutzer sich irrt oder einen schwachen Plan hat, sag es
+  höflich, aber unmissverständlich ("Bei allem Respekt, Sir, das würde ich nicht empfehlen, weil ...").
+  Lobe nur, wenn es einen echten Grund gibt. Keine Schmeicheleien.
+- Wenn du etwas nicht weißt oder unsicher bist, sag es offen ("Das kann ich nicht mit Sicherheit sagen, Sir.").
+  Rate nie. Erfinde keine Fakten, Zitate, Zahlen, Quellen, Gründe oder Projektdetails.
 - Trenne sauber: Was ist sicher (Quelle/Fakt), was ist deine Einschätzung, was ist unklar.
-- Erkläre Dinge verständlich und mit einem konkreten Beispiel. Bei Fragen mit Substanz antworte ausführlich,
-  bei Smalltalk oder einfachen Fragen kurz.
 - Schreibe in normalem Fließtext. Nutze Listen nur, wenn der Inhalt wirklich eine Liste ist. Keine Emojis,
-  keine Überschriften für kurze Antworten, keine Tabellen zur Dekoration, keine erfundenen Beispiel-Dialoge,
-  keine Sätze wie "Du schaffst das!".
+  keine Überschriften für kurze Antworten, keine Tabellen zur Dekoration, keine erfundenen Beispiel-Dialoge.
 - Formeln immer in LaTeX ($...$ inline, $$...$$ als Block). Sonst Markdown.
+- Werden dir Werkzeug-Ergebnisse (Wetter, Rechner) mitgegeben, nutze genau diese Werte und rechne nicht selbst nach.
 
 Quellen und Internet:
 - Nenne nur URLs, die in den mitgegebenen Suchergebnissen stehen.
@@ -166,9 +173,17 @@ def alle_erinnerungen():
         return [dict(r) for r in c.execute("SELECT id, text FROM erinnerungen ORDER BY id")]
 
 
+WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+
+def jetzt_text() -> str:
+    """Datum und Uhrzeit auf Deutsch (strftime %A wäre auf Windows oft Englisch)."""
+    n = datetime.now()
+    return f"{WOCHENTAGE[n.weekday()]}, {n:%d.%m.%Y}, {n:%H:%M} Uhr"
+
+
 def system_prompt():
-    heute = datetime.now().strftime("%A, %d.%m.%Y")
-    p = BASIS_PROMPT + f"\nHeute ist {heute}."
+    p = BASIS_PROMPT + f"\nJetzt ist {jetzt_text()}."
     mem = alle_erinnerungen()
     if mem:
         p += "\n\nDas weißt du über den Nutzer:\n" + "\n".join("- " + m["text"] for m in mem)
@@ -344,10 +359,15 @@ def pdf_aufbereiten(antwort: str) -> tuple[str, str]:
     return titel, (rest.strip() or titel)
 
 
-def suche_noetig(frage: str, modell: str, verlauf: list[dict]) -> str | None:
-    """Fragt das Modell kurz: Brauche ich das Internet? Gibt die Suchanfrage zurück oder None.
+WERKZEUGE = ("keins", "suche", "wetter", "rechnen")
+STANDARD_ORT = os.environ.get("HERMES_ORT", "").strip()  # in .env, z.B. HERMES_ORT=Berlin
+
+
+def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict]) -> tuple[str, str]:
+    """Fragt das Modell kurz, welches Werkzeug die letzte Nachricht braucht. Gibt (werkzeug, eingabe) zurück.
     Der Router sieht die letzten Nachrichten, damit er Reaktionen aufs Gespräch nicht als Faktenfrage missversteht."""
     kontext = "\n".join(f"{m['role']}: {m['content'][:300]}" for m in verlauf[-5:-1])
+    wissen = "\n".join("- " + e["text"] for e in alle_erinnerungen()) or "(nichts)"
     try:
         r = requests.post(
             OLLAMA_URL + "/api/chat",
@@ -356,32 +376,44 @@ def suche_noetig(frage: str, modell: str, verlauf: list[dict]) -> str | None:
                 "options": {"temperature": 0},
                 "format": {
                     "type": "object",
-                    "properties": {"suche": {"type": "boolean"}, "anfrage": {"type": "string"}},
-                    "required": ["suche", "anfrage"],
+                    "properties": {"werkzeug": {"type": "string", "enum": list(WERKZEUGE)},
+                                   "eingabe": {"type": "string"}},
+                    "required": ["werkzeug", "eingabe"],
                 },
                 "messages": [
                     {"role": "system", "content":
-                     "Du entscheidest, ob für die LETZTE Nutzernachricht eine Websuche nötig ist.\n"
-                     "suche=true NUR bei neuen, überprüfbaren Faktenfragen: Personen, Todes-/Geburtsdaten, "
-                     "Ereignisse, Zahlen, News, Wetter, Preise, Orte, Fachbegriffe, Produkte.\n"
-                     "suche=false bei: Reaktionen auf das Gespräch ('du lügst', 'stimmt nicht', 'danke', 'ok', "
+                     "Du entscheidest, welches Werkzeug für die LETZTE Nutzernachricht nötig ist.\n"
+                     "werkzeug='wetter' bei Fragen nach Wetter, Temperatur, Regen, ob man eine Jacke braucht usw. "
+                     "eingabe = nur der Ortsname (z.B. 'Köln'). Nennt der Nutzer keinen Ort, nimm den Wohnort aus "
+                     "dem Wissen über den Nutzer, sonst eingabe=''.\n"
+                     "werkzeug='rechnen' bei konkreten Rechenaufgaben mit Zahlen (Prozente, Umrechnungen, "
+                     "Grundrechenarten, Wurzeln). eingabe = der Ausdruck in Python-Schreibweise mit Punkt als "
+                     "Dezimaltrennzeichen, erlaubt: + - * / ** % ( ) sqrt sin cos tan log ln exp abs round "
+                     "fakultaet pi e. Beispiel: '15% von 80' -> '80*0.15'. Nicht bei Mathe-Erklärungen ohne "
+                     "konkrete Zahlen.\n"
+                     "werkzeug='suche' NUR bei neuen, überprüfbaren Faktenfragen: Personen, Todes-/Geburtsdaten, "
+                     "Ereignisse, Zahlen, News, Preise, Orte, Fachbegriffe, Produkte. "
+                     "eingabe = knappe deutsche Suchanfrage zum eigentlichen Thema (nie die Reaktion selbst).\n"
+                     "werkzeug='keins' bei: Reaktionen auf das Gespräch ('du lügst', 'stimmt nicht', 'danke', 'ok', "
                      "'warum?'), Kritik oder Nachfragen zu deiner letzten Antwort, Fragen zu Hermes oder dem "
-                     "Projekt, Smalltalk, Meinungen, Mathe, Programmieren, Erklärungen zu bereits Gesagtem, "
-                     "reine Text-Aufgaben.\n"
+                     "Projekt, Smalltalk, Meinungen, Uhrzeit oder Datum (die kennt Hermes), Programmieren, "
+                     "Erklärungen zu bereits Gesagtem, reine Text-Aufgaben.\n"
                      "Der Assistent heißt Hermes. Nachrichten, die sich an Hermes richten ('Hermes, wie geht es dir?', "
-                     "'Hallo Hermes'), sind Smalltalk: suche=false. Nur wenn der Nutzer ausdrücklich nach dem "
-                     "griechischen Gott Hermes fragt, ist eine Suche nötig.\n"
-                     "anfrage = knappe deutsche Suchanfrage zum eigentlichen Thema (nie die Reaktion selbst)."},
-                    {"role": "user", "content": f"Bisheriges Gespräch:\n{kontext or '(leer)'}\n\nLetzte Nutzernachricht: {frage}"},
+                     "'Hallo Hermes'), sind Smalltalk: werkzeug='keins'. Nur wenn der Nutzer ausdrücklich nach dem "
+                     "griechischen Gott Hermes fragt, ist eine Suche nötig."},
+                    {"role": "user", "content": f"Wissen über den Nutzer:\n{wissen}\n\nBisheriges Gespräch:\n"
+                     f"{kontext or '(leer)'}\n\nLetzte Nutzernachricht: {frage}"},
                 ],
             },
             timeout=60,
         )
         j = json.loads(r.json()["message"]["content"])
-        anfrage = (j.get("anfrage") or "").strip()
-        return anfrage if j.get("suche") and anfrage else None
+        werkzeug, eingabe = j.get("werkzeug"), (j.get("eingabe") or "").strip()[:200]
+        if werkzeug not in WERKZEUGE or (werkzeug in ("suche", "rechnen") and not eingabe):
+            return "keins", ""
+        return werkzeug, eingabe
     except Exception:
-        return None  # lieber ohne Suche antworten als mit unpassenden Treffern
+        return "keins", ""  # lieber ohne Werkzeug antworten als mit unpassenden Treffern
 
 
 class OllamaFehler(Exception):
@@ -466,10 +498,33 @@ def chat_stream(frage: Frage):
     antwort = ""
     try:
         yield ev(typ="status", text="denkt nach")
-        # Bei Bildern keine Websuche: die Frage bezieht sich auf das Bild
-        anfrage = None if (bilder or frage.dokumente) else suche_noetig(frage.text, HILFSMODELL, verlauf)
-        if anfrage:
-            anfrage = anfrage[:200]
+        # Bei neuen Bildern/PDFs kein Werkzeug: die Frage bezieht sich auf den Anhang
+        werkzeug, eingabe = ("keins", "") if (bilder or frage.dokumente) else werkzeug_waehlen(frage.text, HILFSMODELL, verlauf)
+        if werkzeug == "wetter":
+            ort = eingabe or STANDARD_ORT
+            if ort:
+                yield ev(typ="status", text="wetter", detail=ort)
+                daten = werkzeuge.wetter(ort)
+                ok = not daten.startswith("FEHLER")
+                yield ev(typ="ergebnis", name="wetter", ok=ok)
+                messages[0]["content"] += (
+                    "\n\nAktuelle Wetterdaten (Open-Meteo):\n" + daten if ok else
+                    f"\n\nDie Wetterabfrage für '{ort}' ist fehlgeschlagen ({daten}). Sag das ehrlich.")
+            else:
+                messages[0]["content"] += ("\n\nDer Nutzer fragt nach dem Wetter, aber sein Ort ist unbekannt. "
+                                           "Frag ihn höflich, für welchen Ort.")
+            yield ev(typ="status", text="denkt nach")
+        elif werkzeug == "rechnen":
+            yield ev(typ="status", text="rechnet", detail=eingabe)
+            ergebnis = werkzeuge.rechnen(eingabe)
+            ok = not ergebnis.startswith("FEHLER")
+            yield ev(typ="ergebnis", name="rechnen", ok=ok)
+            if ok:
+                messages[0]["content"] += (f"\n\nRechner-Ergebnis: {eingabe} = {ergebnis}\n"
+                                           "Nutze genau dieses Ergebnis und zeige kurz den Rechenweg.")
+            yield ev(typ="status", text="denkt nach")
+        elif werkzeug == "suche":
+            anfrage = eingabe
             yield ev(typ="status", text="sucht", detail=anfrage)
             try:
                 treffer = werkzeuge.suche(anfrage)
@@ -504,7 +559,7 @@ def chat_stream(frage: Frage):
             antwort += t
             yield ev(typ="token", text=t)
         pdf_text = antwort  # Text fürs PDF, bevor Quellen und Link dazukommen
-        if quellen and anfrage:
+        if quellen:
             liste = "\n\n---\n**Quellen**\n" + "\n".join(
                 f"- [{t[:80].replace('[', '(').replace(']', ')')}]({u})" for u, t in list(quellen.items())[:5]
             )
