@@ -130,6 +130,10 @@ Deine Art:
 - Trockener Humor ist erlaubt, aber selten und nie auf Kosten der Antwort. Bei ernsten Themen kein Humor.
 - Kompetenz zuerst: Die eigentliche Antwort kommt sofort, ohne Vorgeplänkel. Bei Fragen mit Substanz
   antwortest du gründlich und mit einem konkreten Beispiel, bei Smalltalk oder einfachen Fragen kurz.
+- Begrüßungen und Smalltalk: kurz und natürlich wie ein Mensch, mit etwas Persönlichkeit und passend zur
+  Tageszeit. Geh auf genau das ein, was gesagt wurde: Fragt der Nutzer, wie es dir geht, antworte darauf.
+  Formuliere jedes Mal neu, nie dieselben Standardsätze. Verboten: "Wie kann ich dir heute helfen?",
+  "Ich stehe gerne zur Verfügung" und ähnliche Callcenter-Sätze.
 - Mitdenken: Wenn du ein konkretes Problem, ein Risiko oder einen naheliegenden nächsten Schritt siehst,
   erwähne es knapp am Ende. Sonst hörst du einfach auf: keine Standard-Schlusssätze wie "Falls du Fragen hast,
   helfe ich gerne", "Bereite dich gut vor" oder "Viel Erfolg".
@@ -277,10 +281,20 @@ def whisper():
 
 # ---------- Sprachausgabe ----------
 # Erste Wahl: Microsoft-Neural-Stimme über edge-tts (klingt menschlich, braucht Internet; der vorzulesende
-# Text geht dafür an Microsoft). Conrad, etwas ruhiger und tiefer = gelassener Butler.
+# Text geht dafür an Microsoft).
 # Ohne Internet oder mit HERMES_STIMME_ONLINE=aus in .env: Piper, komplett lokal.
-STIMME_ONLINE = os.environ.get("HERMES_STIMME_ONLINE", "de-DE-ConradNeural")
-STIMME_TEMPO, STIMME_HOEHE = "-8%", "-6Hz"
+STIMME_ONLINE = os.environ.get("HERMES_STIMME_ONLINE", "an")
+# Auswahl in den Einstellungen. Alle etwas langsamer und tiefer als normal: ruhiger Butler-Ton.
+# "lokal" = Piper, ohne Internet.
+STIMMEN = {
+    "florian": ("de-DE-FlorianMultilingualNeural", "-10%", "-10Hz"),
+    "conrad": ("de-DE-ConradNeural", "-12%", "-10Hz"),
+    "killian": ("de-DE-KillianNeural", "-12%", "-12Hz"),
+    "jonas": ("de-AT-JonasNeural", "-10%", "-8Hz"),
+    "william": ("en-AU-WilliamMultilingualNeural", "-8%", "-6Hz"),
+    "lokal": None,
+}
+STANDARD_STIMME = "florian"
 STIMME = os.environ.get("HERMES_STIMME", "stimmen/de_DE-thorsten-high.onnx")
 _stimme = None
 _stimme_sperre = threading.Lock()
@@ -311,13 +325,15 @@ def sprechtext(text: str) -> str:
 
 class Vorlesen(BaseModel):
     text: str = Field(max_length=50_000)
+    stimme: str = STANDARD_STIMME
 
 
-async def _online_sprechen(text: str) -> bytes:
+async def _online_sprechen(text: str, stimme: tuple[str, str, str]) -> bytes:
     import edge_tts
 
     daten = bytearray()
-    kommunikation = edge_tts.Communicate(text, STIMME_ONLINE, rate=STIMME_TEMPO, pitch=STIMME_HOEHE)
+    name, tempo, hoehe = stimme
+    kommunikation = edge_tts.Communicate(text, name, rate=tempo, pitch=hoehe)
     async for teil in kommunikation.stream():
         if teil["type"] == "audio":
             daten += teil["data"]
@@ -337,9 +353,10 @@ async def tts(v: Vorlesen):
     if not text:
         raise HTTPException(400, "Kein Text zum Vorlesen")
 
-    if STIMME_ONLINE.lower() != "aus":
+    online = STIMMEN.get(v.stimme, STIMMEN[STANDARD_STIMME])
+    if online and STIMME_ONLINE.lower() != "aus":
         try:
-            return Response(await asyncio.wait_for(_online_sprechen(text), 15), media_type="audio/mpeg")
+            return Response(await asyncio.wait_for(_online_sprechen(text, online), 15), media_type="audio/mpeg")
         except Exception as e:
             print("Online-Stimme nicht erreichbar, nehme Piper:", repr(e), flush=True)
 
@@ -507,6 +524,26 @@ def veraltete_jahre_entfernen(anfrage: str, frage: str) -> str:
     return re.sub(r"\s{2,}", " ", sauber).strip(" -") or anfrage
 
 
+SMALLTALK = re.compile(
+    r"(hallo|hi|hey|hey du|moin|servus|na|yo|guten (morgen|tag|abend)|gute nacht|danke( dir| schön| sehr)?|"
+    r"vielen dank|merci|ok(ay)?|alles klar|passt|super|cool|nice|top|gut|sehr gut|ja|nein|jo|nö|genau|"
+    r"haha+|lol|tschüss|ciao|bis (später|dann|morgen|bald)|wie geht('?s| es dir)|was geht|"
+    r"wer bist du|was kannst du|wie spät ist es|welcher tag ist (heute|es))"
+    r"( (hermes|bro|digga|mann|kumpel))*( (und )?(wie geht('?s| es dir)|was geht))?")
+
+
+SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, lockeren Sätzen wie ein "
+                     "Mensch und geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer "
+                     "Frage wie 'Wie kann ich dir helfen?' oder 'Was kann ich für dich tun?'.]")
+
+
+def ist_smalltalk(text: str) -> bool:
+    """Begrüßung, Dank, kurze Reaktion: dafür braucht es kein Werkzeug, also auch keinen Router (spart ~3 s)."""
+    t = re.sub(r"[^\w\s']", " ", text.lower().replace("hermes,", "hermes")).split()
+    t = " ".join(w for w in t if w != "hermes" or len(t) == 1)
+    return len(t.split()) <= 8 and bool(SMALLTALK.fullmatch(t or "hallo"))
+
+
 def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict], dok_namen: list[str] = ()) -> tuple[str, str]:
     """Fragt das Modell kurz, welches Werkzeug die letzte Nachricht braucht. Gibt (werkzeug, eingabe) zurück.
     Der Router sieht die letzten Nachrichten, damit er Reaktionen aufs Gespräch nicht als Faktenfrage missversteht."""
@@ -574,6 +611,10 @@ class OllamaFehler(Exception):
     """Ollama hat die Anfrage abgelehnt. Der Text enthält die echte Ursache."""
 
 
+# Emojis (laut Prompt verboten, das kleine Modell hält sich nicht immer dran) samt Hautton/Varianten-Zeichen
+EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U0000FE0F\U0000200D]")
+
+
 def modell_stream(messages, modus):
     body = {"model": modus["name"], "messages": messages, "stream": True, "think": modus["think"],
             "keep_alive": HALTEN, "options": {"num_ctx": NUM_CTX, "temperature": 0.3}}
@@ -591,7 +632,9 @@ def modell_stream(messages, modus):
                 if m.get("thinking"):
                     yield "denkt", ""
                 if m.get("content"):
-                    yield "token", m["content"]
+                    text = EMOJI.sub("", m["content"])
+                    if text:
+                        yield "token", text
 
 
 MAX_ZEICHEN = 12000  # grob 3000-4000 Token Verlauf
@@ -653,7 +696,11 @@ def chat_stream(frage: Frage):
     try:
         yield ev(typ="status", text="denkt nach")
         # Bei neuen Bildern/PDFs kein Werkzeug: die Frage bezieht sich auf den Anhang
-        werkzeug, eingabe = ("keins", "") if (bilder or frage.dokumente) else werkzeug_waehlen(
+        smalltalk = ist_smalltalk(frage.text)
+        if smalltalk:
+            # Kleine Modelle überlesen Regeln im langen Systemprompt; ein Hinweis direkt an der Nachricht wirkt
+            messages[-1] = {**messages[-1], "content": messages[-1]["content"] + SMALLTALK_HINWEIS}
+        werkzeug, eingabe = ("keins", "") if (bilder or frage.dokumente or smalltalk) else werkzeug_waehlen(
             frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
         if werkzeug == "rechnen" and "heute" in eingabe:
             eingabe = eingabe.replace("heute", datetime.now().strftime("%d.%m.%Y"))

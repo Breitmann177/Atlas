@@ -214,6 +214,14 @@
   .kachel[data-design="grau"] { background-color:#2a2b2e; color:#ececed; }
   .kachel.aktiv { border:2px solid var(--fg); }
   /* Wake-Word: die aktive Kachel ist voll gefüllt, damit man An/Aus sofort sieht */
+  /* Stimmenauswahl: Klick spielt eine Probe und übernimmt die Stimme */
+  .stimmen { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .stimme { text-align:left; padding:10px 12px; border-radius:12px; border:1px solid var(--rand); background:none;
+            color:var(--dim); cursor:pointer; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; transition:.2s; }
+  .stimme small { display:block; margin-top:3px; font-size:9.5px; letter-spacing:.04em; opacity:.75; }
+  .stimme:hover { color:var(--fg); }
+  .stimme.aktiv { border-color:#34c759; color:#34c759; }
+  .stimme.spielt { animation:blink 1s infinite; }
   /* An/Aus-Schalter (Wake-Word): man sieht am Knopf-Ort UND an der Farbe, ob er an ist */
   .schalter-zeile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px;
                     border:1px solid var(--rand); border-radius:14px; }
@@ -375,6 +383,19 @@
           <button class="kachel" data-design="dunkel">DUNKEL</button>
           <button class="kachel" data-design="grau">GRAU</button>
           <button class="kachel" data-design="hell">HELL</button>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="abschnitt">STIMME</h3>
+        <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Online-Stimmen klingen natürlich, brauchen aber Internet (der Text geht dafür an Microsoft). „Lokal“ läuft komplett auf dem Laptop.</p>
+        <div class="stimmen">
+          <button type="button" class="stimme" data-stimme="florian">FLORIAN<small>ruhig, natürlich</small></button>
+          <button type="button" class="stimme" data-stimme="conrad">CONRAD<small>tief, ernst</small></button>
+          <button type="button" class="stimme" data-stimme="killian">KILLIAN<small>tief, gelassen</small></button>
+          <button type="button" class="stimme" data-stimme="jonas">JONAS<small>österreichisch</small></button>
+          <button type="button" class="stimme" data-stimme="william">WILLIAM<small>leichter Akzent</small></button>
+          <button type="button" class="stimme" data-stimme="lokal">LOKAL<small>offline, Piper</small></button>
         </div>
       </section>
 
@@ -903,7 +924,7 @@
   }
   async function holeAudio(text) {
     try {
-      const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, stimme: stimmeWahl }) });
       return res.ok ? URL.createObjectURL(await res.blob()) : null;
     } catch (e) { return null; }
   }
@@ -924,6 +945,24 @@
       if (url) await abspielen(url);
     }
   }
+
+  // Stimmenauswahl (Einstellungen)
+  let stimmeWahl = "florian";
+  try { stimmeWahl = localStorage.getItem("hermes-stimme") || "florian"; } catch (e) {}
+  function stimmeAnzeigen() {
+    document.querySelectorAll("[data-stimme]").forEach((b) => b.classList.toggle("aktiv", b.dataset.stimme === stimmeWahl));
+  }
+  document.querySelectorAll("[data-stimme]").forEach((b) => b.addEventListener("click", async () => {
+    stimmeWahl = b.dataset.stimme;
+    try { localStorage.setItem("hermes-stimme", stimmeWahl); } catch (e) {}
+    stimmeAnzeigen();
+    if (sprecher) sprecher.pause();
+    b.classList.add("spielt");
+    const url = await holeAudio("Guten Abend. Ich bin Hermes. So klinge ich, wenn ich dir antworte.");
+    if (url) await abspielen(url);
+    b.classList.remove("spielt");
+  }));
+  stimmeAnzeigen();
 
   function liveFragen(text) {
     return new Promise((fertig) => {
