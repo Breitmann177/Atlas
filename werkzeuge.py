@@ -91,23 +91,43 @@ def _latin1(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+# Unicode-Schriften (Windows, dann Raspberry Pi/Linux). Damit klappen auch ş, ğ, ı, € usw.
+SCHRIFTEN = [
+    ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+]
+
+
+def _schrift(pdf: FPDF) -> tuple[str, bool]:
+    """Bindet die erste vorhandene Unicode-Schrift ein. Ohne eine fällt es auf Helvetica (nur Latin-1) zurück."""
+    for normal, fett in SCHRIFTEN:
+        if Path(normal).is_file() and Path(fett).is_file():
+            pdf.add_font("Text", "", normal)
+            pdf.add_font("Text", "B", fett)
+            return "Text", True
+    return "Helvetica", False
+
+
 def pdf_erstellen(titel: str, inhalt: str, dateiname: str = "") -> str:
     """Erstellt ein PDF im Ordner 'pdfs' und gibt den Pfad zurück (oder 'FEHLER: ...')."""
     try:
         PDF_ORDNER.mkdir(exist_ok=True)
-        name = re.sub(r"[^A-Za-z0-9_-]", "_", dateiname or titel)[:50].strip("_") or "dokument"
-        pfad = PDF_ORDNER / f"{name}.pdf"
+        name = re.sub(r"[^A-Za-z0-9_-]", "_", dateiname or titel)[:40].strip("_") or "dokument"
+        # Zeitstempel: gleicher Titel überschreibt sonst ein älteres PDF, auf das ein alter Chat noch verlinkt
+        pfad = PDF_ORDNER / f"{name}_{time.strftime('%Y%m%d-%H%M%S')}.pdf"
 
         pdf = FPDF()
         pdf.set_auto_page_break(True, 15)
         pdf.add_page()
-        pdf.set_font("Helvetica", "B", 16)
-        pdf.multi_cell(0, 9, _latin1(titel), new_x="LMARGIN", new_y="NEXT")
+        schrift, unicode = _schrift(pdf)
+        sauber = (lambda t: t) if unicode else _latin1
+        pdf.set_font(schrift, "B", 16)
+        pdf.multi_cell(0, 9, sauber(titel), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(3)
-        pdf.set_font("Helvetica", size=11)
+        pdf.set_font(schrift, size=11)
         for zeile in inhalt.splitlines():
             if zeile.strip():
-                pdf.multi_cell(0, 6, _latin1(zeile), new_x="LMARGIN", new_y="NEXT")
+                pdf.multi_cell(0, 6, sauber(zeile), new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.ln(4)
         pdf.output(str(pfad))
