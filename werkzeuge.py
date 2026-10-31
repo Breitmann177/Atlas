@@ -30,11 +30,19 @@ PDF_ORDNER = Path("pdfs")
 
 
 def suche(frage: str, n: int = 5) -> list[dict]:
-    with DDGS() as d:
-        treffer = d.text(frage, region="de-de", max_results=n)
+    """Websuche. Bei Fehlern (z.B. kurzzeitige Sperre einer Suchmaschine) wird einmal neu versucht."""
+    for versuch in range(2):
+        try:
+            with DDGS() as d:
+                treffer = d.text(frage, region="de-de", max_results=n) or []
+            if treffer:
+                break
+        except Exception:
+            treffer = []
+        time.sleep(1)
     return [
         {"titel": t.get("title", ""), "url": t.get("href", ""), "text": t.get("body", "")}
-        for t in treffer
+        for t in treffer if t.get("href", "").startswith(("http://", "https://"))
     ]
 
 

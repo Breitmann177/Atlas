@@ -7,3 +7,4 @@ faster-whisper
 python-multipart
 fpdf2
 pypdf
+piper-tts

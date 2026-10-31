@@ -298,6 +298,11 @@
         <path d="M12 18v3"/>
       </svg>
     </button>
+    <button type="button" class="rund mic" id="live" title="Live-Gespräch (oder „Hey Hermes“ sagen)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 10v4"/><path d="M8 6v12"/><path d="M12 3v18"/><path d="M16 7v10"/><path d="M20 10v4"/>
+      </svg>
+    </button>
     <button class="rund senden" id="senden" title="Senden" disabled>
       <svg class="ico-senden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>
@@ -347,6 +352,15 @@
           <button class="kachel" data-design="dunkel">DUNKEL</button>
           <button class="kachel" data-design="grau">GRAU</button>
           <button class="kachel" data-design="hell">HELL</button>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="abschnitt">WAKE-WORD</h3>
+        <p class="hinweis">Sag „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
+        <div class="kacheln">
+          <button class="kachel" data-wake="an">AN</button>
+          <button class="kachel" data-wake="aus">AUS</button>
         </div>
       </section>
 
@@ -641,7 +655,7 @@
       const res = await fetch("/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, chat_id: aktuellerChat, modus, bilder: meineBilder,
+        body: JSON.stringify({ text, chat_id: aktuellerChat, modus, bilder: meineBilder, live: liveAn,
           dokumente: meinePdfs.map((p) => ({ name: p.name, text: p.text })) }),
         signal: abbruch.signal,
       });
@@ -696,6 +710,7 @@
     eingabe.focus();
     fenster.scrollTop = fenster.scrollHeight;
     if (warNeu) ladeChats();
+    if (antwortWarter) { const w = antwortWarter; antwortWarter = null; w(gestoppt ? "" : roh); }
   });
 
   // ---------- Mikrofon (Sprache zu Text) ----------
@@ -782,6 +797,192 @@
     mic.classList.add("aufnahme");
     platzhalter("Ich höre zu ... (nochmal aufs Mikro klicken zum Beenden)");
   });
+
+  // ---------- Live-Gespräch und Wake-Word ----------
+  // Hört übers Mikrofon zu, erkennt per Lautstärke, wann du sprichst und wann du fertig bist,
+  // schickt die Aufnahme an Whisper (/stt), die Antwort an Piper (/tts) und spielt sie ab. Alles lokal.
+  const liveKnopf = document.getElementById("live");
+  let liveAn = false;          // Live-Gespräch läuft
+  let wache = false;           // Wake-Word-Lauschen ist eingeschaltet
+  let ohr = null;              // { stream, ctx, analyser, puffer }
+  let sprecher = null;         // gerade spielendes Audio
+  let lauschLauf = 0;          // wird hochgezählt, um laufende Schleifen zu beenden
+  let antwortWarter = null;    // wartet auf das Ende einer Antwort (siehe form submit)
+  const WAKE = /\b(?:(?:hey|hi|hallo|okay|ok|he|ey)[\s,.!]*)?herm[eèé]s\b/i;
+  const ENDE = /^\s*(stopp?|ende|beenden|tschüss|danke,? das war'?s|das war'?s)\W*$/i;
+
+  async function ohrOeffnen() {
+    if (ohr) return;
+    if (!navigator.mediaDevices || !window.MediaRecorder) throw new Error("kein Mikro");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    const ctx = new AudioContext();
+    const analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    ohr = { stream, ctx, analyser, puffer: new Float32Array(analyser.fftSize) };
+  }
+  function ohrSchliessen() {
+    if (!ohr) return;
+    ohr.stream.getTracks().forEach((t) => t.stop()); ohr.ctx.close(); ohr = null;
+  }
+  // Browser starten Audio erst nach einem Klick: falls das Wake-Word beim Laden schon an ist
+  document.addEventListener("click", () => { if (ohr && ohr.ctx.state === "suspended") ohr.ctx.resume(); });
+
+  function pegel() {
+    ohr.analyser.getFloatTimeDomainData(ohr.puffer);
+    let s = 0; for (const v of ohr.puffer) s += v * v;
+    return Math.sqrt(s / ohr.puffer.length);
+  }
+
+  // Nimmt eine Äußerung auf: Aufnahme läuft schon vorher (damit das erste Wort nicht fehlt),
+  // endet nach "stille" ms Ruhe. Gibt einen Blob zurück, oder null, wenn niemand gesprochen hat.
+  function aeusserung(lauf, { maxWarten = 8000, maxDauer = 30000, stille = 1100 } = {}) {
+    return new Promise((fertig) => {
+      const rec = new MediaRecorder(ohr.stream), teile = [];
+      rec.ondataavailable = (e) => { if (e.data.size) teile.push(e.data); };
+      const t0 = performance.now();
+      let boden = 0.01, an = 0, zuletzt = 0, ende = false;
+      rec.onstop = () => fertig(an && zuletzt - an > 250 ? new Blob(teile, { type: rec.mimeType || "audio/webm" }) : null);
+      rec.start(200);
+      const uhr = setInterval(() => {
+        const jetzt = performance.now(), v = pegel();
+        if (v > Math.max(0.02, boden * 3)) { if (!an) an = jetzt; zuletzt = jetzt; }
+        else if (!an) boden = boden * 0.95 + v * 0.05;  // Grundrauschen des Raums mitlernen
+        const weg = lauf !== lauschLauf;
+        if (!ende && (weg || (!an && jetzt - t0 > maxWarten) || (an && jetzt - zuletzt > stille)
+            || (an && jetzt - an > maxDauer))) {
+          ende = true; clearInterval(uhr);
+          if (weg) an = 0;
+          rec.stop();
+        }
+      }, 50);
+    });
+  }
+
+  async function erkennen(blob) {
+    try {
+      const daten = new FormData();
+      daten.append("datei", blob, "aufnahme.webm");
+      const antwort = await (await fetch("/stt", { method: "POST", body: daten })).json();
+      return (antwort.text || "").trim();
+    } catch (e) { return ""; }
+  }
+
+  // In Sätze teilen: der erste Satz wird schon vorgelesen, während die nächsten noch erzeugt werden
+  function saetze(text) {
+    const teile = text.split("\n---\n**Quellen**")[0].split(/(?<=[.!?:])\s+|\n+/), stuecke = [];
+    let akt = "";
+    for (const s of teile) {
+      if ((akt + " " + s).length > 220 && akt) { stuecke.push(akt); akt = s; } else akt = (akt + " " + s).trim();
+    }
+    if (akt) stuecke.push(akt);
+    return stuecke;
+  }
+  async function holeAudio(text) {
+    try {
+      const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      return res.ok ? URL.createObjectURL(await res.blob()) : null;
+    } catch (e) { return null; }
+  }
+  function abspielen(url) {
+    return new Promise((fertig) => {
+      sprecher = new Audio(url);
+      sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
+      sprecher.play().catch(fertig);
+    }).finally(() => { URL.revokeObjectURL(url); sprecher = null; });
+  }
+  async function sagen(text, lauf) {
+    const stuecke = saetze(text);
+    let naechstes = stuecke.length ? holeAudio(stuecke[0]) : null;
+    for (let i = 0; i < stuecke.length; i++) {
+      const url = await naechstes;
+      naechstes = i + 1 < stuecke.length ? holeAudio(stuecke[i + 1]) : null;
+      if (lauf !== lauschLauf) break;
+      if (url) await abspielen(url);
+    }
+  }
+
+  function liveFragen(text) {
+    return new Promise((fertig) => {
+      if (beschaeftigt) { fertig(""); return; }
+      antwortWarter = fertig;
+      eingabe.value = text;
+      form.requestSubmit();
+    });
+  }
+
+  async function liveStarten(ersteFrage) {
+    if (liveAn) return;
+    liveAn = true; liveKnopf.classList.add("aufnahme");
+    const lauf = ++lauschLauf;  // beendet ein laufendes Wake-Word-Lauschen
+    try { await ohrOeffnen(); } catch (e) {
+      platzhalter("Mikrofon nicht erlaubt (geht nur über localhost oder HTTPS).", 6000);
+      liveBeenden(); return;
+    }
+    let frage = ersteFrage, leer = 0;
+    if (!frage) await sagen("Ja?", lauf);
+    while (liveAn && lauf === lauschLauf) {
+      if (!frage) {
+        platzhalter("Live · Ich höre zu ... (Knopf beendet)");
+        const blob = await aeusserung(lauf, { maxWarten: 15000 });
+        if (!liveAn || lauf !== lauschLauf) break;
+        if (!blob) { if (++leer >= 2) break; continue; }  // 30 s Ruhe: Gespräch endet von selbst
+        platzhalter("Live · Schreibe mit ...");
+        window.hermesDenkt = true;
+        frage = await erkennen(blob);
+        window.hermesDenkt = false;
+        if (!frage) continue;
+      }
+      leer = 0;
+      if (ENDE.test(frage)) { await sagen("Alles klar.", lauf); break; }
+      platzhalter("Live · Denkt nach ...");
+      const antwort = await liveFragen(frage);
+      frage = "";
+      if (!liveAn || lauf !== lauschLauf) break;
+      if (antwort) { platzhalter("Live · Spricht ..."); await sagen(antwort, lauf); }
+    }
+    if (lauf === lauschLauf) liveBeenden();
+  }
+
+  function liveBeenden() {
+    if (!liveAn) return;
+    liveAn = false; lauschLauf++;
+    if (sprecher) sprecher.pause();
+    if (antwortWarter && abbruch) abbruch.abort();
+    liveKnopf.classList.remove("aufnahme");
+    window.hermesDenkt = false;
+    platzhalter(STANDARD);
+    if (wache) wachLauschen(); else ohrSchliessen();
+  }
+
+  liveKnopf.addEventListener("click", () => { if (liveAn) liveBeenden(); else liveStarten(""); });
+
+  async function wachLauschen() {
+    const lauf = ++lauschLauf;
+    try { await ohrOeffnen(); } catch (e) {
+      platzhalter("Mikrofon nicht erlaubt: Wake-Word geht nicht.", 6000); wakeSetzen(false); return;
+    }
+    while (wache && !liveAn && lauf === lauschLauf) {
+      // kurze Stücke: "Hey Hermes" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
+      const blob = await aeusserung(lauf, { maxWarten: 10000, maxDauer: 7000, stille: 700 });
+      if (!blob || beschaeftigt || lauf !== lauschLauf) continue;
+      const text = await erkennen(blob);
+      const m = text.match(WAKE);
+      if (m && lauf === lauschLauf && wache && !liveAn) {
+        const rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
+        liveStarten(rest.length > 3 ? rest : "");
+        return;
+      }
+    }
+  }
+
+  function wakeSetzen(an) {
+    wache = an;
+    try { localStorage.setItem("hermes-wake", an ? "an" : "aus"); } catch (e) {}
+    document.querySelectorAll("[data-wake]").forEach((b) => b.classList.toggle("aktiv", b.dataset.wake === (an ? "an" : "aus")));
+    if (liveAn) return;
+    if (an) wachLauschen(); else { lauschLauf++; ohrSchliessen(); }
+  }
+  document.querySelectorAll("[data-wake]").forEach((b) => b.addEventListener("click", () => wakeSetzen(b.dataset.wake === "an")));
 
   // ---------- Seitenleiste ----------
   function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
@@ -1044,6 +1245,9 @@
   try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
   setzeDesign(gespeichert);
   setzeModus(modus);
+  let wakeGespeichert = false;
+  try { wakeGespeichert = localStorage.getItem("hermes-wake") === "an"; } catch (e) {}
+  wakeSetzen(wakeGespeichert);
   sendeStatus();
   ladeChats();
   ladeErinnerungen(true);

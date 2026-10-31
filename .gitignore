@@ -4,3 +4,4 @@ __pycache__/
 hermes.db*
 pdfs/
 .env
+stimmen/
