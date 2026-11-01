@@ -816,6 +816,33 @@ def letzter_wurf(text: str, verlauf: list[dict]) -> str | None:
     return None
 
 
+# Fragen nach den eigenen Fähigkeiten: feste, wahre Liste. Die Websuche fand sonst das fremde Produkt "Hermes Agent",
+# und das Modell gab dessen Funktionen als seine eigenen aus.
+FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|\bfähigkeiten von hermes\b|"
+                        r"\b(deine|hermes)\b.*\b(fähigkeit\w*|funktion\w*|features?)\b|\b(fähigkeit\w*|funktion\w*|features?)\b.*\b(du|hermes)\b", re.I)
+NOCH_MEHR = re.compile(r"\b(was noch|sonst noch|und noch|alles|liste)\b", re.I)
+FAEHIGKEITEN_LISTE = """Das kann ich:
+
+- Fragen beantworten und dafür im Internet nachschauen, mit Quellen
+- Wetter und Vorhersage für jeden Ort
+- Nachrichten von der Tagesschau und ein Morgen-Briefing auf „Guten Morgen“
+- Rechnen, auch Prozente und Tage zwischen zwei Daten
+- Timer stellen, Uhrzeit weltweit, Münze werfen, würfeln und Zufallszahlen
+- PDFs lesen und Fragen dazu beantworten, neue PDFs erstellen
+- Bilder beschreiben
+- Texte schreiben und übersetzen, Dinge erklären und im Chat beim Programmieren helfen
+- Mit dir reden: per Knopf oder „Hey Hermes“, und du kannst mir ins Wort fallen
+- Mir Dinge über dich merken, wenn du es möchtest
+
+Nicht kann ich: Programme oder Dateien auf deinem Laptop steuern und mich zu einer bestimmten Uhrzeit von selbst melden."""
+
+
+def faehigkeiten(text: str, gemeint: str, verlauf: list[dict]) -> str | None:
+    davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
+    nachfrage = bool(NOCH_MEHR.search(text)) and bool(davor) and bool(FAEHIGKEIT.search(davor[-1]))
+    return FAEHIGKEITEN_LISTE if FAEHIGKEIT.search(text) or FAEHIGKEIT.search(gemeint) or nachfrage else None
+
+
 def sofort_antwort(text: str) -> str | None:
     """Weltzeit, Münze, Würfel, Zufallszahl. Echter Zufall und echte Uhr statt geratener Modell-Antworten."""
     m = UHRZEIT_ORT.search(text)
@@ -1369,7 +1396,8 @@ def chat_stream(frage: Frage):
     # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
-        None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text)))
+        None if (bilder or frage.dokumente) else (
+            faehigkeiten(frage.text, gemeint, verlauf) or sofort_antwort(gemeint) or humor_spruch(frage.text)))
     if sofort:
         # Münze und Würfel: Erst fliegt es im Auge, dann kommt das Ergebnis, damit die Antwort nichts vorwegnimmt
         wurf = None if gemerkt or name else ("muenze" if MUENZE.search(gemeint) else "wuerfel" if WUERFEL.search(gemeint) else None)
