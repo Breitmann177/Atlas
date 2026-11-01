@@ -760,6 +760,8 @@ zwei Sätze, NUR aus den mitgegebenen Schlagzeilen, nichts dazuerfinden. Nenne a
 
 WETTER = re.compile(r"\b(wetter|temperatur|wie (warm|kalt|heiß)|regnet|regnen|regen|schneit|schnee|gewitter|"
                     r"sonnig|bewölkt|grad draußen|regenschirm|schirm mitnehmen)\b", re.I)
+VERGANGEN = re.compile(r"\b(gestern|vorgestern|letzte\w*|war)\b", re.I)
+KLEIDUNG = re.compile(r"\b(jacke|mantel|anziehen|sonnencreme)\b", re.I)
 KEIN_ORT = {"Deutschland", "Grad", "Celsius", "Uhr", "Hermes"}
 
 
@@ -795,6 +797,7 @@ QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit de
 # ---------- Sofort-Antworten: dafür braucht es kein Sprachmodell, also auch keine Halluzinationen ----------
 UHRZEIT_ORT = re.compile(r"\b(wie spät|wie viel uhr|wieviel uhr|uhrzeit)\b.*\b(?:in|auf) "
                          r"([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)", re.I)
+WURF_SEKUNDEN = 1.5  # so lange wie die Animation im Browser
 MUENZE = re.compile(r"\b(wirf|werf\w*|münzwurf)\b.*\bmünze\b|\bmünzwurf\b|\bkopf oder zahl\b", re.I)
 WUERFEL = re.compile(r"^\W*(hermes\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfeln|wirf einen würfel)\b", re.I)
 ZUFALL = re.compile(r"\b(?:zufallszahl|zufällige zahl)\b(?:.*?(\d+)\D+(\d+))?", re.I)
@@ -917,6 +920,11 @@ def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict], dok_namen: li
         werkzeug, eingabe = j.get("werkzeug"), (j.get("eingabe") or "").strip()[:200]
         if werkzeug not in WERKZEUGE or (werkzeug in ("suche", "rechnen") and not eingabe):
             return "keins", ""
+        # Das kleine Modell schwankt: Es nannte einmal das Wetter als Antwort auf eine Frage nach Ereignissen.
+        # Deshalb gelten seine Wetter- und Rechner-Wahl nur, wenn die Frage wirklich danach klingt; sonst wird gesucht.
+        if (werkzeug == "wetter" and not (WETTER.search(frage) or KLEIDUNG.search(frage))) or (
+                werkzeug == "rechnen" and not RECHENFRAGE.search(frage)):
+            werkzeug, eingabe = "suche", (FUELLWOERTER.sub("", frage).strip(" ?!.,") or frage)[:200]
         if werkzeug == "suche":
             eingabe = veraltete_jahre_entfernen(eingabe, frage)
         return werkzeug, eingabe
@@ -994,7 +1002,7 @@ class FloskelFilter:
 
 
 # Grenzen fürs Modell: Bei Tabellen dachte es im Test über 9 Minuten ohne Ende. Etwa 60 Stücke pro Sekunde.
-MAX_DENKEN = 900  # ~15 s, danach wird das Nachdenken abgebrochen und direkt geantwortet
+MAX_DENKEN = 900  # ~15 s, danach direkt antworten. Im Test war 450 schlechter: langsamer durch Neustarts und mehr falsche Antworten
 MAX_ANTWORT = 1500
 
 
@@ -1076,7 +1084,8 @@ FUELLWOERTER = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?((kannst
 FRAGEWORT = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?(wer|wen|wem|wessen|was|wann|wo|wohin|woher|wie|warum|wieso|weshalb|"
                        r"welche\w*|wieviel\w*|gibt es|gibt's|stimmt es|ist|sind|hat|haben|war|waren)\b", re.I)
 AN_HERMES = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
-RECHENFRAGE = re.compile(r"\d.*(%|\bprozent\b|\bmal\b|\bplus\b|\bminus\b|\bgeteilt\b|\bwurzel\b|[+*/=])", re.I)
+RECHENFRAGE = re.compile(r"\d.*(%|\bprozent\b|\bmal\b|\bplus\b|\bminus\b|\bgeteilt\b|\bdurch\b|\bhoch\b|\bwurzel\b|\btage\b|"
+                         r"\bwochen\b|[+*/=])|\b(wurzel|tage|wochen)\b.*\d|\brechne\b|\bberechne\b", re.I)
 
 
 def ohne_router(text: str, dokumente: list) -> bool:
@@ -1136,7 +1145,7 @@ def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
     ort = ort_aus_text(text)
     if UHRZEIT_ORT.search(vorige) and ort:
         return f"Wie spät ist es in {ort}?"
-    if WETTER.search(vorige) and not WETTER.search(text):
+    if WETTER.search(vorige) and not WETTER.search(text) and len(text.split()) <= 5:
         ort = ort or ort_aus_text(vorige)
         if ort:  # das "in Ort" steht vorn, damit genau dieser Ort gefunden wird; der Rest nennt den Tag
             return f"Wetter in {ort}: {text.strip()}"
@@ -1318,6 +1327,11 @@ def chat_stream(frage: Frage):
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
         None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text)))
     if sofort:
+        # Münze und Würfel: Erst fliegt es im Auge, dann kommt das Ergebnis, damit die Antwort nichts vorwegnimmt
+        wurf = None if gemerkt or name else ("muenze" if MUENZE.search(gemeint) else "wuerfel" if WUERFEL.search(gemeint) else None)
+        if wurf:
+            yield ev(typ="wurf", art=wurf, ergebnis=re.sub(r"\D", "", sofort) or sofort.rstrip("."))
+            time.sleep(WURF_SEKUNDEN)
         yield ev(typ="token", text=sofort)
         if neuer_fakt:
             yield ev(typ="gemerkt", fakt=neuer_fakt)
@@ -1379,7 +1393,9 @@ def chat_stream(frage: Frage):
                 yield ev(typ="ergebnis", name="wetter", ok=ok)
                 messages[0]["content"] += (
                     "\n\nAktuelle Wetterdaten vom Wetterdienst Open-Meteo (Messwerte und Vorhersage):\n" + daten +
-                    "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten." if ok else
+                    "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten."
+                    + ("\nFragt der Nutzer nach einem vergangenen Tag, sag ehrlich, dass du nur das aktuelle Wetter und die "
+                       "Vorhersage kennst, und gib heutige Werte nicht als vergangene aus." if VERGANGEN.search(gemeint) else "") if ok else
                     f"\n\nDie Wetterabfrage für '{ort}' ist fehlgeschlagen ({daten}). Sag das ehrlich.")
             else:
                 messages[0]["content"] += ("\n\nDer Nutzer fragt nach dem Wetter, aber sein Ort ist unbekannt. "

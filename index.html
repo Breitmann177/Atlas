@@ -40,6 +40,11 @@
                   top:calc(84px + min(380px,80vw) * 0.553 + 4px); background:none; border:0; padding:2px 8px;
                   color:var(--fg); font-family:var(--mono); font-size:15px; letter-spacing:.2em;
                   transition:top .8s ease, left .8s ease, transform .8s ease, font-size .8s ease; }
+  #wurfanzeige { position:fixed; z-index:21; left:50%; transform:translateX(-50%); pointer-events:none;
+                 top:calc(84px + min(380px,80vw) * 0.553 + 4px); color:var(--fg); font-family:var(--mono);
+                 font-size:15px; letter-spacing:.2em; }
+  body.klein #wurfanzeige { top:54px; left:18px; transform:none; width:72px; font-size:11px; letter-spacing:.06em; text-align:center; }
+  body.wurf #hero p, body.wurf #timeranzeige { visibility:hidden; }
   body.timer #hero p { visibility:hidden; }  /* sonst überlappt "BEREIT" die Restzeit */
   body.klein #timeranzeige { top:54px; left:18px; transform:none; width:72px; padding:0; font-size:11px;
                              letter-spacing:.06em; text-align:center; }
@@ -322,6 +327,7 @@
 <body>
 <canvas id="auge" title="Menü"></canvas>
 <button type="button" id="timeranzeige" title="Timer stoppen" hidden></button>
+<div id="wurfanzeige" hidden></div>
 
 <header><div class="logo">HERMES</div></header>
 
@@ -813,6 +819,7 @@
             if (aktiveKette) aktiveKette.rein(" Soll ich mir das merken?");
           }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
+          else if (ev.typ === "wurf") wurfStarten(ev.art, ev.ergebnis);
           else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); if (aktiveKette) aktiveKette.rein("\n" + ev.text); }
         }
         fenster.scrollTop = fenster.scrollHeight;
@@ -1074,6 +1081,21 @@
     b.classList.remove("spielt");
   }));
   stimmeAnzeigen();
+
+  // ---------- Münze und Würfel im Auge ----------
+  const WURF_DAUER = 1400, WURF_ZEIGEN = 3500;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
+  const wurfAnzeige = document.getElementById("wurfanzeige");
+  let wurfUhr = [];
+  function wurfStarten(art, ergebnis) {
+    wurfUhr.forEach(clearTimeout);
+    window.hermesWurf = { art, ergebnis, start: performance.now(), dauer: WURF_DAUER };
+    document.body.classList.add("wurf");
+    wurfAnzeige.hidden = false; wurfAnzeige.textContent = "...";
+    wurfUhr = [
+      setTimeout(() => { wurfAnzeige.textContent = String(ergebnis).toUpperCase(); }, WURF_DAUER),
+      setTimeout(() => { window.hermesWurf = null; wurfAnzeige.hidden = true; document.body.classList.remove("wurf"); }, WURF_DAUER + WURF_ZEIGEN),
+    ];
+  }
 
   // ---------- Timer ----------
   // Zählt im Browser herunter. Solange er läuft, wird die Pupille zur Uhr (siehe Auge), darunter steht die Restzeit.
@@ -1465,6 +1487,7 @@
     const UMHER = [[-1, -.3], [1, -.2], [.7, .6], [-.7, .5], [0, -.7], [1, .1], [-1, .2]];
 
     function stimmung(t) {
+      if (window.hermesWurf) return "wurf";
       if (window.hermesSucht) return "sucht";
       if (window.hermesSpricht) return "spricht";
       if (window.hermesDenkt) return "denkt";
@@ -1472,6 +1495,40 @@
       if (window.hermesTimer) return "timer";
       if (window.hermesFroh && t - window.hermesFroh < 1800) return "froh";
       return "ruhe";
+    }
+
+    // Münze oder Würfel statt Pupille: fliegt hoch, dreht sich immer langsamer und landet auf dem Ergebnis
+    function wurfZeichnen(t, cx, cy) {
+      const w = window.hermesWurf, p = Math.min(1, (t - w.start) / w.dauer), brems = 1 - Math.pow(1 - p, 3);
+      const hoehe = Math.sin(p * Math.PI) * 22;
+      q.save();
+      q.translate(cx, cy - hoehe);
+      if (w.art === "muenze") {
+        const flach = p < 1 ? Math.abs(Math.cos(brems * Math.PI * 9)) : 1;
+        q.scale(1, Math.max(0.06, flach));
+        q.fillStyle = "#000"; q.beginPath(); q.arc(0, 0, 62, 0, Math.PI * 2); q.fill();
+        q.fillStyle = "#f2f2f2"; q.beginPath(); q.arc(0, 0, 54, 0, Math.PI * 2); q.fill();
+        if (p >= 1) {
+          q.fillStyle = "#000";
+          if (w.ergebnis === "Kopf") {
+            q.beginPath(); q.arc(0, -13, 19, 0, Math.PI * 2); q.fill();
+            q.beginPath(); q.ellipse(0, 28, 31, 22, 0, 0, Math.PI * 2); q.fill();
+          } else {
+            q.font = "bold 84px Arial,sans-serif"; q.textAlign = "center"; q.textBaseline = "middle";
+            q.fillText("1", 0, 4);
+          }
+        }
+      } else {
+        q.rotate(brems * Math.PI * 6);
+        q.fillStyle = "#000"; q.beginPath(); q.roundRect(-60, -60, 120, 120, 18); q.fill();
+        q.fillStyle = "#f2f2f2"; q.beginPath(); q.roundRect(-52, -52, 104, 104, 12); q.fill();
+        const a = 28, punkte = { 1: [[0, 0]], 2: [[-a, -a], [a, a]], 3: [[-a, -a], [0, 0], [a, a]],
+          4: [[-a, -a], [a, -a], [-a, a], [a, a]], 5: [[-a, -a], [a, -a], [0, 0], [-a, a], [a, a]],
+          6: [[-a, -a], [a, -a], [-a, 0], [a, 0], [-a, a], [a, a]] };
+        q.fillStyle = "#000";
+        (punkte[p >= 1 ? w.ergebnis : 5] || []).forEach(([x, y]) => { q.beginPath(); q.arc(x, y, 11, 0, Math.PI * 2); q.fill(); });
+      }
+      q.restore();
     }
 
     function zeichne(t) {
@@ -1494,6 +1551,8 @@
       } else if (s === "spricht") {
         zOffen = 0.95; zFreude = 0.35 + Math.abs(Math.sin(t / 180)) * 0.25; zPupille = 26;
         ziel.x = 0; ziel.y = Math.sin(t / 180) * 3;
+      } else if (s === "wurf") {
+        zOffen = 1.15; ziel.x = 0; ziel.y = 0;
       } else if (s === "timer") {
         zOffen = 1.1; ziel.x = 0; ziel.y = 0;
       } else if (s === "froh") {
@@ -1551,6 +1610,7 @@
         q.fillStyle = "#000"; q.beginPath(); q.arc(cx, cy, 6, 0, Math.PI * 2); q.fill();
         q.globalAlpha = 1;
       }
+      if (window.hermesWurf) wurfZeichnen(t, cx, cy);
       q.restore();
       // Lächeln: das Unterlid schiebt sich als Bogen von unten ins Auge -> freundliche "^"-Form.
       // Ohne Clip gezeichnet, damit es auch den weichen Rand des Auges abdeckt.
