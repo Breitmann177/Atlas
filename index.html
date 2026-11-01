@@ -966,16 +966,17 @@
     return -1;
   }
   function sprechKette(lauf) {
-    let puffer = "", stumm = false, erster = true, kette = Promise.resolve();
+    let puffer = "", stumm = false, erster = true, aus = false, kette = Promise.resolve();
     const raus = (text) => {
       if (!text.trim()) return;
       const ton = holeAudio(text).then((url) => (url && lauf === lauschLauf ? new Audio(url) : null));
       kette = kette.then(async () => {
         const audio = await ton;
-        if (audio && lauf === lauschLauf) await abspielen(audio);
+        if (audio && !aus && lauf === lauschLauf) await abspielen(audio);
       });
     };
     return {
+      abbrechen() { aus = true; stumm = true; puffer = ""; },
       rein(t) {
         if (stumm) return;
         puffer += t;
@@ -1063,6 +1064,35 @@
     });
   }
 
+  // Kurzer, weicher Ton nach "Hey Hermes": Ich höre jetzt zu. Zwei leise Töne, schnell ausklingend.
+  function hoerTon() {
+    try {
+      const ctx = new AudioContext(), t0 = ctx.currentTime + 0.02;
+      [[659.25, 0], [880, 0.09]].forEach(([ton, start]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t = t0 + start;
+        o.type = "sine"; o.frequency.value = ton;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.07, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+        o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3);
+      });
+      setTimeout(() => ctx.close(), 800);
+    } catch (e) {}
+  }
+
+  // Reinreden: Solange Hermes spricht, wird das Mikrofon beobachtet. Bleibt der Pegel kurz deutlich über dem,
+  // was gerade als Echo der eigenen Stimme ankommt, hört er auf und lauscht. (Das Mikrofon läuft mit Echounterdrückung.)
+  function reinredenWaechter(beiReinreden) {
+    let boden = 0.01, laut = 0, ausgeloest = false;
+    const uhr = setInterval(() => {
+      if (!ohr || !window.hermesSpricht) { laut = 0; return; }
+      const v = pegel();
+      if (v > Math.max(0.05, boden * 3)) laut += 50;
+      else { laut = 0; boden = boden * 0.97 + v * 0.03; }
+      if (laut >= 250) { ausgeloest = true; clearInterval(uhr); beiReinreden(); }
+    }, 50);
+    return { stopp() { clearInterval(uhr); }, get ausgeloest() { return ausgeloest; } };
+  }
+
   async function liveStarten(ersteFrage) {
     if (liveAn) return;
     liveAn = true; liveAnzeige(true);
@@ -1072,7 +1102,6 @@
       liveBeenden(); return;
     }
     let frage = ersteFrage, leer = 0;
-    if (!frage) await sagen("Ja?", lauf);
     while (liveAn && lauf === lauschLauf) {
       if (!frage) {
         platzhalter("Live · Ich höre zu ... (Knopf beendet)");
@@ -1092,12 +1121,18 @@
       platzhalter("Live · Denkt nach ...");
       const kette = sprechKette(lauf);
       aktiveKette = kette;
+      const waechter = reinredenWaechter(() => {
+        kette.abbrechen();
+        if (sprecher) sprecher.pause();
+        if (abbruch) abbruch.abort();  // läuft die Antwort noch, wird sie nicht weiter erzeugt
+      });
       await liveFragen(frage);
       aktiveKette = null;
       frage = "";
-      if (!liveAn || lauf !== lauschLauf) break;
+      if (!liveAn || lauf !== lauschLauf) { waechter.stopp(); break; }
       platzhalter("Live · Spricht ...");
       await kette.ende();
+      waechter.stopp();
     }
     if (lauf === lauschLauf) liveBeenden();
   }
@@ -1132,6 +1167,7 @@
       const text = await erkennen(blob, true);
       const m = text.match(WAKE);
       if (m && lauf === lauschLauf && wache && !liveAn) {
+        hoerTon();
         let rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
         if (rest.length > 3) {
           // Frage direkt hinterher ("Hey Hermes, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen

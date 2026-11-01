@@ -10,3 +10,5 @@ pypdf
 piper-tts
 edge-tts
 tzdata
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*

@@ -7,7 +7,8 @@ import secrets
 import sqlite3
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 import requests
@@ -75,7 +76,13 @@ def pruefe(request: Request):
 
 
 # docs/openapi aus: sonst wäre eine Liste aller Endpunkte öffentlich
-app = FastAPI(dependencies=[Depends(pruefe)], docs_url=None, redoc_url=None, openapi_url=None)
+@asynccontextmanager
+async def _beim_start(_app):
+    whisper_aufwaermen()
+    yield
+
+
+app = FastAPI(dependencies=[Depends(pruefe)], docs_url=None, redoc_url=None, openapi_url=None, lifespan=_beim_start)
 
 # Nur diese Host-Namen werden bedient. Schützt vor "DNS-Rebinding": eine fremde Webseite, deren Name auf
 # 127.0.0.1 zeigt, könnte sonst im Browser dein lokales Hermes ansprechen. Für Tailscale den Namen/die IP
@@ -293,20 +300,57 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
 
 
 # ---------- Spracherkennung ----------
-# Zwei Größen: "medium" versteht deutlich mehr richtig (im Test: "wie viel Uhr" statt "wie die US"), braucht
-# auf der CPU aber ~3-4 s pro Satz. "small" (~1-2 s) nur fürs Dauerlauschen auf "Hey Hermes".
+# Auf der Grafikkarte braucht "medium" ~0,6 s pro Satz, auf der CPU ~5 s. Ist die Karte aus (Stromsparmodus) oder
+# der Speicher voll, geht es auf der CPU weiter; dort lauscht das kleinere "small" auf "Hey Hermes".
 _whisper: dict[str, object] = {}
 _whisper_sperre = threading.Lock()
+_gpu_kaputt = False
+
+
+def _cuda_dlls():
+    """Die CUDA-Bibliotheken liegen als pip-Pakete in der venv; Windows muss sie dort finden."""
+    import glob
+    import site
+
+    for basis in site.getsitepackages():
+        for ordner in glob.glob(os.path.join(basis, "nvidia", "*", "bin")):
+            os.environ["PATH"] = ordner + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(ordner)
 
 
 def whisper(groesse: str = "medium"):
-    with _whisper_sperre:  # gleichzeitige Anfragen sollen ein Modell nicht doppelt laden oder parallel nutzen
-        if groesse not in _whisper:
-            from faster_whisper import WhisperModel
+    """Gibt (modell, auf_grafikkarte) zurück. Aufrufer hält die Sperre."""
+    global _gpu_kaputt
+    from faster_whisper import WhisperModel
 
-            _whisper[groesse] = WhisperModel(groesse, device="cpu", compute_type="int8",
-                                             cpu_threads=max(4, (os.cpu_count() or 8) // 2))
-        return _whisper[groesse]
+    if not _gpu_kaputt:
+        try:
+            if "gpu" not in _whisper:
+                _cuda_dlls()
+                _whisper["gpu"] = WhisperModel("medium", device="cuda", compute_type="int8_float16")
+            return _whisper["gpu"], True
+        except Exception as e:
+            _gpu_kaputt = True
+            print("Spracherkennung läuft auf der CPU, Grafikkarte nicht nutzbar:", repr(e), flush=True)
+    if groesse not in _whisper:
+        _whisper[groesse] = WhisperModel(groesse, device="cpu", compute_type="int8",
+                                         cpu_threads=max(4, (os.cpu_count() or 8) // 2))
+    return _whisper[groesse], False
+
+
+def whisper_aufwaermen():
+    """Der allererste Lauf auf der Grafikkarte dauerte im Test 60 s. Das soll beim Start passieren, nicht bei dir."""
+    def arbeit():
+        import numpy as np
+
+        try:
+            with _whisper_sperre:
+                modell, _ = whisper()
+                list(modell.transcribe(np.zeros(16000, dtype=np.float32), language="de")[0])
+        except Exception as e:
+            print("Spracherkennung konnte nicht vorgeladen werden:", repr(e), flush=True)
+    threading.Thread(target=arbeit, daemon=True).start()
 
 
 # Whisper "hört" bei Stille oder Rauschen gern Sätze aus seinen Trainingsdaten (Untertitel). Die verwerfen wir.
@@ -317,10 +361,20 @@ HALLUZINATION = re.compile(
 
 
 def transkribieren(pfad: str, groesse: str) -> str:
-    modell = whisper(groesse)
-    with _whisper_sperre:
-        teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
-        saetze = [t.text.strip() for t in teile]  # erst hier rechnet Whisper wirklich
+    global _gpu_kaputt
+    with _whisper_sperre:  # immer nur eine Erkennung gleichzeitig
+        modell, gpu = whisper(groesse)
+        try:
+            teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
+            saetze = [t.text.strip() for t in teile]  # erst hier rechnet Whisper wirklich
+        except Exception as e:
+            if not gpu:
+                raise
+            _gpu_kaputt = True  # z.B. Grafikspeicher voll: ab jetzt CPU
+            print("Spracherkennung wechselt auf die CPU:", repr(e), flush=True)
+            modell, _ = whisper(groesse)
+            teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
+            saetze = [t.text.strip() for t in teile]
     saetze = [s for s in saetze if s and not HALLUZINATION.search(s)]
     return " ".join(saetze).strip()
 
@@ -977,9 +1031,13 @@ def briefing_daten(messages: list[dict], mit_wetter: bool):
     yield ev(typ="status", text="denkt nach")
 
 
-# Auto-Modus: Bei solchen Fragen lohnt sich das Nachdenken
-KOMPLEX = re.compile(r"\b(erklär\w*|erkläre\w*|warum|wieso|weshalb|vergleich\w*|unterschied\w*|analysier\w*|begründ\w*|"
-                     r"vor- und nachteile|beweis\w*|schritt für schritt|plan\w*|programmier\w*|code|fehler|berechne\w*)\b", re.I)
+OHNE_ROUTER = re.compile(r"^\W*(hermes\W*)?(warum|wieso|weshalb|erklär\w*|wie funktioniert|wie geht|wie mache|wie kann ich|"
+                         r"schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*|hilf|gib mir (einen|ein paar) tipp)\b", re.I)
+
+
+def ohne_router(text: str, dokumente: list) -> bool:
+    """Erklär- und Schreibaufgaben brauchen kein Werkzeug: Router sparen (~2,5 s). Im Zweifel fragt er den Router."""
+    return not dokumente and bool(OHNE_ROUTER.search(text)) and not werkzeuge.ZEITNAH.search(text)
 
 
 def chat_stream(frage: Frage):
@@ -1059,7 +1117,7 @@ def chat_stream(frage: Frage):
             # Wetterfragen nie dem Router überlassen: sonst landet er manchmal bei der Websuche und zufälligen Seiten
             if not anhang and WETTER.search(frage.text):
                 werkzeug, eingabe = "wetter", ort_aus_text(frage.text)
-            elif anhang or smalltalk:
+            elif anhang or smalltalk or ohne_router(frage.text, dokumente):
                 werkzeug, eingabe = "keins", ""
             else:
                 werkzeug, eingabe = werkzeug_waehlen(frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
@@ -1105,15 +1163,21 @@ def chat_stream(frage: Frage):
                                              f", vom {t['datum']}" if t.get("datum") else "", t["text"])
                      for i, t in enumerate(treffer)]
             # die drei besten Seiten gleichzeitig lesen (nacheinander dauert es dreimal so lange)
-            with ThreadPoolExecutor(3) as pool:
-                laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in treffer[:3]]
-                for url, lauf in laeufe:
-                    yield ev(typ="status", text="liest", detail=url)
-                    text = lauf.result()
-                    ok = not text.startswith("FEHLER")
-                    yield ev(typ="ergebnis", name="seite_lesen", ok=ok)
-                    if ok:
-                        teile.append("Seiteninhalt von %s:\n%s" % (url, text))
+            # Höchstens 5 s warten: eine langsame Seite soll nicht die ganze Antwort aufhalten
+            pool = ThreadPoolExecutor(3)
+            frist = time.time() + 5
+            laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in treffer[:3]]
+            for url, lauf in laeufe:
+                yield ev(typ="status", text="liest", detail=url)
+                try:
+                    text = lauf.result(timeout=max(frist - time.time(), 0.05))
+                except FutureTimeout:
+                    text = "FEHLER: zu langsam"
+                ok = not text.startswith("FEHLER")
+                yield ev(typ="ergebnis", name="seite_lesen", ok=ok)
+                if ok:
+                    teile.append("Seiteninhalt von %s:\n%s" % (url, text))
+            pool.shutdown(wait=False)
             kontext = "\n\n".join(teile) if teile else "Keine Treffer gefunden."
             # Qwen 3.8 erlaubt nur EINE System-Nachricht ganz am Anfang, deshalb wird alles dort angehängt
             messages[0]["content"] += (
@@ -1131,10 +1195,8 @@ def chat_stream(frage: Frage):
             modus = {**modus, "think": True}
         if frage.modus == "auto":
             # Gemessen auf der RTX 5070: klein ~2 s, klein mit Nachdenken 5-7 s, groß 28-58 s.
-            # Deshalb kommt das große Modell nur bei Bildern zum Einsatz (das kleine kann keine).
-            if not bilder and not frage.live and not smalltalk and not news and not briefing and (
-                    quellen or KOMPLEX.search(frage.text) or len(frage.text) > 200):
-                modus = {**modus, "think": True}
+            # Das große Modell nur bei Bildern (das kleine kann keine). Bei der Websuche kein Nachdenken: mit dem
+            # langen Kontext dauerte das 15-29 s; die Quellen-Regeln schützen auch ohne vor Erfundenem.
             yield ev(typ="modus", text="großes Modell" if bilder else "denkt nach" if modus["think"] else "schnell")
         letztes_denken = 0.0
         # Beim PDF-Wunsch nicht filtern: dort ist der Text ein Dokument, keine Gesprächsantwort
