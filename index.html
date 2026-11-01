@@ -40,8 +40,9 @@
                   top:calc(84px + min(380px,80vw) * 0.553 + 4px); background:none; border:0; padding:2px 8px;
                   color:var(--fg); font-family:var(--mono); font-size:15px; letter-spacing:.2em;
                   transition:top .8s ease, left .8s ease, transform .8s ease, font-size .8s ease; }
-  /* Wurf: Das Auge kommt groß in die Mitte, der Chat wird kurz abgedunkelt. Im kleinen Auge sähe man davon nichts. */
-  body.wurf::before { content:""; position:fixed; inset:0; z-index:19; background:rgba(0,0,0,.78); pointer-events:none; }
+  /* Wurf: Das Auge kommt groß in die Mitte, der Text ist so lange weg. Im kleinen Auge sähe man davon nichts. */
+  body.wurf::before { content:""; position:fixed; inset:0; z-index:19; background:#000; pointer-events:none;
+                      -webkit-mask-image:none; mask-image:none; }  /* sonst deckt es nur die obersten 150px ab */
   body.wurf #auge, body.klein.wurf #auge { top:84px; left:50%; width:min(380px,80vw); transform:translateX(-50%);
                                            transition:top .2s ease, left .2s ease, width .2s ease, transform .2s ease; }
   #wurfanzeige { position:fixed; z-index:21; left:50%; transform:translateX(-50%); pointer-events:none;
@@ -1127,7 +1128,7 @@
     wurfUhr.forEach(clearTimeout);
     window.hermesWurf = { art, ergebnis, start: performance.now(), dauer: WURF_DAUER };
     document.body.classList.add("wurf");
-    wurfAnzeige.hidden = false; wurfAnzeige.textContent = "...";
+    wurfAnzeige.hidden = false; wurfAnzeige.textContent = "";
     wurfUhr = [
       setTimeout(() => { wurfAnzeige.textContent = String(ergebnis).toUpperCase(); }, WURF_DAUER),
       setTimeout(() => { window.hermesWurf = null; wurfAnzeige.hidden = true; document.body.classList.remove("wurf"); }, WURF_DAUER + WURF_ZEIGEN),
@@ -1535,6 +1536,7 @@
     }
 
     // Münze oder Würfel statt Pupille: bleibt an Ort und Stelle, dreht sich immer langsamer und landet auf dem Ergebnis.
+    // Beim Drehen sieht man beide Seiten der Münze im Wechsel, zuletzt die, auf der sie landet.
     // Die dunkle Scheibe dahinter verdeckt die Pupille, auch wenn die Münze beim Drehen fast unsichtbar schmal ist.
     function wurfZeichnen(t, cx, cy) {
       const w = window.hermesWurf, p = Math.min(1, (t - w.start) / w.dauer), brems = 1 - Math.pow(1 - p, 3);
@@ -1542,18 +1544,17 @@
       q.save();
       q.translate(cx, cy);
       if (w.art === "muenze") {
-        const flach = p < 1 ? Math.abs(Math.cos(brems * Math.PI * 15)) : 1;
-        q.scale(1, Math.max(0.06, flach));
+        const winkel = (1 - Math.pow(1 - p, 2)) * Math.PI * 9, drehung = Math.cos(winkel);
+        q.scale(1, Math.max(0.06, Math.abs(drehung)));
         q.fillStyle = "#f2f2f2"; q.beginPath(); q.arc(0, 0, 56, 0, Math.PI * 2); q.fill();
-        if (p >= 1) {
-          q.fillStyle = "#000";
-          if (w.ergebnis === "Kopf") {
-            q.beginPath(); q.arc(0, -13, 19, 0, Math.PI * 2); q.fill();
-            q.beginPath(); q.ellipse(0, 28, 31, 22, 0, 0, Math.PI * 2); q.fill();
-          } else {
-            q.font = "bold 84px Arial,sans-serif"; q.textAlign = "center"; q.textBaseline = "middle";
-            q.fillText("1", 0, 4);
-          }
+        const seite = drehung < 0 ? w.ergebnis : w.ergebnis === "Kopf" ? "Zahl" : "Kopf";
+        q.fillStyle = "#000";
+        if (seite === "Kopf") {
+          q.beginPath(); q.arc(0, -13, 19, 0, Math.PI * 2); q.fill();
+          q.beginPath(); q.ellipse(0, 28, 31, 22, 0, 0, Math.PI * 2); q.fill();
+        } else {
+          q.font = "bold 84px Arial,sans-serif"; q.textAlign = "center"; q.textBaseline = "middle";
+          q.fillText("1", 0, 4);
         }
       } else {
         q.rotate(brems * Math.PI * 10);
@@ -1562,7 +1563,7 @@
           4: [[-a, -a], [a, -a], [-a, a], [a, a]], 5: [[-a, -a], [a, -a], [0, 0], [-a, a], [a, a]],
           6: [[-a, -a], [a, -a], [-a, 0], [a, 0], [-a, a], [a, a]] };
         q.fillStyle = "#000";
-        (punkte[p >= 1 ? w.ergebnis : 5] || []).forEach(([x, y]) => { q.beginPath(); q.arc(x, y, 9, 0, Math.PI * 2); q.fill(); });
+        (punkte[p >= 1 ? w.ergebnis : 1 + Math.floor(brems * 40) % 6] || []).forEach(([x, y]) => { q.beginPath(); q.arc(x, y, 9, 0, Math.PI * 2); q.fill(); });
       }
       q.restore();
     }
@@ -1570,7 +1571,7 @@
     function zeichne(t) {
       if (t > naechstes) { blinzelStart = t; naechstes = t + 2500 + Math.random() * 3500; }
       const b = t - blinzelStart;
-      const lid = b < 160 ? 1 - 0.95 * Math.sin((b / 160) * Math.PI) : 1;
+      const lid = b < 160 && !window.hermesWurf ? 1 - 0.95 * Math.sin((b / 160) * Math.PI) : 1;  // beim Wurf nicht blinzeln, sonst ist die Münze kurz weg
 
       const s = stimmung(t);
       let zOffen = 1, zFreude = 0, zPupille = 24;
