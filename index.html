@@ -866,6 +866,7 @@
             vorschlaege(huelle, ev.fakten);
             if (aktiveKette) aktiveKette.ansage("Soll ich mir das merken?");
           }
+          else if (ev.typ === "sprechgrenze") { if (aktiveKette) aktiveKette.begrenze(ev.saetze); }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
           else if (ev.typ === "wurf") wurfStarten(ev.art, ev.ergebnis);
           else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; if (aktiveKette) aktiveKette.rein("\n" + ev.text); else zeige(); }
@@ -1097,6 +1098,8 @@
   function sprechKette(lauf) {
     let puffer = "", stumm = false, erster = true, aus = false, kette = Promise.resolve();
     let ziel = null, gezeigt = "", schlussRoh = null, gestoppt = false;
+    let grenze = 0, gesagt = 0, gekuerzt = false;  // Weiche Grenze: nach so vielen ganzen Sätzen schweigt er, der Text bleibt vollständig
+    const saetzeIn = (t) => { let n = 0, pos = 0, g; while ((g = satzGrenze(t.slice(pos), 1)) >= 0) { pos += g; n++; } return n; };
     // Jeder Abschnitt erscheint erst, wenn sein Ton startet: Text und Stimme laufen gemeinsam
     const zeigeStueck = (text) => {
       if (!ziel) return;
@@ -1120,6 +1123,7 @@
       schluss(roh, abgebrochen) { schlussRoh = roh; gestoppt = abgebrochen; },
       abbrechen() { aus = true; stumm = true; puffer = ""; },
       ansage(text) { raus(text, false); },  // gesprochen, aber nicht Teil der Antwort ("Moment, ich schaue nach.")
+      begrenze(n) { grenze = n; },
       rein(t) {
         if (stumm) return;
         puffer += t;
@@ -1127,12 +1131,20 @@
         if (q >= 0) { puffer = puffer.slice(0, q); stumm = true; }
         if ((puffer.match(/```/g) || []).length % 2) return;  // Codeblock noch offen: abwarten
         let g;
+        if (grenze) {  // Ein Satz zählt erst, wenn der nächste begonnen hat: Gekürzt wird also nur, wenn wirklich noch etwas kommt
+          let n = gesagt, pos = 0;
+          while (n < grenze && (g = satzGrenze(puffer.slice(pos), 1)) >= 0) { pos += g; n++; }
+          if (n >= grenze) { puffer = puffer.slice(0, pos); stumm = true; gekuerzt = true; }
+        }
         while ((g = satzGrenze(puffer, erster ? 15 : 120)) >= 0) {
-          raus(puffer.slice(0, g)); puffer = puffer.slice(g); erster = false;
+          const stueck = puffer.slice(0, g);
+          gesagt += saetzeIn(stueck + "x");
+          raus(stueck); puffer = puffer.slice(g); erster = false;
         }
       },
       async ende() {
         raus(puffer); puffer = ""; stumm = true;
+        if (gekuerzt && !aus && !gestoppt) raus("Den Rest finden Sie im Chat.", false);
         await kette;
         if (!ziel) return;
         // Zum Schluss der vollständige Text mit Quellen; bei Unterbrechung nur, was wirklich gesagt wurde

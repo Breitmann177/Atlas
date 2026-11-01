@@ -177,6 +177,13 @@ for (hoechst, regen), soll in {(9.9, 0): ("kalt", "Ich würde Ihnen eine Jacke e
                               (8, 80): ("kalt", "Ich würde Ihnen eine Jacke und einen Schirm empfehlen."),
                               (26, None): ("warm", ""), (31.7, 0): ("heiß", "Viel trinken und Sonnencreme nicht vergessen.")}.items():
     pruefe(f"Wetter-Einordnung {hoechst} Grad, {regen} % Regen", server.werkzeuge.wetter_einordnung(hoechst, regen), soll)
+for text, soll in {"Erklär mir das genau": True, "Erzähl mir mehr darüber": True, "Lies mir das ganze Rezept vor": True, "Wie geht das Schritt für Schritt?": True,
+                   "Wer ist Friedrich Merz?": False, "Wie mache ich Pizzateig?": False, "Wann genau war das?": False}.items():
+    pruefe(f"Mehr gewünscht: {text}", bool(server.MEHR_GEWUENSCHT.search(text)), soll)
+pruefe("Sprechmodus: kurze Vorstellung", server.faehigkeiten("Wer bist du?", "Wer bist du?", [], True), server.VORSTELLUNG_GESPROCHEN)
+pruefe("Chat: lange Vorstellung", server.faehigkeiten("Wer bist du?", "Wer bist du?", [], False), server.VORSTELLUNG_TEXT)
+pruefe("Sprechmodus: kurze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], True), server.FAEHIGKEITEN_GESPROCHEN)
+pruefe("Chat: ganze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], False), server.FAEHIGKEITEN_LISTE)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
 pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)

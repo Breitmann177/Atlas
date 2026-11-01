@@ -189,7 +189,7 @@ Quellen und Internet:
 
 # Kommt dazu, wenn der Nutzer im Live-Sprachmodus spricht
 LIVE_PROMPT = """Ihr sprecht gerade miteinander (Live-Sprachmodus): Deine Antwort wird laut vorgelesen.
-Antworte deshalb wie im Gespräch: meist 1 bis 3 Sätze, außer der Nutzer will ausdrücklich mehr.
+Antworte deshalb wie im Gespräch: meist 2 bis 4 kurze Sätze, bei einfachen Fragen einer, das Wichtigste zuerst, außer der Nutzer will ausdrücklich mehr.
 Keine Listen, keine Tabellen, kein Markdown, keine Formeln, keine URLs, keine Emojis, kein Programmcode. Schreib
 Zahlen und Einheiten so, wie man sie ausspricht (z.B. "zwölf Grad"). Wird nach Code gefragt, sag kurz, dass das
 im Chat besser geht."""
@@ -886,6 +886,10 @@ HERKUNFT = re.compile(r"\b(wer|von wem)\b.*\b(dich|du)\b.*\b(gebaut|entwickelt|p
                       r"\bhat \w+ dich\b.*\b(gebaut|entwickelt|programmiert|gemacht|geschrieben)\b", re.I)
 HERKUNFT_TEXT = "Ich bin Alexs Projekt. Wer welchen Teil im Einzelnen gebaut oder programmiert hat, kann ich nicht sagen."
 NOCH_MEHR = re.compile(r"\b(was noch|sonst noch|und noch|alles|liste)\b", re.I)
+# Im Gespräch hört er nach SPRECH_SAETZE ganzen Sätzen auf zu sprechen, der Rest steht im Chat. Außer man will es ausdrücklich genau wissen.
+SPRECH_SAETZE = 4
+MEHR_GEWUENSCHT = re.compile(r"\b(erklär|erzähl|beschreib|sag)\w*\b.*\b(genau\w*|ausführlich\w*|mehr|alles|komplett|vollständig\w*|detailliert\w*)\b|"
+                             r"\b(mehr dazu|mehr darüber|mehr details?|schritt für schritt|ganze\w* rezept|ausführlich\w*|im detail)\b|\blies\b.*\bvor\b", re.I)
 FAEHIGKEITEN_LISTE = """Das kann ich:
 
 - Fragen beantworten und dafür im Internet nachschauen, mit Quellen
@@ -903,16 +907,21 @@ Nicht kann ich: Programme oder Dateien auf Ihrem Laptop steuern und mich zu eine
 VORSTELLUNG_TEXT = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ins Internet gehe ich nur für Suche, Wetter und Nachrichten und für meine Stimme.
 
 Ich beantworte Fragen und schaue dafür im Internet nach, mit Quellen. Außerdem kann ich rechnen, PDFs lesen, Bilder beschreiben, Timer stellen und mir Dinge merken, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
+VORSTELLUNG_GESPROCHEN = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ich schaue im Internet nach, nenne das Wetter, rechne und merke mir Dinge, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
+FAEHIGKEITEN_GESPROCHEN = """Ich beantworte Fragen und schaue dafür im Internet nach. Ich nenne Wetter und Nachrichten, rechne, stelle Timer und werfe Münzen. PDFs lese ich, Bilder beschreibe ich, und Dinge über Sie merke ich mir, wenn Sie das möchten. Die ganze Liste steht im Chat, wenn Sie danach fragen."""
 
 
-def faehigkeiten(text: str, gemeint: str, verlauf: list[dict]) -> str | None:
+def faehigkeiten(text: str, gemeint: str, verlauf: list[dict], live: bool = False) -> str | None:
+    kurz = live and not MEHR_GEWUENSCHT.search(text)  # eine vorgelesene Liste mit zehn Punkten hört niemand zu Ende
     if VORSTELLUNG.search(text) or VORSTELLUNG.search(gemeint):
-        return VORSTELLUNG_TEXT
+        return VORSTELLUNG_GESPROCHEN if kurz else VORSTELLUNG_TEXT
     if HERKUNFT.search(text) or HERKUNFT.search(gemeint):
         return HERKUNFT_TEXT
     davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
     nachfrage = bool(NOCH_MEHR.search(text)) and bool(davor) and bool(FAEHIGKEIT.search(davor[-1]) or VORSTELLUNG.search(davor[-1]))
-    return FAEHIGKEITEN_LISTE if FAEHIGKEIT.search(text) or FAEHIGKEIT.search(gemeint) or nachfrage else None
+    if FAEHIGKEIT.search(text) or FAEHIGKEIT.search(gemeint) or nachfrage:
+        return FAEHIGKEITEN_GESPROCHEN if kurz and not nachfrage else FAEHIGKEITEN_LISTE
+    return None
 
 
 def sofort_antwort(text: str) -> str | None:
@@ -1649,7 +1658,7 @@ def chat_stream(frage: Frage):
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
         None if (bilder or frage.dokumente) else (
-            faehigkeiten(frage.text, gemeint, verlauf) or sofort_antwort(gemeint) or humor_spruch(frage.text)))
+            faehigkeiten(frage.text, gemeint, verlauf, frage.live) or sofort_antwort(gemeint) or humor_spruch(frage.text)))
     if sofort:
         # Münze und Würfel: Erst fliegt es im Auge, dann kommt das Ergebnis, damit die Antwort nichts vorwegnimmt
         wurf = None if gemerkt or name else ("muenze" if MUENZE.search(gemeint) else "wuerfel" if WUERFEL.search(gemeint) else None)
@@ -1837,6 +1846,8 @@ def chat_stream(frage: Frage):
         letztes_denken = 0.0
         # Beim PDF-Wunsch nicht filtern: dort ist der Text ein Dokument, keine Gesprächsantwort
         filter_ = None if pdf_modus else FloskelFilter()
+        if frage.live and not (pdf_modus or briefing or news or MEHR_GEWUENSCHT.search(frage.text)):
+            yield ev(typ="sprechgrenze", saetze=SPRECH_SAETZE)
         for art, t in modell_stream(messages, modus):
             if art == "denkt":
                 if time.time() - letztes_denken > 2:  # nur ab und zu melden, damit die UI "lebt"
