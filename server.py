@@ -1056,7 +1056,7 @@ class FloskelFilter:
 
 
 # Grenzen fürs Modell: Bei Tabellen dachte es im Test über 9 Minuten ohne Ende. Etwa 60 Stücke pro Sekunde.
-MAX_DENKEN = 900  # ~15 s, danach direkt antworten. Im Test war 450 schlechter: langsamer durch Neustarts und mehr falsche Antworten
+MAX_DENKEN = 1500  # ~25 s, nur gegen Endlos-Denken. Abbrechen kostet Zeit und Genauigkeit: Mit 450 kamen mehr falsche Antworten
 MAX_ANTWORT = 1500
 
 
@@ -1128,6 +1128,7 @@ def briefing_daten(messages: list[dict], mit_wetter: bool):
 
 
 OHNE_ROUTER = re.compile(r"^\W*(hermes\W*)?(schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*)\b", re.I)
+MIN_SEITE = 300  # Zeichen; kürzer ist meist nur ein Cookie-Hinweis oder eine leere Seite
 # Auto-Modus: Bei solchen Fragen lohnt sich das Nachdenken
 KOMPLEX = re.compile(r"\b(erklär\w*|warum|wieso|weshalb|vergleich\w*|unterschied\w*|analysier\w*|begründ\w*|"
                      r"vor- und nachteile|beweis\w*|schritt für schritt|plan\w*|programmier\w*|code|fehler|berechne\w*)\b", re.I)
@@ -1523,17 +1524,22 @@ def chat_stream(frage: Frage):
             pool = ThreadPoolExecutor(3)
             frist = time.time() + 5
             # Pro Seite nur einen Treffer lesen: sonst liest er zweimal Wikipedia statt der aktuellen Sportschau-Tabelle
-            zu_lesen = list({werkzeuge._domain(t["url"]).split(".", 1)[-1]: t for t in reversed(treffer)}.values())[::-1][:3]
+            # Reservetreffer: Manche Seiten liefern fast nichts (bei der Bundesliga 43 Zeichen), dann zählt die nächste
+            zu_lesen = list({werkzeuge._domain(t["url"]).split(".", 1)[-1]: t for t in reversed(treffer)}.values())[::-1][:5]
             laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in zu_lesen]
+            gelesen = 0
             for url, lauf in laeufe:
+                if gelesen >= 3:
+                    break
                 yield ev(typ="status", text="liest", detail=url)
                 try:
                     text = lauf.result(timeout=max(frist - time.time(), 0.05))
                 except FutureTimeout:
                     text = "FEHLER: zu langsam"
-                ok = not text.startswith("FEHLER")
+                ok = not text.startswith("FEHLER") and len(text) >= MIN_SEITE
                 yield ev(typ="ergebnis", name="seite_lesen", ok=ok)
                 if ok:
+                    gelesen += 1
                     teile.append("Seiteninhalt von %s:\n%s" % (url, text))
             pool.shutdown(wait=False)
             kontext = "\n\n".join(teile) if teile else "Keine Treffer gefunden."

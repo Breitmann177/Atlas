@@ -761,6 +761,7 @@
     }
     const huelle = nachricht("", "bot");
     const inhalt = huelle.querySelector(".inhalt");
+    if (aktiveKette) aktiveKette.binde(huelle);
     inhalt.classList.add("typing");
     inhalt.textContent = "denkt nach ...";
     window.hermesDenkt = true; window.hermesSucht = false;
@@ -811,18 +812,19 @@
           } else if (ev.typ === "ergebnis" && offen) {
             const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen = null; window.hermesSucht = false;
           } else if (ev.typ === "token") {
-            inhalt.classList.remove("typing"); window.hermesDenkt = false; window.hermesSucht = false;
-            roh += ev.text; zeige();
+            window.hermesDenkt = false; window.hermesSucht = false;
+            roh += ev.text;
             if (aktiveKette) aktiveKette.rein(ev.text);
+            else { inhalt.classList.remove("typing"); zeige(); }
           } else if (ev.typ === "modus") modusHinweis(ev.text);
           else if (ev.typ === "gemerkt") gemerktKarte(huelle, ev.fakt);
           else if (ev.typ === "vorschlag") {
             vorschlaege(huelle, ev.fakten);
-            if (aktiveKette) aktiveKette.rein(" Soll ich mir das merken?");
+            if (aktiveKette) aktiveKette.ansage("Soll ich mir das merken?");
           }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
           else if (ev.typ === "wurf") wurfStarten(ev.art, ev.ergebnis);
-          else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); if (aktiveKette) aktiveKette.rein("\n" + ev.text); }
+          else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; if (aktiveKette) aktiveKette.rein("\n" + ev.text); else zeige(); }
         }
         fenster.scrollTop = fenster.scrollHeight;
       }
@@ -832,8 +834,11 @@
     }
     abbruch = null;
     if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";
-    inhalt.classList.remove("typing");
-    if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
+    if (aktiveKette) aktiveKette.schluss(roh, gestoppt);  // im Gespräch zeigt die Sprechkette den Text
+    else {
+      inhalt.classList.remove("typing");
+      if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
+    }
     window.hermesDenkt = false; window.hermesSucht = false;
     beschaeftigt = false;
     sendeStatus();
@@ -1007,11 +1012,15 @@
       return res.ok ? (await res.json()).url : null;
     } catch (e) { return null; }
   }
-  function abspielen(quelle) {  // URL oder schon vorgeladenes Audio
+  function abspielen(quelle, beimStart) {  // URL oder schon vorgeladenes Audio; beimStart läuft, sobald man wirklich etwas hört
     return new Promise((fertig) => {
       sprecher = typeof quelle === "string" ? new Audio(quelle) : quelle; window.hermesSpricht = true;
-      sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
-      sprecher.play().catch(fertig);
+      const start = () => { clearTimeout(sicherung); if (beimStart) { beimStart(); beimStart = null; } };
+      // Kommt gar kein Ton an, darf das Gespräch nicht hängen bleiben: Text zeigen und weitermachen
+      const sicherung = setTimeout(() => { start(); fertig(); }, 15000);
+      sprecher.onplaying = start;
+      sprecher.onended = sprecher.onerror = sprecher.onpause = () => { start(); fertig(); };
+      sprecher.play().catch(() => { start(); fertig(); });
       // Klingt die Stimme anders, soll man den Grund sehen: Microsoft war nicht erreichbar
       fetch("/status").then((r) => r.json()).then((st) => {
         if (st.ersatzstimme) platzhalter("Microsoft-Stimme gerade nicht erreichbar: lokale Ersatzstimme", 6000);
@@ -1043,17 +1052,30 @@
   }
   function sprechKette(lauf) {
     let puffer = "", stumm = false, erster = true, aus = false, kette = Promise.resolve();
-    const raus = (text) => {
+    let ziel = null, gezeigt = "", schlussRoh = null, gestoppt = false;
+    // Jeder Abschnitt erscheint erst, wenn sein Ton startet: Text und Stimme laufen gemeinsam
+    const zeigeStueck = (text) => {
+      if (!ziel) return;
+      gezeigt += text;
+      ziel.querySelector(".inhalt").classList.remove("typing");
+      aktualisiere(ziel, gezeigt);
+      fenster.scrollTop = fenster.scrollHeight;
+    };
+    const raus = (text, anzeigen = true) => {
       if (!text.trim()) return;
       const ton = holeAudio(text).then((url) => (url && lauf === lauschLauf ? new Audio(url) : null));
       kette = kette.then(async () => {
         const audio = await ton;
-        if (audio && !aus && lauf === lauschLauf) await abspielen(audio);
+        if (aus || lauf !== lauschLauf) return;
+        const zeigen = () => { if (anzeigen && !aus) zeigeStueck(text); };
+        if (audio) await abspielen(audio, zeigen); else zeigen();
       });
     };
     return {
+      binde(huelle) { ziel = huelle; },
+      schluss(roh, abgebrochen) { schlussRoh = roh; gestoppt = abgebrochen; },
       abbrechen() { aus = true; stumm = true; puffer = ""; },
-      ansage(text) { raus(text); },
+      ansage(text) { raus(text, false); },  // gesprochen, aber nicht Teil der Antwort ("Moment, ich schaue nach.")
       rein(t) {
         if (stumm) return;
         puffer += t;
@@ -1065,7 +1087,17 @@
           raus(puffer.slice(0, g)); puffer = puffer.slice(g); erster = false;
         }
       },
-      async ende() { raus(puffer); puffer = ""; stumm = true; await kette; },
+      async ende() {
+        raus(puffer); puffer = ""; stumm = true;
+        await kette;
+        if (!ziel) return;
+        // Zum Schluss der vollständige Text mit Quellen; bei Unterbrechung nur, was wirklich gesagt wurde
+        const inhalt = ziel.querySelector(".inhalt");
+        inhalt.classList.remove("typing");
+        const fertig = gestoppt || aus ? (gezeigt ? gezeigt + "\n\n*(abgebrochen)*" : "*(abgebrochen)*") : schlussRoh;
+        if (fertig) aktualisiere(ziel, fertig); else if (!gezeigt) inhalt.textContent = "";
+        fenster.scrollTop = fenster.scrollHeight;
+      },
     };
   }
 
@@ -1221,7 +1253,7 @@
       await liveFragen(frage);
       aktiveKette = null;
       frage = "";
-      if (!liveAn || lauf !== lauschLauf) { waechter.stopp(); break; }
+      if (!liveAn || lauf !== lauschLauf) { waechter.stopp(); kette.abbrechen(); await kette.ende(); break; }
       platzhalter("Live · Spricht ...");
       await kette.ende();
       waechter.stopp();

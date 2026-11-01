@@ -14,6 +14,7 @@ import operator
 import re
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -68,19 +69,30 @@ def _seriositaet(url: str) -> int:
     return 2 if any(d == s or d.endswith("." + s) for s in SERIOES) or d.endswith(".gov") else 0
 
 
+def _web_suche(frage: str) -> list[dict]:
+    with DDGS() as d:
+        return d.text(frage, region="de-de", max_results=12) or []
+
+
+def _news_suche(frage: str) -> list[dict]:
+    try:
+        with DDGS() as d:
+            return d.news(frage, region="de-de", max_results=5) or []
+    except Exception:
+        return []
+
+
 def suche(frage: str, n: int = 6) -> list[dict]:
     """Websuche mit Qualitätsfilter. Unseriöse Seiten fliegen raus, seriöse kommen nach vorn; bei zeitnahen
     Fragen kommen Nachrichten mit Datum dazu. Bei Fehlern wird einmal neu versucht."""
     treffer, meldungen = [], []
     for versuch in range(2):
         try:
-            with DDGS() as d:
-                treffer = d.text(frage, region="de-de", max_results=12) or []
-                if ZEITNAH.search(frage):
-                    try:
-                        meldungen = d.news(frage, region="de-de", max_results=5) or []
-                    except Exception:
-                        meldungen = []
+            # Web- und Nachrichtensuche gleichzeitig: spart etwa eine Sekunde, ohne etwas wegzulassen
+            with ThreadPoolExecutor(2) as pool:
+                nachrichten_lauf = pool.submit(_news_suche, frage) if ZEITNAH.search(frage) else None
+                treffer = _web_suche(frage)
+                meldungen = nachrichten_lauf.result() if nachrichten_lauf else []
             if treffer or meldungen:
                 break
         except Exception:
