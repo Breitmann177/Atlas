@@ -40,10 +40,13 @@
                   top:calc(84px + min(380px,80vw) * 0.553 + 4px); background:none; border:0; padding:2px 8px;
                   color:var(--fg); font-family:var(--mono); font-size:15px; letter-spacing:.2em;
                   transition:top .8s ease, left .8s ease, transform .8s ease, font-size .8s ease; }
+  /* Wurf: Das Auge kommt groß in die Mitte, der Chat wird kurz abgedunkelt. Im kleinen Auge sähe man davon nichts. */
+  body.wurf::before { content:""; position:fixed; inset:0; z-index:19; background:rgba(0,0,0,.78); pointer-events:none; }
+  body.wurf #auge, body.klein.wurf #auge { top:84px; left:50%; width:min(380px,80vw); transform:translateX(-50%);
+                                           transition:top .2s ease, left .2s ease, width .2s ease, transform .2s ease; }
   #wurfanzeige { position:fixed; z-index:21; left:50%; transform:translateX(-50%); pointer-events:none;
-                 top:calc(84px + min(380px,80vw) * 0.553 + 4px); color:var(--fg); font-family:var(--mono);
-                 font-size:15px; letter-spacing:.2em; }
-  body.klein #wurfanzeige { top:54px; left:18px; transform:none; width:72px; font-size:11px; letter-spacing:.06em; text-align:center; }
+                 top:calc(84px + min(380px,80vw) * 0.553 + 4px); color:#fff; font-family:var(--mono);
+                 font-size:20px; letter-spacing:.25em; }
   body.wurf #hero p, body.wurf #timeranzeige { visibility:hidden; }
   body.timer #hero p { visibility:hidden; }  /* sonst überlappt "BEREIT" die Restzeit */
   body.klein #timeranzeige { top:54px; left:18px; transform:none; width:72px; padding:0; font-size:11px;
@@ -1083,7 +1086,7 @@
   stimmeAnzeigen();
 
   // ---------- Münze und Würfel im Auge ----------
-  const WURF_DAUER = 1400, WURF_ZEIGEN = 3500;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
+  const WURF_DAUER = 1400, WURF_ZEIGEN = 2500;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
   const wurfAnzeige = document.getElementById("wurfanzeige");
   let wurfUhr = [];
   function wurfStarten(art, ergebnis) {

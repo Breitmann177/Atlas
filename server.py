@@ -798,8 +798,8 @@ QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit de
 UHRZEIT_ORT = re.compile(r"\b(wie spät|wie viel uhr|wieviel uhr|uhrzeit)\b.*\b(?:in|auf) "
                          r"([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)", re.I)
 WURF_SEKUNDEN = 1.5  # so lange wie die Animation im Browser
-MUENZE = re.compile(r"\b(wirf|werf\w*|münzwurf)\b.*\bmünze\b|\bmünzwurf\b|\bkopf oder zahl\b", re.I)
-WUERFEL = re.compile(r"^\W*(hermes\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfeln|wirf einen würfel)\b", re.I)
+MUENZE = re.compile(r"(?=.*\bm(?:ü|ue)nze\w*\b)(?=.*\b(?:wirf\w*|werf\w*|schnipp\w*|flip\w*)\b)|\bm(?:ü|ue)nzwurf\b|\bkopf oder zahl\b", re.I)
+WUERFEL = re.compile(r"^\W*(hermes\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfel doch|würfeln|wirf (einen|den|nen|ne) würfel)\b", re.I)
 ZUFALL = re.compile(r"\b(?:zufallszahl|zufällige zahl)\b(?:.*?(\d+)\D+(\d+))?", re.I)
 
 
