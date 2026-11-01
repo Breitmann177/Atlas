@@ -730,6 +730,8 @@
           if (ev.typ === "start") aktuellerChat = ev.chat_id;
           else if (ev.typ === "status" && ev.detail !== undefined) {
             schritte++; window.hermesSucht = true;
+            // Im Gespräch: Die Suche dauert, also sagt er kurz Bescheid, statt still zu bleiben
+            if (ev.text === "sucht" && aktiveKette) aktiveKette.ansage("Moment, ich schaue nach.");
             if (!karte) {
               karte = document.createElement("details"); karte.className = "recherche"; karte.open = true;
               karte.innerHTML = "<summary></summary>"; huelle.insertBefore(karte, inhalt);
@@ -978,6 +980,7 @@
     };
     return {
       abbrechen() { aus = true; stumm = true; puffer = ""; },
+      ansage(text) { raus(text); },
       rein(t) {
         if (stumm) return;
         puffer += t;
