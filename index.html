@@ -791,6 +791,7 @@
           if (!zeile.trim()) continue;
           const ev = JSON.parse(zeile);
           if (ev.typ === "start") aktuellerChat = ev.chat_id;
+          else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { /* kein Internet-Suchen: kein Kasten */ }
           else if (ev.typ === "status" && ev.detail !== undefined) {
             schritte++; window.hermesSucht = true;
             // Im Gespräch: Die Suche dauert, also sagt er kurz Bescheid, statt still zu bleiben
@@ -801,7 +802,7 @@
             }
             karte.querySelector("summary").textContent = "RECHERCHE · " + schritte + (schritte === 1 ? " SCHRITT" : " SCHRITTE");
             offen = document.createElement("div"); offen.className = "schritt";
-            offen.innerHTML = "<b>" + ({ liest: "LIEST", wetter: "WETTER", rechnet: "RECHNET" }[ev.text] || "SUCHT") + "</b><span></span><i class=\"puls\"></i>";
+            offen.innerHTML = "<b>" + (ev.text === "liest" ? "LIEST" : "SUCHT") + "</b><span></span><i class=\"puls\"></i>";
             offen.querySelector("span").textContent = ev.detail;
             karte.appendChild(offen);
           } else if (ev.typ === "status") {
