@@ -102,8 +102,7 @@
                border:1px solid var(--rand); border-left:3px solid var(--fg); border-radius:10px; background:var(--feld); font-size:14px; }
   .merkkarte b { font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--dim); font-weight:600; }
   .merkkarte span { overflow-wrap:anywhere; }
-  .merkkarte.fertig { border-left-color:#34c759; }
-  .merkkarte.fertig b { color:#34c759; }
+  .gemerkt { color:var(--dim); font-size:12px; margin-bottom:4px; padding-left:16px; }
   .merkknoepfe { display:flex; gap:8px; margin-top:4px; }
   .merkknoepfe button { border:1px solid var(--rand); background:none; color:var(--fg); border-radius:8px; padding:4px 12px; cursor:pointer; font:inherit; font-size:13px; }
   .merkknoepfe button:first-child { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
@@ -718,12 +717,10 @@
     return m && SIE_FORM[m[1]] ? "Sie " + SIE_FORM[m[1]] + m[2] : f;
   }
   let offenerVorschlag = null;  // { fakten, karte }
-  function gemerktKarte(huelle, f) {
-    const d = document.createElement("div"); d.className = "merkkarte fertig";
-    const k = document.createElement("b"); k.textContent = "✓ ERINNERUNG GESPEICHERT";
-    const t = document.createElement("span"); t.textContent = alsSie(f);
-    d.append(k, t); huelle.appendChild(d);
-    fenster.scrollTop = fenster.scrollHeight;
+  function gemerktKarte(huelle, f) {  // nur eine graue Zeile über der Antwort; was genau gespeichert ist, zeigt der Tooltip
+    let d = huelle.querySelector(".gemerkt");
+    if (!d) { d = document.createElement("div"); d.className = "gemerkt"; d.textContent = "Erinnerung gespeichert"; huelle.prepend(d); }
+    d.title = (d.title ? d.title + "\n" : "") + alsSie(f);
   }
   function vorschlaege(huelle, fakten) {
     const d = document.createElement("div"); d.className = "merkkarte";
