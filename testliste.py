@@ -172,6 +172,11 @@ for text, soll in {"freiburg": "Freiburg", "in köln": "Köln", "bad homburg": "
                    "ach egal": "", "nein danke": "", "warum willst du das wissen?": ""}.items():
     pruefe(f"Ort nachgereicht: {text}", server.ort_nachgereicht(text, NACH_ORT), soll)
 pruefe("Ort nur nach der Rückfrage", server.ort_nachgereicht("freiburg", [{"role": "assistant", "content": "Hallo"}, {"role": "assistant", "content": "Hallo"}, {"role": "user", "content": "freiburg"}]), "")
+for (hoechst, regen), soll in {(9.9, 0): ("kalt", "Ich würde Ihnen eine Jacke empfehlen."), (10.8, 13): ("kühl", "Ich würde Ihnen eine Jacke empfehlen."),
+                              (20, 10): ("mild", ""), (20, 70): ("mild", "Ich würde Ihnen einen Schirm empfehlen."),
+                              (8, 80): ("kalt", "Ich würde Ihnen eine Jacke und einen Schirm empfehlen."),
+                              (26, None): ("warm", ""), (31.7, 0): ("heiß", "Viel trinken und Sonnencreme nicht vergessen.")}.items():
+    pruefe(f"Wetter-Einordnung {hoechst} Grad, {regen} % Regen", server.werkzeuge.wetter_einordnung(hoechst, regen), soll)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
 pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)

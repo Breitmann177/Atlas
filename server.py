@@ -1075,14 +1075,14 @@ FLOSKEL_ANFAENGE = ("wie kann", "was kann", "kann ich", "darf ich", "falls du", 
                     "und wenn du", "alles, was du", "alles was du", "für alles", "wenn du was", "wenn du etwas",
                     "ich bin hermes", "ich bin dein", "ich bin ihr", "sagen sie", "lassen sie", "das merke", "das merk", "merke ich",
                     "ich merke", "ich merk", "ich habe mir", "ich habe das", "das habe ich", "ist gemerkt", "ich speichere",
-                    "danke für die info", "danke für die information")
+                    "danke für die info", "danke für die information", "rat:")
 # "Ich bin Hermes, dein persönlicher Assistent." -> "Ich bin Hermes." (der Nutzer will kein Gerede über die Rolle)
 ROLLE = re.compile(r",? *(dein|ihr|euer) (persönliche[rn]? |digitale[rn]? |treue[rn]? |eigene[rn]? )*(ki-)?"
                    r"(assistent|butler|helfer|begleiter|diener)\w*", re.I)
 
 
 def ohne_rolle(satz: str) -> str:
-    satz = ROLLE.sub("", satz)
+    satz = re.sub(r"^(\s*)Rat:\s*", r"\1", ROLLE.sub("", satz), flags=re.I)  # die Wetterdaten nennen ihn so, sagen soll er es nicht
     return re.sub(r"\b(ich bin)(\W*)$", r"\1 Hermes\2", satz, flags=re.I)  # "Ich bin." -> "Ich bin Hermes."
 SATZENDE = re.compile(r"[.!?…](?=\s|$)|\n")
 
@@ -1747,11 +1747,12 @@ def chat_stream(frage: Frage):
                 messages[0]["content"] += (
                     "\n\nAktuelle Wetterdaten vom Wetterdienst Open-Meteo (Messwerte und Vorhersage):\n" + daten +
                     "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten. "
-                    "Beantworte zuerst direkt die gestellte Frage, wenn es passt mit Ja oder Nein. Unter 10 Grad gilt als kalt. "
+                    "Beantworte zuerst direkt die gestellte Frage, wenn es passt mit Ja oder Nein. "
                     "Nimm genau die Zeile des gefragten Tages. Steht der Tag nicht in den Werten, sag das und nenne die Tage, die du hast. "
                     "Unter 30 % Regenwahrscheinlichkeit ist eher kein Regen zu erwarten, sag das so. "
-                    "Ist es kalt, nass oder sehr heiß, schließe mit einem kurzen Rat als eigenem Satz, ohne 'falls', "
-                    "zum Beispiel: Ich würde Ihnen eine Jacke empfehlen. Sonst gib keinen Rat."
+                    "Übernimm die Einordnung (kalt, kühl, mild, warm, heiß) aus dieser Zeile und widersprich ihr nicht. Steht dort ein Rat, "
+                    "beende die Antwort genau mit diesem Satz, ohne 'falls' und ohne Zusätze. Steht dort keiner, gib keinen Rat. "
+                    "Den Wind nenne nur, wenn danach gefragt wird oder er über 40 km/h liegt."
                     + ("\nFragt der Nutzer nach einem vergangenen Tag, sag ehrlich, dass du nur das aktuelle Wetter und die "
                        "Vorhersage kennst, und gib heutige Werte nicht als vergangene aus." if VERGANGEN.search(gemeint) else "") if ok else
                     f"\n\nDie Wetterabfrage für '{ort}' ist fehlgeschlagen ({daten}). Sag das ehrlich.")

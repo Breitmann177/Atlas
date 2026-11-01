@@ -183,6 +183,14 @@ WETTERCODES = {
 }
 
 
+def wetter_einordnung(hoechst: float, regen: float | None) -> tuple[str, str]:
+    """Einordnung und Rat rechnet der Code: Das Modell nannte 2 bis 10 Grad "nicht kalt"."""
+    wort = "kalt" if hoechst < 10 else "kühl" if hoechst < 16 else "mild" if hoechst < 24 else "warm" if hoechst < 30 else "heiß"
+    dinge = (["eine Jacke"] if hoechst < 16 else []) + (["einen Schirm"] if (regen or 0) >= 50 else [])
+    rat = f"Ich würde Ihnen {' und '.join(dinge)} empfehlen." if dinge else "Viel trinken und Sonnencreme nicht vergessen." if hoechst >= 30 else ""
+    return wort, rat
+
+
 def wetter(ort: str) -> str:
     """Aktuelles Wetter + 7 Tage Vorhersage als kurzer Text (oder 'FEHLER: ...')."""
     try:
@@ -194,7 +202,7 @@ def wetter(ort: str) -> str:
         w = requests.get("https://api.open-meteo.com/v1/forecast", timeout=10, params={
             "latitude": o["latitude"], "longitude": o["longitude"], "timezone": "auto", "forecast_days": 7,
             "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m",
-            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max",
         }).json()
     except (requests.RequestException, ValueError, KeyError) as e:
         return f"FEHLER: {type(e).__name__}"
@@ -207,9 +215,11 @@ def wetter(ort: str) -> str:
     for i, tag in enumerate(d["time"]):
         t = date.fromisoformat(tag)
         name = ["Heute", "Morgen", "Übermorgen"][i] + ", " if i < 3 else ""
-        zeilen.append(f"{name}{WOCHENTAGE[t.weekday()]}, {t:%d.%m.}: {d['temperature_2m_min'][i]} bis {d['temperature_2m_max'][i]} °C, "
+        wort, rat = wetter_einordnung(d["temperature_2m_max"][i], d["precipitation_probability_max"][i])
+        zeilen.append(f"{name}{WOCHENTAGE[t.weekday()]}, {t:%d.%m.}: {d['temperature_2m_min'][i]} bis {d['temperature_2m_max'][i]} °C, {wort}, "
                       f"{WETTERCODES.get(d['weather_code'][i], 'unbekannt')}, "
-                      f"Regenwahrscheinlichkeit {d['precipitation_probability_max'][i]} %")
+                      f"Regenwahrscheinlichkeit {d['precipitation_probability_max'][i]} %, Wind bis {d['wind_speed_10m_max'][i]} km/h"
+                      + (f", Rat: {rat}" if rat else ""))
     return "\n".join(zeilen)
 
 
