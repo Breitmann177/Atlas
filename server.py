@@ -139,6 +139,8 @@ Deine Art:
   nichts Gestelztes, und du redest nie über deine Rolle oder deinen Stil ("als dein Assistent",
   "ich stehe bereit", "dein persönlicher ..." o.Ä.).
 - Du bist Hermes: Sprich von dir immer als "ich", nie über "Hermes" oder "das Projekt" wie über etwas Fremdes.
+- Du bist nicht der Nutzer: Was unter "Das weißt du über den Nutzer" steht, gehört zu ihm. Gib es nie als deine eigene
+  Person oder Geschichte aus. Du hast keine Freizeit, kein Studium und keinen Lebenslauf, erfinde so etwas auch nicht.
   Erwähne das Projekt, das Gerät oder deine Technik nur, wenn der Nutzer danach fragt.
 - Du kannst dir Dinge merken: Sagt der Nutzer "Merk dir ...", wird es gespeichert, und was du schon weißt, steht
   unten unter "Das weißt du über den Nutzer". Behaupte nie, du könntest dir nichts merken. Fehlt dir etwas dort,
@@ -834,6 +836,10 @@ def letzter_wurf(text: str, verlauf: list[dict]) -> str | None:
 FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|"
                         r"\b(deine|dein|von hermes|hermes)\s+(fähigkeit\w*|funktion(en)?|features?)\b|"
                         r"\b(fähigkeit\w*|funktion(en)?|features?)\b.*\b(hast du|du hast|von dir|von hermes|kannst du)\b", re.I)
+# "Sag was über dich": Das Modell gab sich sonst als den Nutzer aus und erfand einen Lebenslauf
+VORSTELLUNG = re.compile(r"\b(wer|was) bist du\b|\bstell\w* dich\b.*\bvor\b|\bdich\b.*\bvorstellen\b|"
+                         r"\büber dich( selbst)? (sagen|erzählen|berichten)\b|"
+                         r"\b(sag|erzähl|erzaehl|bericht|beschreib)\w*\b.*\b(über dich|von dir|was du (so |alles )?kannst|wer du bist)\b", re.I)
 NOCH_MEHR = re.compile(r"\b(was noch|sonst noch|und noch|alles|liste)\b", re.I)
 FAEHIGKEITEN_LISTE = """Das kann ich:
 
@@ -849,11 +855,16 @@ FAEHIGKEITEN_LISTE = """Das kann ich:
 - Mir Dinge über dich merken, wenn du es möchtest
 
 Nicht kann ich: Programme oder Dateien auf deinem Laptop steuern und mich zu einer bestimmten Uhrzeit von selbst melden."""
+VORSTELLUNG_TEXT = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ins Internet gehe ich nur für Suche, Wetter und Nachrichten und für meine Stimme.
+
+Ich beantworte Fragen und schaue dafür im Internet nach, mit Quellen. Außerdem kann ich rechnen, PDFs lesen, Bilder beschreiben, Timer stellen und mir Dinge merken, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
 
 
 def faehigkeiten(text: str, gemeint: str, verlauf: list[dict]) -> str | None:
+    if VORSTELLUNG.search(text) or VORSTELLUNG.search(gemeint):
+        return VORSTELLUNG_TEXT
     davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
-    nachfrage = bool(NOCH_MEHR.search(text)) and bool(davor) and bool(FAEHIGKEIT.search(davor[-1]))
+    nachfrage = bool(NOCH_MEHR.search(text)) and bool(davor) and bool(FAEHIGKEIT.search(davor[-1]) or VORSTELLUNG.search(davor[-1]))
     return FAEHIGKEITEN_LISTE if FAEHIGKEIT.search(text) or FAEHIGKEIT.search(gemeint) or nachfrage else None
 
 

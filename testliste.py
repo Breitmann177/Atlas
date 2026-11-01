@@ -34,6 +34,8 @@ def weg(text, verlauf=()):
         return "münze"
     if server.WUERFEL.search(text):
         return "würfel"
+    if server.VORSTELLUNG.search(text):
+        return "vorstellung"
     if server.FAEHIGKEIT.search(text):
         return "fähigkeiten"
     if server.UHRZEIT_ORT.search(text):
@@ -66,6 +68,10 @@ WEGE = [
     ("Was ist eine Münze?", "suche"), ("Würfel mal", "würfel"), ("Was ist ein Würfel?", "suche"),
     ("Was kannst du so alles?", "fähigkeiten"), ("Was sind die Fähigkeiten von Hermes?", "fähigkeiten"),
     ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("hermes wie funktioniert das Thema grenzwerte", "suche"),
+    ("hermes wir sind hier in einem bewerbungsgespräch sag mal was über dich was du kannst etc", "vorstellung"),
+    ("Wer bist du?", "vorstellung"), ("Stell dich mal kurz vor", "vorstellung"), ("Erzähl mir was über dich", "vorstellung"),
+    ("Kannst du dich vorstellen?", "vorstellung"), ("Kannst du dir vorstellen, dass es regnet?", "wetter"),
+    ("Erzähl mir was über Rom", "router"), ("Mach einfach, was du kannst", "router"),
     ("Hermes, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
     ("Wer ist Hermes in der griechischen Mythologie?", "suche"), ("Wie hoch ist der Eiffelturm?", "suche"),
     ("Was sind 18 Prozent von 2450?", "router"), ("Wie schreibe ich eine Schleife in Python?", "router"),
@@ -89,6 +95,7 @@ ANTWORTEN = [
     ("Wie spät ist es in Tokio?", ["Tokio"], []),
     ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
     ("hermes wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
+    ("hermes wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Hermes"], ["Ich bin Alex", "studiere"]),
 ]
 GESPRAECHE = [
     (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
