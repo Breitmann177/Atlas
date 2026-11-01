@@ -513,7 +513,7 @@ async def tts_stream(tid: str):
     if online and STIMME_ONLINE.lower() != "aus" and time.time() >= _online_pause_bis:
         # Auf das erste Audio-Stück warten (mit einem zweiten Versuch), erst dann zusagen. Bricht der Dienst
         # danach ab, endet der Ton einfach früher; er springt nie mitten in der Antwort auf eine andere Stimme.
-        for versuch in range(2):
+        for versuch in range(3):
             strom = _online_strom(text, online)
             try:
                 erstes = await asyncio.wait_for(strom.__anext__(), 12)
@@ -533,7 +533,7 @@ async def tts_stream(tid: str):
             return StreamingResponse(weiter(), media_type="audio/mpeg")
         print("Online-Stimme nicht erreichbar, nehme die lokale Stimme", flush=True)
         # Im Live-Modus kommt jeder Satz einzeln: nicht bei jedem Satz neu probieren und zwischen Stimmen springen
-        _online_pause_bis = time.time() + 60
+        _online_pause_bis = time.time() + 20
 
     def erzeugen():
         puffer = io.BytesIO()
@@ -546,6 +546,7 @@ async def tts_stream(tid: str):
     except Exception as e:
         print("TTS-FEHLER:", repr(e), flush=True)
         raise HTTPException(500, "Sprachausgabe nicht verfügbar (Stimme in 'stimmen/' vorhanden?)")
+    print("Sprachausgabe: lokale Ersatzstimme benutzt", flush=True)
     return Response(daten, media_type="audio/wav")
 
 
@@ -637,7 +638,8 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "grafikkarte": grafikkarte_aktiv()}
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "grafikkarte": grafikkarte_aktiv(),
+            "ersatzstimme": time.time() < _online_pause_bis}
 
 
 # ---------- Chat: erst prüfen ob gesucht werden muss, dann antworten ----------
@@ -759,16 +761,22 @@ zwei Sätze, NUR aus den mitgegebenen Schlagzeilen, nichts dazuerfinden. Nenne a
 
 
 WETTER = re.compile(r"\b(wetter|temperatur|wie (warm|kalt|heiß)|regnet|regnen|regen|schneit|schnee|gewitter|"
-                    r"sonnig|bewölkt|grad draußen|regenschirm|schirm mitnehmen)\b", re.I)
+                    r"sonnig|bewölkt|grad draußen|wie ?viel grad (ist es|sind es|hat es|wird es|haben wir|werden es)|regenschirm|schirm mitnehmen)\b", re.I)
 VERGANGEN = re.compile(r"\b(gestern|vorgestern|letzte\w*|war)\b", re.I)
 KLEIDUNG = re.compile(r"\b(jacke|mantel|anziehen|sonnencreme)\b", re.I)
+KEIN_ORT_KLEIN = {"der", "die", "das", "den", "dem", "des", "einer", "einem", "einen", "meiner", "meinem", "unserer", "zukunft",
+                  "ordnung", "deutschland", "ruhe", "letzter", "dieser", "diesem", "diesen", "kürze"}
 KEIN_ORT = {"Deutschland", "Grad", "Celsius", "Uhr", "Hermes"}
 
 
 def ort_aus_text(text: str) -> str:
     """'Wie wird das Wetter morgen in Bad Homburg?' -> 'Bad Homburg' (leer, wenn kein Ort genannt ist)."""
     m = re.search(r"\b(?:in|für|bei|nach) ([A-ZÄÖÜ][\wäöüß-]+(?: (?:am |an der |im )?[A-ZÄÖÜ][\wäöüß-]+)?)", text)
-    return m.group(1) if m and m.group(1) not in KEIN_ORT else ""
+    if m and m.group(1) not in KEIN_ORT:
+        return m.group(1)
+    # Klein getippt ("wetter in köln"): nur direkt hinter "in" und ohne Füllwörter wie "in der" oder "in zukunft"
+    m = re.search(r"\bin ([a-zäöüß][a-zäöüß-]{2,})\b", text)
+    return m.group(1).title() if m and m.group(1) not in KEIN_ORT_KLEIN else ""
 
 
 def wohnort() -> str:
@@ -798,6 +806,8 @@ QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit de
 # ---------- Sofort-Antworten: dafür braucht es kein Sprachmodell, also auch keine Halluzinationen ----------
 UHRZEIT_ORT = re.compile(r"\b(wie spät|wie viel uhr|wieviel uhr|uhrzeit)\b.*\b(?:in|auf) "
                          r"([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)", re.I)
+UHRZEIT = re.compile(r"\b(wie spät|wie ?viel uhr)\b|\buhrzeit\b.*\?|^\W*uhrzeit\W*$", re.I)
+DATUM_FRAGE = re.compile(r"\b(welcher tag|welches datum|den wievielten|der wievielte|welchen tag)\b.*\b(heute|ist|haben|es)\b", re.I)
 WURF_SEKUNDEN = 3.0  # so lange wie die Animation im Browser (WURF_DAUER)
 NOCHMAL = re.compile(r"^\W*(hermes\W*)?(noch ?mal|noch ein(mal|e|en)?|wieder|nochmal werfen|nochmal würfeln|noch einer)"
                      r"(\s+(bitte|werfen|würfeln|versuchen))*\W*$", re.I)
@@ -848,6 +858,10 @@ def sofort_antwort(text: str) -> str | None:
     m = UHRZEIT_ORT.search(text)
     if m:
         return werkzeuge.weltzeit(m.group(2)) or None
+    if UHRZEIT.search(text):
+        return f"Es ist {datetime.now():%H:%M} Uhr."
+    if DATUM_FRAGE.search(text):
+        return f"Heute ist {jetzt_text().rsplit(',', 1)[0]}."
     if MUENZE.search(text):
         return f"{secrets.choice(['Kopf', 'Zahl'])}."
     if WUERFEL.search(text):
@@ -1136,6 +1150,9 @@ def ohne_router(text: str, dokumente: list) -> bool:
     return not dokumente and bool(OHNE_ROUTER.search(text)) and not werkzeuge.ZEITNAH.search(text)
 
 
+SUCH_FUELLSEL = re.compile(r"\b(nochmal|noch mal|eigentlich|denn|mal|bitte|bro|digga|alter|keine ahnung|ungefähr so)\b", re.I)
+
+
 def direkte_suche(text: str, dokumente: list) -> str | None:
     """Gibt die Suchanfrage zurück, wenn ohne Router gesucht werden soll. Jede Sachfrage geht ins Internet, im Chat wie
     im Gespräch: Der Router ließ im laufenden Chat die Suche aus, und das Modell nannte aus dem Gedächtnis den falschen
@@ -1146,7 +1163,8 @@ def direkte_suche(text: str, dokumente: list) -> str | None:
                  and not REAKTION.search(text) and not PROGRAMMIEREN.search(text) and not RECHENFRAGE.search(text))
     if not befehl and not sachfrage:
         return None
-    return (frage.strip(" ?!.,") or text)[:200]
+    sauber = re.sub(r"\s+", " ", SUCH_FUELLSEL.sub(" ", frage)).strip(" ?!.,")
+    return (sauber or frage.strip(" ?!.,") or text)[:200]
 
 
 # ---------- Folgefragen ----------

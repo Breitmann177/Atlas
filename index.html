@@ -1012,6 +1012,10 @@
       sprecher = typeof quelle === "string" ? new Audio(quelle) : quelle; window.hermesSpricht = true;
       sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
       sprecher.play().catch(fertig);
+      // Klingt die Stimme anders, soll man den Grund sehen: Microsoft war nicht erreichbar
+      fetch("/status").then((r) => r.json()).then((st) => {
+        if (st.ersatzstimme) platzhalter("Microsoft-Stimme gerade nicht erreichbar: lokale Ersatzstimme", 6000);
+      }).catch(() => {});
     }).finally(() => {
       if (sprecher) sprecher.removeAttribute("src");  // laufenden Download abbrechen
       sprecher = null; window.hermesSpricht = false;
