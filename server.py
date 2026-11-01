@@ -789,7 +789,8 @@ QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Achte auf das Datum und nimm bei aktuellen Fragen die neueste Angabe. Nenne das Datum, wenn es wichtig ist.
 - Widersprechen sich Quellen, sag das offen und nenne beide Angaben.
 - Nenne bei Zahlen und Ergebnissen die Quelle.
-- Reicht es nicht für eine sichere Antwort, sag: "Das konnte ich nicht sicher herausfinden." Rate nie."""
+- Reicht es nicht für eine sichere Antwort, sag: "Dazu habe ich nichts Sicheres gefunden. Das heißt aber nicht, dass
+  nichts passiert ist." Schließe aus fehlenden Treffern nie, dass etwas nicht passiert ist. Rate nie."""
 QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit dem, was in den Suchergebnissen steht. "
                    "Steht es dort nicht eindeutig, sag das ehrlich, statt zu raten.]")
 
@@ -1094,7 +1095,10 @@ SUCH_BEFEHL = re.compile(r"\b(googl\w*|such\w*|recherchier\w*|im internet|im net
 FUELLWOERTER = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?((kannst|könntest) du( mir)?( mal| bitte)* )?"
                           r"((googl\w*|such\w*|recherchier\w*|schau|guck)( mal| bitte| doch| im internet| im netz| nach| online)*\W*)?", re.I)
 FRAGEWORT = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?(wer|wen|wem|wessen|was|wann|wo|wohin|woher|wie|warum|wieso|weshalb|"
-                       r"welche\w*|wieviel\w*|gibt es|gibt's|stimmt es|ist|sind|hat|haben|war|waren)\b", re.I)
+                       r"welche\w*|wieviel\w*|gibt es|gibt's|gab es|stimmt es|ist|sind|hat|haben|war|waren|wurde|wurden|wird|werden)\b", re.I)
+# Keine Sachfragen: Reaktionen aufs Gespräch und Programmieren (dafür taugt die Websuche nicht)
+REAKTION = re.compile(r"\b(stimmt das|ist das (so|richtig|wahr|sicher)|war das|was soll das)\b", re.I)
+PROGRAMMIEREN = re.compile(r"\b(python|javascript|java|html|css|code|programm\w*|funktion|variable|schleife|bug|fehlermeldung)\b", re.I)
 AN_HERMES = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
 RECHENFRAGE = re.compile(r"\d.*(%|\bprozent\b|\bmal\b|\bplus\b|\bminus\b|\bgeteilt\b|\bdurch\b|\bhoch\b|\bwurzel\b|\btage\b|"
                          r"\bwochen\b|[+*/=])|\b(wurzel|tage|wochen)\b.*\d|\brechne\b|\bberechne\b", re.I)
@@ -1105,14 +1109,17 @@ def ohne_router(text: str, dokumente: list) -> bool:
     return not dokumente and bool(OHNE_ROUTER.search(text)) and not werkzeuge.ZEITNAH.search(text)
 
 
-def direkte_suche(text: str, live: bool, dokumente: list) -> str | None:
-    """Gibt die Suchanfrage zurück, wenn ohne Router gesucht werden soll. Im Sprechmodus geht jede Sachfrage
-    ins Internet: das Modell soll dort nichts aus dem Gedächtnis vortragen."""
+def direkte_suche(text: str, dokumente: list) -> str | None:
+    """Gibt die Suchanfrage zurück, wenn ohne Router gesucht werden soll. Jede Sachfrage geht ins Internet, im Chat wie
+    im Gespräch: Der Router ließ im laufenden Chat die Suche aus, und das Modell nannte aus dem Gedächtnis den falschen
+    Bundeskanzler."""
+    frage = FUELLWOERTER.sub("", text)
     befehl = bool(SUCH_BEFEHL.search(text))
-    sachfrage = live and not dokumente and bool(FRAGEWORT.search(text)) and not AN_HERMES.search(FUELLWOERTER.sub("", text))
-    if not befehl and (not sachfrage or RECHENFRAGE.search(text)):
+    sachfrage = (not dokumente and bool(FRAGEWORT.search(text)) and len(frage.split()) >= 2 and not AN_HERMES.search(frage)
+                 and not REAKTION.search(text) and not PROGRAMMIEREN.search(text) and not RECHENFRAGE.search(text))
+    if not befehl and not sachfrage:
         return None
-    return (FUELLWOERTER.sub("", text).strip(" ?!.,") or text)[:200]
+    return (frage.strip(" ?!.,") or text)[:200]
 
 
 # ---------- Folgefragen ----------
@@ -1122,8 +1129,10 @@ FOLGEFRAGE = re.compile(r"^\W*(und|aber|auch|was ist mit|wie sieht'?s|wie ist es
 
 def ist_folgefrage(text: str, verlauf: list[dict]) -> bool:
     """Kurze Nachricht mit Bezug aufs Gespräch ('Und wie alt ist der?'). verlauf enthält die aktuelle Nachricht schon."""
-    return (len(verlauf) >= 3 and len(text.split()) <= 9 and bool(FOLGEFRAGE.search(text))
-            and not ist_smalltalk(text) and not plauderei(text))
+    if len(verlauf) < 3 or ist_smalltalk(text) or plauderei(text) or len(text.split()) > 9:
+        return False
+    kurze_frage = len(text.split()) <= 7 and (text.strip().endswith("?") or bool(FRAGEWORT.search(text)))
+    return bool(FOLGEFRAGE.search(text)) or kurze_frage
 
 
 def _modell_json(system: str, nutzer: str, feld: str) -> str:
@@ -1168,7 +1177,11 @@ def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
         "PFLICHT: Jedes Wort, das auf etwas aus dem Gespräch zeigt (er, sie, der, die, das, ihm, ihn, dort, da), "
         "ersetzt du durch den vollen Namen aus dem Gespräch.\n"
         "Beispiel: Thema Anna Schmidt: 'Wo wurde er geboren?' wird 'Wo wurde Anna Schmidt geboren?'.\n"
-        "Beantworte die Nachricht nicht und erfinde nichts. Hat sie keinen Verweis, gib sie unverändert zurück.",
+        "Auch ohne solche Wörter kann sich eine kurze Frage aufs Thema beziehen: Gespräch über den Stadtlauf in Bonn am "
+        "3. Mai: 'Gab es Verletzte?' wird 'Gab es beim Stadtlauf in Bonn am 3. Mai Verletzte?'. Übernimm dabei Ereignis, "
+        "Ort und Datum aus dem Gespräch.\n"
+        "Ist es eine eigenständige Frage zu einem neuen Thema ('Wer ist Bundeskanzler?'), gib sie unverändert zurück. "
+        "Beantworte die Nachricht nicht und erfinde nichts.",
         f"Gespräch:\n{kontext}\n\nLetzte Nachricht: {text}", "frage")
     vergleich = lambda x: re.sub(r"\W+", " ", x).strip().lower()
     if neu and "{" not in neu and 3 < len(neu) < 250 and vergleich(neu) != vergleich(text):
@@ -1292,6 +1305,23 @@ def humor_spruch(text: str) -> str | None:
     return None
 
 
+# Dann wäre eine Quellenliste irreführend: Sie sähe aus, als wäre die Antwort belegt
+NICHTS_GEFUNDEN = re.compile(r"nicht(s)? sicher\w*|nichts verlässliches|nichts gefunden|(quellen|suchergebnisse?n?)\b[^.]*\b(nicht|keine?)\b", re.I)
+FUELLWORT = {"wurde", "wurden", "wird", "werden", "haben", "hatte", "etwas", "eine", "einer", "einen", "einem", "dass",
+             "nicht", "noch", "auch", "sind", "gibt", "beim", "bei", "dann", "aber", "oder", "welche", "welcher", "welches",
+             "warum", "wieso", "weshalb", "wann", "wie", "wer", "was", "der", "die", "das", "den", "dem", "des", "ein",
+             "und", "ist", "hat", "gab", "war", "waren", "von", "vom", "zum", "zur", "mit", "für", "über", "aus", "nach"}
+
+
+def treffer_passen(treffer: list[dict], frage: str) -> bool:
+    """Grobe Prüfung: Kommen die wichtigen Wörter der Frage in den Treffern überhaupt vor?"""
+    woerter = {w for w in re.findall(r"[a-zäöüß0-9-]{3,}", frage.lower()) if w not in FUELLWORT}
+    if not treffer or not woerter:
+        return bool(treffer)
+    text = " ".join(t["titel"] + " " + t["text"] for t in treffer).lower()
+    return sum(w in text for w in woerter) / len(woerter) >= 0.6
+
+
 def chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
@@ -1390,8 +1420,8 @@ def chat_stream(frage: Frage):
                 werkzeug, eingabe = "wetter", ort_aus_text(gemeint)
             elif anhang or smalltalk or ohne_router(gemeint, dokumente):
                 werkzeug, eingabe = "keins", ""
-            elif direkte_suche(gemeint, frage.live, dokumente):
-                werkzeug, eingabe = "suche", direkte_suche(gemeint, frage.live, dokumente)
+            elif direkte_suche(gemeint, dokumente):
+                werkzeug, eingabe = "suche", direkte_suche(gemeint, dokumente)
             else:
                 werkzeug, eingabe = werkzeug_waehlen(gemeint, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
         if werkzeug == "rechnen" and "heute" in eingabe:
@@ -1427,8 +1457,11 @@ def chat_stream(frage: Frage):
             yield ev(typ="status", text="sucht", detail=anfrage)
             try:
                 treffer = werkzeuge.suche(anfrage)
-                if not treffer and anfrage.lower() != gemeint.lower():
-                    treffer = werkzeuge.suche(gemeint[:200])  # zweite Chance mit der vollständigen Frage
+                # Nicht gleich aufgeben: Passen die Treffer kaum zur Frage, wird mit der vollständigen Frage nachgesucht.
+                # (Eine zu allgemeine Anfrage fand einmal nur Statistiken statt der Berichte über den Abend.)
+                if not treffer_passen(treffer, gemeint) and anfrage.lower() != gemeint.lower():
+                    gesehen = {t["url"] for t in treffer}
+                    treffer = [t for t in werkzeuge.suche(gemeint[:200]) if t["url"] not in gesehen] + treffer
             except Exception:
                 treffer = []
             yield ev(typ="ergebnis", name="web_suche", ok=bool(treffer))
@@ -1495,7 +1528,7 @@ def chat_stream(frage: Frage):
         antwort = antwort.rstrip()
         pdf_text = antwort  # Text fürs PDF, bevor Quellen und Link dazukommen
         # Keine Quellenliste, wenn nichts gefunden wurde: sonst sähe "weiß ich nicht" wie eine belegte Antwort aus
-        if quellen and not re.search(r"nicht sicher herausfinden|nichts verlässliches", antwort, re.I):
+        if quellen and not NICHTS_GEFUNDEN.search(antwort[:200]):  # nur der Anfang: spätere Einschränkungen zählen nicht
             liste = "\n\n---\n**Quellen**\n" + "\n".join(
                 f"- [{t[:80].replace('[', '(').replace(']', ')')}]({u})" for u, t in list(quellen.items())[:5]
             )
