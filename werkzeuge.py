@@ -184,7 +184,7 @@ WETTERCODES = {
 
 
 def wetter(ort: str) -> str:
-    """Aktuelles Wetter + 3 Tage Vorhersage als kurzer Text (oder 'FEHLER: ...')."""
+    """Aktuelles Wetter + 7 Tage Vorhersage als kurzer Text (oder 'FEHLER: ...')."""
     try:
         g = requests.get("https://geocoding-api.open-meteo.com/v1/search", timeout=10,
                          params={"name": ort, "count": 1, "language": "de"}).json().get("results") or []
@@ -192,7 +192,7 @@ def wetter(ort: str) -> str:
             return f"FEHLER: Ort '{ort}' nicht gefunden."
         o = g[0]
         w = requests.get("https://api.open-meteo.com/v1/forecast", timeout=10, params={
-            "latitude": o["latitude"], "longitude": o["longitude"], "timezone": "auto", "forecast_days": 3,
+            "latitude": o["latitude"], "longitude": o["longitude"], "timezone": "auto", "forecast_days": 7,
             "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
         }).json()
@@ -203,8 +203,11 @@ def wetter(ort: str) -> str:
               f"Jetzt: {c['temperature_2m']} °C (gefühlt {c['apparent_temperature']} °C), "
               f"{WETTERCODES.get(c['weather_code'], 'unbekannt')}, Wind {c['wind_speed_10m']} km/h, "
               f"Luftfeuchtigkeit {c['relative_humidity_2m']} %"]
+    # "Morgen" rechnet der Code aus: Mit reinen Daten wie 2026-11-02 verrutschte das Modell im Test um einen Tag
     for i, tag in enumerate(d["time"]):
-        zeilen.append(f"{tag}: {d['temperature_2m_min'][i]} bis {d['temperature_2m_max'][i]} °C, "
+        t = date.fromisoformat(tag)
+        name = ["Heute", "Morgen", "Übermorgen"][i] + ", " if i < 3 else ""
+        zeilen.append(f"{name}{WOCHENTAGE[t.weekday()]}, {t:%d.%m.}: {d['temperature_2m_min'][i]} bis {d['temperature_2m_max'][i]} °C, "
                       f"{WETTERCODES.get(d['weather_code'][i], 'unbekannt')}, "
                       f"Regenwahrscheinlichkeit {d['precipitation_probability_max'][i]} %")
     return "\n".join(zeilen)

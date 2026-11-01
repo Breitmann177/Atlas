@@ -801,6 +801,25 @@ def ort_aus_text(text: str) -> str:
     return m.group(1).title() if m and m.group(1) not in KEIN_ORT_KLEIN else ""
 
 
+WETTER_ORT_FRAGE = "Für welchen Ort soll ich nachsehen?"
+# Die Vorhersage reicht 7 Tage. Das Modell erfand sonst Werte für "in drei Wochen", deshalb antwortet hier der Code.
+WETTER_ZU_WEIT = re.compile(r"\bin (\d+|zwei|drei|vier|fünf|sechs|acht|neun|zehn|ein paar|mehreren) (wochen|monaten|jahren)\b|"
+                            r"\b(nächsten|kommenden|im) (monat|jahr|januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember)\b|"
+                            r"\bin einem (monat|jahr)\b|\bübernächste\w* woche\b", re.I)
+WETTER_ZU_WEIT_TEXT = "So weit reicht die Vorhersage nicht. Verlässliche Werte habe ich nur für die nächsten 7 Tage."
+ORT_ANFANG = re.compile(r"^(ich (bin|wohne|lebe) |wohne |bin )?(in|für|bei|nach)\s+|\s+bitte$", re.I)
+KEIN_ORT_WORT = re.compile(r"\b(egal|nein|nö|lass|vergiss|danke|nichts|keine?|weiß|wieso|warum|stopp)\b|\d", re.I)
+
+
+def ort_nachgereicht(text: str, verlauf: list[dict]) -> str:
+    """Hermes hat nach dem Ort gefragt und der Nutzer antwortet: "Freiburg" ist dann ein Ort, kein neues Suchwort."""
+    if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or verlauf[-2]["content"] != WETTER_ORT_FRAGE
+            or text.strip().endswith("?") or KEIN_ORT_WORT.search(text)):
+        return ""
+    ort = ORT_ANFANG.sub("", ANREDE.sub("", text).strip(" .,!")).strip()
+    return ort.title() if ort and len(ort.split()) <= 4 else ""
+
+
 def wohnort() -> str:
     """Ort fürs Wetter: HERMES_ORT aus .env, sonst eine gespeicherte Erinnerung wie 'Der Nutzer wohnt in Köln.'"""
     if STANDARD_ORT:
@@ -1442,6 +1461,10 @@ def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
     zurück; (None, None), wenn es keine Bitte ums Merken ist."""
     if MERK_PRUEFUNG.search(text):
         return merk_pruefung(verlauf), None
+    # "ach egal" auf die Frage nach dem Ort: Das Modell erfand sonst Wetter für eine unbekannte Gegend
+    if (len(verlauf) >= 2 and verlauf[-2]["role"] == "assistant" and verlauf[-2]["content"] == WETTER_ORT_FRAGE
+            and KEIN_ORT_WORT.search(text) and not text.strip().endswith("?")):
+        return "Alles klar, dann lasse ich es.", None
     fakt = antwort_auf_nachfrage(text, verlauf)
     if fakt:
         return ("Alles klar, das weiß ich jetzt.", fakt) if erinnerung_speichern(fakt) else ("Das weiß ich schon.", None)
@@ -1619,6 +1642,9 @@ def chat_stream(frage: Frage):
     gemerkt, neuer_fakt = (None, None) if (bilder or frage.dokumente) else merken(frage.text, verlauf)
     if not gemerkt and not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
         gemeint = frage_aufloesen(frage.text, verlauf)
+    wetter_ort = ort_nachgereicht(frage.text, verlauf)
+    if wetter_ort:
+        gemeint = f"{verlauf[-3]['content'].rstrip(' ?.!')} in {wetter_ort}"
     # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
@@ -1673,7 +1699,9 @@ def chat_stream(frage: Frage):
             yield from briefing_daten(messages, mit_wetter=briefing)
             werkzeug, eingabe = "keins", ""
         else:
-            if anhang or smalltalk or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
+            if wetter_ort:
+                werkzeug, eingabe = "wetter", wetter_ort
+            elif anhang or smalltalk or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
                 werkzeug, eingabe = "keins", ""
             else:
                 art, anfrage = ("", "") if dokumente else analysieren(gemeint, verlauf)
@@ -1691,6 +1719,12 @@ def chat_stream(frage: Frage):
                     return
                 if art in ("hermes", "gespraech", "aufgabe"):
                     werkzeug, eingabe = "keins", ""
+                elif art == "wetter" and WETTER_ZU_WEIT.search(gemeint):
+                    yield ev(typ="token", text=WETTER_ZU_WEIT_TEXT)
+                    with db() as c:
+                        c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", WETTER_ZU_WEIT_TEXT))
+                    yield ev(typ="fertig")
+                    return
                 elif art == "wetter":
                     werkzeug, eingabe = "wetter", ort_aus_text(gemeint)
                 elif art == "internet" and (anfrage or direkte_suche(gemeint, dokumente)):
@@ -1713,13 +1747,21 @@ def chat_stream(frage: Frage):
                 messages[0]["content"] += (
                     "\n\nAktuelle Wetterdaten vom Wetterdienst Open-Meteo (Messwerte und Vorhersage):\n" + daten +
                     "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten. "
-                    "Ist es kalt, nass oder sehr heiß, schließe mit einem kurzen Rat, zum Beispiel: Ich würde Ihnen eine Jacke empfehlen."
+                    "Beantworte zuerst direkt die gestellte Frage, wenn es passt mit Ja oder Nein. Unter 10 Grad gilt als kalt. "
+                    "Nimm genau die Zeile des gefragten Tages. Steht der Tag nicht in den Werten, sag das und nenne die Tage, die du hast. "
+                    "Unter 30 % Regenwahrscheinlichkeit ist eher kein Regen zu erwarten, sag das so. "
+                    "Ist es kalt, nass oder sehr heiß, schließe mit einem kurzen Rat als eigenem Satz, ohne 'falls', "
+                    "zum Beispiel: Ich würde Ihnen eine Jacke empfehlen. Sonst gib keinen Rat."
                     + ("\nFragt der Nutzer nach einem vergangenen Tag, sag ehrlich, dass du nur das aktuelle Wetter und die "
                        "Vorhersage kennst, und gib heutige Werte nicht als vergangene aus." if VERGANGEN.search(gemeint) else "") if ok else
                     f"\n\nDie Wetterabfrage für '{ort}' ist fehlgeschlagen ({daten}). Sag das ehrlich.")
             else:
-                messages[0]["content"] += ("\n\nDer Nutzer fragt nach dem Wetter, aber sein Ort ist unbekannt. "
-                                           "Frag ihn höflich, für welchen Ort.")
+                # Fester Satz, damit die nächste Nachricht sicher als Antwort darauf erkannt wird
+                yield ev(typ="token", text=WETTER_ORT_FRAGE)
+                with db() as c:
+                    c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", WETTER_ORT_FRAGE))
+                yield ev(typ="fertig")
+                return
             yield ev(typ="status", text="denkt nach")
         elif werkzeug == "rechnen":
             yield ev(typ="status", text="rechnet", detail=eingabe)
@@ -1826,7 +1868,8 @@ def chat_stream(frage: Frage):
                 link = f"\n\n[PDF herunterladen](/pdf/{os.path.basename(pfad)})"
             antwort += link
             yield ev(typ="token", text=link)
-        vorschlaege = fakten_vorschlagen(frage.text, HILFSMODELL) or korrektur_vorschlagen(frage.text, verlauf)
+        vorschlaege = (fakten_vorschlagen(frage.text, HILFSMODELL) or korrektur_vorschlagen(frage.text, verlauf)
+                       or ([f"Der Nutzer wohnt in {wetter_ort}."] if wetter_ort and not wohnort() else []))
         if vorschlaege:
             yield ev(typ="vorschlag", fakten=vorschlaege)
     except OllamaFehler as e:

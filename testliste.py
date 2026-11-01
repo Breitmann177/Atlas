@@ -125,6 +125,7 @@ ANALYSE = {
                  "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
 }
 GESPRAECHE = [
+    (["ist es morgen kalt?", "freiburg"], ["Freiburg"]),
     (["Wie alt bin ich?", "19", "Wie alt bin ich?"], ["19"]),
     (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
     (["Wie wird das Wetter morgen in Köln?", "Und in Hamburg?"], ["Hamburg"]),
@@ -166,6 +167,11 @@ pruefe("Gelernt passt nicht zum Thema", server.gelerntes_passt("Wie hoch ist der
 for e in server.alle_erinnerungen():
     with server.db() as c:
         c.execute("DELETE FROM erinnerungen WHERE id=?", (e["id"],))
+NACH_ORT = [{"role": "user", "content": "ist es morgen kalt?"}, {"role": "assistant", "content": server.WETTER_ORT_FRAGE}, {"role": "user", "content": ""}]
+for text, soll in {"freiburg": "Freiburg", "in köln": "Köln", "bad homburg": "Bad Homburg", "Für Heilbronn bitte": "Heilbronn", "ich wohne in Ulm": "Ulm",
+                   "ach egal": "", "nein danke": "", "warum willst du das wissen?": ""}.items():
+    pruefe(f"Ort nachgereicht: {text}", server.ort_nachgereicht(text, NACH_ORT), soll)
+pruefe("Ort nur nach der Rückfrage", server.ort_nachgereicht("freiburg", [{"role": "assistant", "content": "Hallo"}, {"role": "assistant", "content": "Hallo"}, {"role": "user", "content": "freiburg"}]), "")
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
 pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)
