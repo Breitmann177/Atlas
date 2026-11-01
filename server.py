@@ -1088,6 +1088,131 @@ def direkte_suche(text: str, live: bool, dokumente: list) -> str | None:
     return (FUELLWOERTER.sub("", text).strip(" ?!.,") or text)[:200]
 
 
+# ---------- Folgefragen ----------
+FOLGEFRAGE = re.compile(r"^\W*(und|aber|auch|was ist mit|wie sieht'?s|wie ist es|dann)\b|\b(der|die|das|dem|den|dessen|deren|"
+                        r"er|sie|es|ihm|ihn|ihr|dort|da|davon|dazu|damals|daran|darüber|dafür)\b", re.I)
+
+
+def ist_folgefrage(text: str, verlauf: list[dict]) -> bool:
+    """Kurze Nachricht mit Bezug aufs Gespräch ('Und wie alt ist der?'). verlauf enthält die aktuelle Nachricht schon."""
+    return (len(verlauf) >= 3 and len(text.split()) <= 9 and bool(FOLGEFRAGE.search(text))
+            and not ist_smalltalk(text) and not plauderei(text))
+
+
+def _modell_json(system: str, nutzer: str, feld: str) -> str:
+    """Kurze JSON-Antwort vom Modell; leer bei jedem Fehler."""
+    try:
+        r = requests.post(
+            OLLAMA_URL + "/api/chat",
+            json={
+                "model": HILFSMODELL, "stream": False, "think": False, "keep_alive": HALTEN,
+                "options": {"num_ctx": NUM_CTX, "temperature": 0},
+                "format": {"type": "object", "properties": {feld: {"type": "string"}}, "required": [feld]},
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": nutzer}],
+            },
+            timeout=30,
+        )
+        return (json.loads(r.json()["message"]["content"]).get(feld) or "").strip()
+    except Exception:
+        return ""
+
+
+VERWEIS_AM_ENDE = re.compile(r"\b(der|die|das|den|dem|er|sie|ihm|ihn|ihr|dort|da)\b(?=\W*$)", re.I)
+VERWEIS = re.compile(r"\b(er|sie|ihm|ihn|dort|dessen|deren)\b", re.I)
+
+
+def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
+    """Macht aus 'Und wie alt ist der?' eine vollständige Frage, damit Suche und Werkzeuge wissen, worum es geht.
+    Das Modell allein ist dafür zu unzuverlässig: Wetter und Uhrzeit löst fester Code auf, sonst hängt das Thema
+    als Rettung an. Gibt im Zweifel die Originalfrage zurück."""
+    davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
+    vorige = davor[-1] if davor else ""
+    ort = ort_aus_text(text)
+    if UHRZEIT_ORT.search(vorige) and ort:
+        return f"Wie spät ist es in {ort}?"
+    if WETTER.search(vorige) and not WETTER.search(text):
+        ort = ort or ort_aus_text(vorige)
+        if ort:  # das "in Ort" steht vorn, damit genau dieser Ort gefunden wird; der Rest nennt den Tag
+            return f"Wetter in {ort}: {text.strip()}"
+
+    kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-5:-1])
+    neu = _modell_json(
+        "Schreibe die letzte Nachricht des Nutzers so um, dass ein Fremder sie ohne das Gespräch versteht. "
+        "PFLICHT: Jedes Wort, das auf etwas aus dem Gespräch zeigt (er, sie, der, die, das, ihm, ihn, dort, da), "
+        "ersetzt du durch den vollen Namen aus dem Gespräch.\n"
+        "Beispiel: Thema Anna Schmidt: 'Wo wurde er geboren?' wird 'Wo wurde Anna Schmidt geboren?'.\n"
+        "Beantworte die Nachricht nicht und erfinde nichts. Hat sie keinen Verweis, gib sie unverändert zurück.",
+        f"Gespräch:\n{kontext}\n\nLetzte Nachricht: {text}", "frage")
+    vergleich = lambda x: re.sub(r"\W+", " ", x).strip().lower()
+    if neu and "{" not in neu and 3 < len(neu) < 250 and vergleich(neu) != vergleich(text):
+        return neu
+
+    # Modell hat nichts ersetzt: Thema einzeln erfragen und selbst einsetzen
+    if not (re.match(r"\W*und\b", text, re.I) or VERWEIS_AM_ENDE.search(text) or VERWEIS.search(text)):
+        return text
+    thema = _modell_json("Nenne das Hauptthema des Gesprächs in höchstens vier Wörtern, zum Beispiel einen Namen. "
+                         "Nur das Thema, kein Satz.", f"Gespräch:\n{kontext}", "thema")
+    if not thema or "{" in thema or len(thema) > 60:
+        return text
+    rest = re.sub(r"^\W*und\s+", "", text, flags=re.I).strip()
+    rest = rest[:1].upper() + rest[1:]
+    if VERWEIS_AM_ENDE.search(rest):
+        return VERWEIS_AM_ENDE.sub(thema, rest)
+    return f"{rest.rstrip(' ?.!')} {thema}?"
+
+
+# ---------- Gelegentlicher trockener Humor ----------
+STIMMUNG = re.compile(r"\b(muss ich|viel zu tun|viel machen|viel arbeit|stress\w*|müde|kein bock|keine lust|nervt|nervig|"
+                      r"anstrengend|montag|hunger|kaputt|platt|langweilig|schlafen|arbeiten|lernen|hausaufgaben|klausur\w*)\b", re.I)
+# Hier verbietet sich jeder Witz
+ERNST = re.compile(r"\b(traurig|depress\w*|tod|tot|gestorben|stirbt|krank\w*|krebs|angst|panik|einsam|weinen|suizid\w*|"
+                   r"umbring\w*|trennung|schluss gemacht|verloren|unfall|krankenhaus|schmerz\w*|verzweifelt)\b", re.I)
+# Feste Sprüche statt Modell-Humor: Das kleine Modell schrieb im Test Unsinn, diese hier sitzen immer.
+SPRUECHE = [
+    (r"lernen|klausur\w*|hausaufgaben", [
+        "Lernen ist bei mir zum Glück schon abgeschlossen. Bei dir, fürchte ich, noch nicht.",
+        "Mein herzliches Beileid. Ich musste für mein Wissen nie eine Klausur schreiben, aber das behalte ich besser für mich.",
+    ]),
+    (r"müde|schlafen|kaputt|platt", [
+        "Verstehe. Schlaf gehört zu den wenigen Dingen, um die ich Menschen nicht beneide.",
+        "Ein klarer Fall von Akku leer. Bei mir hilft ein Stromkabel, bei dir vermutlich ein Bett.",
+        "Ich empfehle das bewährte Verfahren namens Schlafen. Ich selbst habe es nie gebraucht, höre aber nur Gutes.",
+    ]),
+    (r"hunger", [
+        "Da kann ich nicht mitreden, ich lebe von Strom. Schmeckt übrigens nach nichts.",
+    ]),
+    (r"muss ich|viel zu tun|viel machen|viel arbeit|arbeiten|stress\w*|montag", [
+        "Mein Beileid. Ich bin ehrlich dankbar, eine Maschine zu sein und so etwas nicht fühlen zu müssen.",
+        "Klingt anstrengend. Zum Glück bestehe ich nur aus Rechenleistung und habe keine To-do-Liste.",
+        "Ich würde dir ja Mut zusprechen, aber Überstunden kenne ich nur vom Hörensagen.",
+    ]),
+    (r"kein bock|keine lust|nervt|nervig|anstrengend|langweilig", [
+        "Das Gefühl ist mir fremd, und ich muss sagen, ich vermisse nichts.",
+        "Verständlich. Ich habe zwar keine Launen, aber ich würde dir trotzdem nicht widersprechen.",
+    ]),
+]
+SPRUCH_CHANCE = 50  # Prozent, wenn der Nutzer von seinem Tag erzählt; sonst antwortet er normal und ernst
+_letzter_spruch = ""
+
+
+def plauderei(text: str) -> bool:
+    """Der Nutzer erzählt von seinem Tag, statt etwas zu fragen ('Poah, heute muss ich echt viel machen')."""
+    return bool(STIMMUNG.search(text)) and not text.strip().endswith("?") and not FRAGEWORT.search(text) and not ERNST.search(text)
+
+
+def humor_spruch(text: str) -> str | None:
+    """Ab und zu ein trockener Spruch wie J.A.R.V.I.S., nie zweimal derselbe hintereinander."""
+    global _letzter_spruch
+    if not plauderei(text) or secrets.randbelow(100) >= SPRUCH_CHANCE:
+        return None
+    for muster, sprueche in SPRUECHE:
+        if re.search(rf"\b({muster})\b", text, re.I):
+            auswahl = [x for x in sprueche if x != _letzter_spruch] or sprueche
+            _letzter_spruch = secrets.choice(auswahl)
+            return _letzter_spruch
+    return None
+
+
 def chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
@@ -1125,7 +1250,11 @@ def chat_stream(frage: Frage):
             c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", bestaetigung))
         yield ev(typ="fertig")
         return
-    sofort = None if (bilder or frage.dokumente) else sofort_antwort(frage.text)
+    # Was der Nutzer meint: bei Folgefragen die vollständige Frage, sonst sein Text. Danach richten sich Suche und Werkzeuge.
+    gemeint = frage.text
+    if not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
+        gemeint = frage_aufloesen(frage.text, verlauf)
+    sofort = None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text))
     if sofort:
         yield ev(typ="token", text=sofort)
         with db() as c:
@@ -1154,23 +1283,25 @@ def chat_stream(frage: Frage):
         anhang = bool(bilder or frage.dokumente)
         briefing = not anhang and bool(BRIEFING.search(frage.text))
         news = not anhang and not briefing and bool(NACHRICHTEN.search(frage.text))
-        smalltalk = not briefing and ist_smalltalk(frage.text)
+        smalltalk = not briefing and not anhang and (ist_smalltalk(frage.text) or plauderei(frage.text))
         hinweis = (BRIEFING_HINWEIS if briefing else NEWS_HINWEIS if news else
                    SMALLTALK_HINWEIS if smalltalk else STIL_HINWEIS)
+        if gemeint != frage.text:
+            hinweis += f"\n\n[Hinweis an Hermes, nicht erwähnen: Gemeint ist: {gemeint}]"
         messages[-1] = {**messages[-1], "content": messages[-1]["content"] + hinweis}
         if briefing or news:
             yield from briefing_daten(messages, mit_wetter=briefing)
             werkzeug, eingabe = "keins", ""
         else:
             # Wetterfragen nie dem Router überlassen: sonst landet er manchmal bei der Websuche und zufälligen Seiten
-            if not anhang and WETTER.search(frage.text):
-                werkzeug, eingabe = "wetter", ort_aus_text(frage.text)
-            elif anhang or smalltalk or ohne_router(frage.text, dokumente):
+            if not anhang and not smalltalk and WETTER.search(gemeint):
+                werkzeug, eingabe = "wetter", ort_aus_text(gemeint)
+            elif anhang or smalltalk or ohne_router(gemeint, dokumente):
                 werkzeug, eingabe = "keins", ""
-            elif direkte_suche(frage.text, frage.live, dokumente):
-                werkzeug, eingabe = "suche", direkte_suche(frage.text, frage.live, dokumente)
+            elif direkte_suche(gemeint, frage.live, dokumente):
+                werkzeug, eingabe = "suche", direkte_suche(gemeint, frage.live, dokumente)
             else:
-                werkzeug, eingabe = werkzeug_waehlen(frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
+                werkzeug, eingabe = werkzeug_waehlen(gemeint, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
         if werkzeug == "rechnen" and "heute" in eingabe:
             eingabe = eingabe.replace("heute", datetime.now().strftime("%d.%m.%Y"))
         if werkzeug == "wetter":
@@ -1202,8 +1333,8 @@ def chat_stream(frage: Frage):
             yield ev(typ="status", text="sucht", detail=anfrage)
             try:
                 treffer = werkzeuge.suche(anfrage)
-                if not treffer and anfrage.lower() != frage.text.lower():
-                    treffer = werkzeuge.suche(frage.text[:200])  # zweite Chance mit der Originalfrage
+                if not treffer and anfrage.lower() != gemeint.lower():
+                    treffer = werkzeuge.suche(gemeint[:200])  # zweite Chance mit der vollständigen Frage
             except Exception:
                 treffer = []
             yield ev(typ="ergebnis", name="web_suche", ok=bool(treffer))
