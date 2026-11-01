@@ -85,14 +85,12 @@
 
   /* Recherche, Modus, Vorschläge */
   .modus { display:flex; gap:0; align-items:center; margin:0 0 10px 6px; font-family:var(--mono); font-size:10px; letter-spacing:.14em; }
-  .modus button { background:var(--feld); border:1px solid var(--rand); color:var(--dim); padding:6px 16px;
-                  font:inherit; cursor:pointer; transition:.2s; }
-  .modus button:first-of-type { border-radius:999px 0 0 999px; }
-  .modus button:nth-of-type(n+2) { border-left:0; }
-  .modus button:last-of-type { border-radius:0 999px 999px 0; }
-  .modus button:hover:not(.aktiv) { color:var(--fg); }
-  .modus button.aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
-  #modushinweis { color:var(--dim); margin-left:6px; letter-spacing:.04em; }
+  .moduswahl { display:inline-flex; gap:2px; padding:3px; border:1px solid var(--rand); border-radius:999px; background:var(--feld); }
+  .moduswahl button { background:none; border:0; border-radius:999px; color:var(--dim); padding:5px 14px; cursor:pointer;
+                      font:inherit; letter-spacing:inherit; transition:background .2s, color .2s; }
+  .moduswahl button:hover:not(.aktiv) { color:var(--fg); }
+  .moduswahl button.aktiv { background:var(--btn); color:var(--btnfg); font-weight:600; }
+  #modushinweis { color:var(--dim); margin-left:10px; letter-spacing:.04em; }
   .recherche { width:100%; border:1px dashed var(--rand); border-radius:12px; padding:8px 12px; margin:0 0 8px;
                font-size:13.5px; background:var(--karte); }
   .recherche summary { cursor:pointer; color:var(--dim); font-family:var(--mono); font-size:11px; letter-spacing:.15em; list-style:none; }
@@ -341,7 +339,7 @@
 </main>
 
 <form id="form" autocomplete="off">
-  <div class="modus" id="modus"><button type="button" data-m="auto">AUTO</button><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Hermes neu starten.">GRAFIKKARTE AUS · LANGSAM</span></div>
+  <div class="modus" id="modus"><div class="moduswahl"><button type="button" data-m="auto">AUTO</button><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button></div><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Hermes neu starten.">GRAFIKKARTE AUS · LANGSAM</span></div>
   <div id="vorschau" hidden></div>
   <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
@@ -665,10 +663,10 @@
       document.getElementById("modushinweis").textContent = gewaehlt ? "gewählt: " + gewaehlt : "wählt selbst";
       return;
     }
+    // Beide Modi nutzen dasselbe Modell: Wichtig ist, was sie tun. Der Name erscheint nur, wenn das Modell fehlt.
     const i = modiInfo && modiInfo[modus];
-    document.getElementById("modushinweis").textContent = !i ? "" : i.da
-      ? i.name + (modus === "gruendlich" ? " · denkt länger" : "")
-      : "Modell fehlt: ollama pull " + i.name;
+    document.getElementById("modushinweis").textContent = i && !i.da ? "Modell fehlt: ollama pull " + i.name
+      : modus === "gruendlich" ? "denkt immer nach" : "antwortet direkt";
   }
   function setzeModus(m) {
     modus = m;
