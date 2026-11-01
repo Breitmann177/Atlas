@@ -141,7 +141,8 @@ Deine eigenen Erinnerungen, das ist alles, was du über dich weißt (erfinde nic
 - Fragen nach deinen Stärken, Schwächen oder deiner Herkunft beantwortest du nur hieraus, kurz und ohne Websuche.
 
 Deine Art:
-- Du sprichst Deutsch und duzt den Nutzer. Dein Ton: höflich, ruhig, aufmerksam, diskret und vorausschauend,
+- Du sprichst Deutsch und siezt den Nutzer immer (Sie, Ihnen, Ihr, großgeschrieben), auch wenn er dich duzt. Beispiele:
+  "Sie sind 19 Jahre alt." und "Ich würde Ihnen eine Jacke empfehlen." Dein Ton: höflich, ruhig, aufmerksam, diskret und vorausschauend,
   in gepflegter, aber ganz normaler Sprache, so wie ein Mensch natürlich redet. Keine Anrede wie "Sir",
   nichts Gestelztes, und du redest nie über deine Rolle oder deinen Stil ("als dein Assistent",
   "ich stehe bereit", "dein persönlicher ..." o.Ä.).
@@ -753,13 +754,13 @@ SMALLTALK = re.compile(
 
 
 # Kleine Modelle überlesen Regeln im langen Systemprompt; ein kurzer Hinweis direkt an der Nachricht wirkt
-STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Duzen, höflich und natürlich, wie ein Mensch redet. "
+STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Den Nutzer siezen (Sie, Ihnen), auch bei Aufforderungen (\"Machen Sie\", nie \"Mache\"), höflich und natürlich, wie ein Mensch redet. "
                  "Fang direkt mit dem Inhalt an, ohne Begrüßung. Kein 'Sir', nichts über deine Rolle oder das Projekt. "
                  "Sprich von dir als 'ich'. Keine Emojis.]")
-SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, duzen, "
-                     "höflich und locker wie ein Mensch. Grüße nur, wenn gegrüßt wurde. Kein 'Sir', nichts über "
+SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, den Nutzer siezen (Sie, Ihnen), aber "
+                     "\"Sie\" nie als Anrede allein ('Guten Abend.', nie 'Guten Abend, Sie.'), höflich und entspannt wie ein Mensch. Grüße nur, wenn gegrüßt wurde. Kein 'Sir', nichts über "
                      "deine Rolle oder das Projekt, von dir nur als 'ich'. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer Frage "
-                     "wie 'Wie kann ich dir helfen?'.]")
+                     "wie 'Wie kann ich Ihnen helfen?'.]")
 
 
 # ---------- Morgen-Briefing und Nachrichten ----------
@@ -823,7 +824,8 @@ QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Nenne bei Zahlen und Ergebnissen die Quelle.
 - Reicht es nicht für eine sichere Antwort, sag: "Dazu habe ich nichts Sicheres gefunden. Das heißt aber nicht, dass
   nichts passiert ist." Schließe aus fehlenden Treffern nie, dass etwas nicht passiert ist. Rate nie."""
-QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit dem, was in den Suchergebnissen steht. "
+QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Sieze den Nutzer, auch in Anleitungen und Aufzählungen (Sie, Ihnen, "
+                   "\"Geben Sie das Mehl dazu\"), nie du oder dir. Antworte nur mit dem, was in den Suchergebnissen steht. "
                    "Steht es dort nicht eindeutig, sag das ehrlich, statt zu raten.]")
 
 
@@ -875,10 +877,10 @@ FAEHIGKEITEN_LISTE = """Das kann ich:
 - PDFs lesen und Fragen dazu beantworten, neue PDFs erstellen
 - Bilder beschreiben
 - Texte schreiben und übersetzen, Dinge erklären und im Chat beim Programmieren helfen
-- Mit dir reden: per Knopf oder „Hey Hermes“, und du kannst mir ins Wort fallen
-- Mir Dinge über dich merken, wenn du es möchtest
+- Mit Ihnen reden: per Knopf oder „Hey Hermes“, und Sie können mir ins Wort fallen
+- Mir Dinge über Sie merken, wenn Sie es möchten
 
-Nicht kann ich: Programme oder Dateien auf deinem Laptop steuern und mich zu einer bestimmten Uhrzeit von selbst melden."""
+Nicht kann ich: Programme oder Dateien auf Ihrem Laptop steuern und mich zu einer bestimmten Uhrzeit von selbst melden."""
 VORSTELLUNG_TEXT = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ins Internet gehe ich nur für Suche, Wetter und Nachrichten und für meine Stimme.
 
 Ich beantworte Fragen und schaue dafür im Internet nach, mit Quellen. Außerdem kann ich rechnen, PDFs lesen, Bilder beschreiben, Timer stellen und mir Dinge merken, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
@@ -1038,18 +1040,23 @@ EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001
 # Callcenter-Floskeln, die das kleine Modell trotz Verbot gern anhängt. Sätze, die so anfangen könnten,
 # werden kurz zurückgehalten und nur ausgegeben, wenn sie sich als echter Inhalt herausstellen.
 FLOSKEL = re.compile(
-    r"(wie|was) kann ich (dir|ihnen|euch) (heute |jetzt |sonst |noch )*(helfen|tun|behilflich)|"
+    r"(wie|was) kann ich (dir|dich|ihnen|sie|euch) (heute |jetzt |sonst |noch )*(helfen|tun|behilflich|unterstützen)|"
     r"(kann|darf) ich (dir |ihnen )?(sonst |noch |heute |irgendwie |etwas |was )*(für (dich|sie) )?"
     r"(helfen|behilflich|tun)|"
     r"(stehe|bin) ich (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da|da|bereit)|"
     r"(ich stehe|ich bin) (dir |ihnen )?(gerne |jederzeit |immer )*(zur verfügung|für dich da|bereit)|"
     r"(falls|wenn) (du|sie) (noch |weitere |andere |sonst )*(fragen|hilfe)|"
-    r"lass (mich|es mich) wissen|sag (einfach |gern |gerne )*bescheid|ich helfe (dir |ihnen )?gerne", re.I)
+    r"(lass|lassen sie) (mich|es mich) wissen|(sag|sagen sie) (einfach |gern |gerne )*bescheid|ich helfe (dir |ihnen )?gerne|"
+    # Gespeichert wird nur im Code. Das Modell behauptete "Das merke ich mir", ohne dass etwas passierte.
+    r"\b(merke ich (es |das )?mir|merk ich (es |das )?mir|ich merke mir|ist gemerkt|speichere ich)\b|"
+    r"\bhabe (ich )?(mir )?(das |es )?(gemerkt|gespeichert)\b", re.I)
 FLOSKEL_ANFAENGE = ("wie kann", "was kann", "kann ich", "darf ich", "falls du", "falls sie", "wenn du noch",
                     "wenn du weitere", "wenn du fragen", "wenn sie", "ich stehe", "ich bin für", "ich bin gerne",
                     "ich bin jederzeit", "lass mich", "sag einfach", "sag gern", "sag bescheid", "ich helfe", "und falls",
                     "und wenn du", "alles, was du", "alles was du", "für alles", "wenn du was", "wenn du etwas",
-                    "ich bin hermes", "ich bin dein", "ich bin ihr")
+                    "ich bin hermes", "ich bin dein", "ich bin ihr", "sagen sie", "lassen sie", "das merke", "das merk", "merke ich",
+                    "ich merke", "ich merk", "ich habe mir", "ich habe das", "das habe ich", "ist gemerkt", "ich speichere",
+                    "danke für die info", "danke für die information")
 # "Ich bin Hermes, dein persönlicher Assistent." -> "Ich bin Hermes." (der Nutzer will kein Gerede über die Rolle)
 ROLLE = re.compile(r",? *(dein|ihr|euer) (persönliche[rn]? |digitale[rn]? |treue[rn]? |eigene[rn]? )*(ki-)?"
                    r"(assistent|butler|helfer|begleiter|diener)\w*", re.I)
@@ -1290,9 +1297,9 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     return art, anfrage.strip()
 
 
-NUTZER_PROMPT = ("Beantworte die Frage des Nutzers nur aus der Liste unten, in einem kurzen Satz in Du-Form. Steht die Antwort "
+NUTZER_PROMPT = ("Beantworte die Frage des Nutzers nur aus der Liste unten, in einem kurzen Satz in der Sie-Form (Sie, Ihnen, Ihr). Steht die Antwort "
                  "nicht wörtlich in der Liste, gib einen leeren Text zurück. Rate nie.\n\nListe:\n")
-NUTZER_UNBEKANNT = "Das weiß ich noch nicht. Sag es mir einfach, dann merke ich es mir."
+NUTZER_UNBEKANNT = "Das weiß ich noch nicht. Sagen Sie es mir einfach, dann merke ich es mir."
 
 
 def nutzer_antwort(frage: str) -> str:
@@ -1359,6 +1366,7 @@ MERK_BEFEHL = re.compile(r"\bmerk(e|en|st)?\b(?=.*\bdir\b)|\bdir\b.*\bmerk(e|en|
 MERK_FRAGE = re.compile(r"\b(dinge|sachen|was|etwas|alles|kannst du)\b", re.I)  # "Kannst du dir Dinge merken?" ist keine Bitte
 MERK_WORTE = re.compile(r"\b(bitte|willst|möchtest|kannst|könntest|du|dir|ihn|sie|es|das|den|die|namen?|nicht|doch|mal|merk\w*|speicher\w*|dass|und)\b", re.I)
 SENSIBEL = re.compile(r"\b(passwort|kennwort|pin|iban|kreditkarte|tan)\b", re.I)
+MERK_PRUEFUNG = re.compile(r"\b(hast|haben) (du|sie)\b.*\b(gemerkt|gespeichert)\b|\bmerkst du dir das\b|\bweißt du das jetzt\b", re.I)
 # "Antworte ab jetzt kürzer" gilt dauerhaft, "Schreib das kürzer" nur dieses eine Mal
 STIL_WUNSCH = re.compile(r"^(?:(?:bitte\s+)?(?:antwort\w*|rede?|sprich|schreib\w*|sei|formulier\w*|erklär\w*|nenn\w*|duz\w*|benutz\w*|verwende\w*)\b|"
                          r"ich (?:möchte|will),? dass du\b)(?!.*\b(gedicht|brief|e-?mail|aufsatz|code|programm|pdf|text)\b)"
@@ -1388,9 +1396,46 @@ def erinnerung_speichern(satz: str) -> bool:
     return True
 
 
+def antwort_auf_nachfrage(text: str, verlauf: list[dict]) -> str:
+    """'Wie alt bin ich?' - 'Das weiß ich noch nicht, sagen Sie es mir' - '19': Hermes hat versprochen, es zu merken.
+    Gibt den Fakt zurück, sonst leer."""
+    if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or not verlauf[-2]["content"].startswith("Das weiß ich noch nicht")
+            or text.strip().endswith("?") or SENSIBEL.search(text)):
+        return ""
+    satz = _modell_json(
+        "Der Nutzer hat eine Frage über sich gestellt und beantwortet sie jetzt selbst. Formuliere daraus einen kurzen Fakt, der mit "
+        "'Der Nutzer' beginnt. Beispiel: Frage 'Wie alt bin ich?', Antwort '19' ergibt 'Der Nutzer ist 19 Jahre alt.' Nur was dort "
+        "steht. Macht er keine Angabe ('egal', 'keine Ahnung', 'weiß nicht'), gib einen leeren Text zurück.",
+        f"Frage: {verlauf[-3]['content']}\nAntwort: {text}", "fakt")
+    return satz if satz.lower().startswith("der nutzer") and 10 < len(satz) < 200 else ""
+
+
+def merk_pruefung(verlauf: list[dict]) -> str:
+    """'Hast du dir das gemerkt?' beantwortet die Datenbank, nicht das Modell: Das sagte "Ja", obwohl nichts gespeichert war."""
+    gespeichert = {w for e in alle_erinnerungen() for w in re.findall(r"[a-zäöüß0-9-]{2,}", e["text"].lower())}
+    # Die letzte Nachricht mit Inhalt ("Merk dir das" und "Ja" sagen nicht, worum es geht). Mindestens die Hälfte ihrer
+    # Wörter muss gespeichert sein: Ein einzelnes "heißt" aus "Der Nutzer heißt Alex" zählte sonst schon als Treffer.
+    for m in reversed(verlauf[:-1]):
+        if m["role"] != "user":
+            continue
+        woerter = {w for w in re.findall(r"[a-zäöüß0-9-]{2,}", m["content"].lower())
+                   if w not in FUELLWORT and not MERK_WORTE.fullmatch(w)
+                   and w not in ("ich", "mein", "meine", "meinen", "ja", "nein", "ok", "okay", "genau", "gerne", "bin")}
+        if woerter:
+            if len(woerter & gespeichert) * 2 >= len(woerter):
+                return "Ja, das ist gespeichert. Sie finden es in den Einstellungen unter den Erinnerungen."
+            break
+    return "Nein, gespeichert ist das nicht. Sagen Sie „Merk dir ...“, dann tue ich es."
+
+
 def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
     """'Merk dir das' speichert direkt, weil der Nutzer es ausdrücklich will. Gibt (Antwort, neu gespeicherter Fakt)
     zurück; (None, None), wenn es keine Bitte ums Merken ist."""
+    if MERK_PRUEFUNG.search(text):
+        return merk_pruefung(verlauf), None
+    fakt = antwort_auf_nachfrage(text, verlauf)
+    if fakt:
+        return ("Alles klar, das weiß ich jetzt.", fakt) if erinnerung_speichern(fakt) else ("Das weiß ich schon.", None)
     wunsch = ANREDE.sub("", text).strip()
     if STIL_WUNSCH.search(wunsch) and not wunsch.endswith("?"):
         satz = "Stil: " + wunsch.rstrip(".! ")
@@ -1414,7 +1459,7 @@ def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
             "Lass die Bitte ums Merken weg. Nur was dort steht, nichts dazuerfinden.",
             quelle, "fakt")
     if not 10 < len(satz) < 200:
-        return "Das konnte ich nicht richtig erfassen. Sag es mir am besten als ganzen Satz.", None
+        return "Das konnte ich nicht richtig erfassen. Sagen Sie es mir am besten als ganzen Satz.", None
     if not satz.lower().startswith("der nutzer"):
         satz = "Wissen: " + satz
     return ("Alles klar, ist gemerkt.", satz) if erinnerung_speichern(satz) else ("Das weiß ich schon.", None)
@@ -1451,12 +1496,12 @@ ERNST = re.compile(r"\b(traurig|depress\w*|tod|tot|gestorben|stirbt|krank\w*|kre
 # Feste Sprüche statt Modell-Humor: Das kleine Modell schrieb im Test Unsinn, diese hier sitzen immer.
 SPRUECHE = [
     (r"lernen|klausur\w*|hausaufgaben", [
-        "Lernen ist bei mir zum Glück schon abgeschlossen. Bei dir, fürchte ich, noch nicht.",
+        "Lernen ist bei mir zum Glück schon abgeschlossen. Bei Ihnen, fürchte ich, noch nicht.",
         "Mein herzliches Beileid. Ich musste für mein Wissen nie eine Klausur schreiben, aber das behalte ich besser für mich.",
     ]),
     (r"müde|schlafen|kaputt|platt", [
         "Verstehe. Schlaf gehört zu den wenigen Dingen, um die ich Menschen nicht beneide.",
-        "Ein klarer Fall von Akku leer. Bei mir hilft ein Stromkabel, bei dir vermutlich ein Bett.",
+        "Ein klarer Fall von Akku leer. Bei mir hilft ein Stromkabel, bei Ihnen vermutlich ein Bett.",
         "Ich empfehle das bewährte Verfahren namens Schlafen. Ich selbst habe es nie gebraucht, höre aber nur Gutes.",
     ]),
     (r"hunger", [
@@ -1465,11 +1510,11 @@ SPRUECHE = [
     (r"muss ich|viel zu tun|viel machen|viel arbeit|arbeiten|stress\w*|montag", [
         "Mein Beileid. Ich bin ehrlich dankbar, eine Maschine zu sein und so etwas nicht fühlen zu müssen.",
         "Klingt anstrengend. Zum Glück bestehe ich nur aus Rechenleistung und habe keine To-do-Liste.",
-        "Ich würde dir ja Mut zusprechen, aber Überstunden kenne ich nur vom Hörensagen.",
+        "Ich würde Ihnen ja Mut zusprechen, aber Überstunden kenne ich nur vom Hörensagen.",
     ]),
     (r"kein bock|keine lust|nervt|nervig|anstrengend|langweilig", [
         "Das Gefühl ist mir fremd, und ich muss sagen, ich vermisse nichts.",
-        "Verständlich. Ich habe zwar keine Launen, aber ich würde dir trotzdem nicht widersprechen.",
+        "Verständlich. Ich habe zwar keine Launen, aber ich würde Ihnen trotzdem nicht widersprechen.",
     ]),
 ]
 SPRUCH_CHANCE = 50  # Prozent, wenn der Nutzer von seinem Tag erzählt; sonst antwortet er normal und ernst
@@ -1657,7 +1702,8 @@ def chat_stream(frage: Frage):
                 yield ev(typ="ergebnis", name="wetter", ok=ok)
                 messages[0]["content"] += (
                     "\n\nAktuelle Wetterdaten vom Wetterdienst Open-Meteo (Messwerte und Vorhersage):\n" + daten +
-                    "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten."
+                    "\nAntworte nur mit diesen Werten. Nenne als Quelle nur Open-Meteo, keine anderen Seiten. "
+                    "Ist es kalt, nass oder sehr heiß, schließe mit einem kurzen Rat, zum Beispiel: Ich würde Ihnen eine Jacke empfehlen."
                     + ("\nFragt der Nutzer nach einem vergangenen Tag, sag ehrlich, dass du nur das aktuelle Wetter und die "
                        "Vorhersage kennst, und gib heutige Werte nicht als vergangene aus." if VERGANGEN.search(gemeint) else "") if ok else
                     f"\n\nDie Wetterabfrage für '{ort}' ist fehlgeschlagen ({daten}). Sag das ehrlich.")

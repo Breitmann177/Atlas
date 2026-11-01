@@ -122,6 +122,7 @@ ANALYSE = {
                  "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
 }
 GESPRAECHE = [
+    (["Wie alt bin ich?", "19", "Wie alt bin ich?"], ["19"]),
     (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
     (["Wie wird das Wetter morgen in Köln?", "Und in Hamburg?"], ["Hamburg"]),
     (["Wie hoch ist der Eiffelturm?", "Und wann wurde er gebaut?"], ["1887", "1889"]),

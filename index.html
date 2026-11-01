@@ -372,7 +372,7 @@
       <button type="button" data-m="schnell"><span><b>Schnell</b><small>antwortet direkt</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
       <button type="button" data-m="gruendlich"><span><b>Gründlich</b><small>denkt immer nach</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
     </div>
-    <textarea id="eingabe" rows="1" placeholder="Schreib Hermes etwas ..." autocomplete="off" autofocus></textarea>
+    <textarea id="eingabe" rows="1" placeholder="Schreiben Sie Hermes etwas ..." autocomplete="off" autofocus></textarea>
     <button type="button" class="rund mic" id="mic" title="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
@@ -423,7 +423,7 @@
     <div class="einst">
       <section>
         <h3 class="abschnitt">ERINNERUNGEN</h3>
-        <p class="hinweis">Das weiß Hermes über dich (<span id="zaehler">0</span>). Klick auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
+        <p class="hinweis">Das weiß Hermes über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
         <ul class="listen" id="liste"></ul>
         <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
       </section>
@@ -449,7 +449,7 @@
 
       <section>
         <h3 class="abschnitt">WAKE-WORD</h3>
-        <p class="hinweis">Sag „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
+        <p class="hinweis">Sagen Sie „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
         <div class="schalter-zeile" id="wakeZeile">
           <b id="wakeText">AUS</b>
           <button type="button" class="schalter" id="wakeSchalter" role="switch" aria-checked="false" aria-label="Wake-Word an/aus"></button>
@@ -474,7 +474,7 @@
   let beschaeftigt = false;
   let abbruch = null;  // AbortController der laufenden Antwort (für den Stopp-Knopf)
   let chatsAlle = [];
-  const STANDARD = "Schreib Hermes etwas ...";
+  const STANDARD = "Schreiben Sie Hermes etwas ...";
 
   const chat = document.getElementById("chat");
   const fenster = document.getElementById("fenster");
@@ -709,19 +709,19 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") plusMenue(false); });
 
   // Merken: Hermes fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
-  const DU_FORM = { "heißt": "heißt", wohnt: "wohnst", lebt: "lebst", studiert: "studierst", hat: "hast", ist: "bist",
-    mag: "magst", spielt: "spielst", arbeitet: "arbeitest", kommt: "kommst", liebt: "liebst", hasst: "hasst",
-    isst: "isst", macht: "machst", geht: "gehst", lernt: "lernst", "fährt": "fährst" };
-  function alsDu(f) {
+  const SIE_FORM = { "heißt": "heißen", wohnt: "wohnen", lebt: "leben", studiert: "studieren", hat: "haben", ist: "sind",
+    mag: "mögen", spielt: "spielen", arbeitet: "arbeiten", kommt: "kommen", liebt: "lieben", hasst: "hassen",
+    isst: "essen", macht: "machen", geht: "gehen", lernt: "lernen", "fährt": "fahren" };
+  function alsSie(f) {
     f = f.replace(/^(Korrektur|Wissen|Stil): /, "");
     const m = f.match(/^Der Nutzer (\S+)(.*)$/);
-    return m && DU_FORM[m[1]] ? "Du " + DU_FORM[m[1]] + m[2] : f;
+    return m && SIE_FORM[m[1]] ? "Sie " + SIE_FORM[m[1]] + m[2] : f;
   }
   let offenerVorschlag = null;  // { fakten, karte }
   function gemerktKarte(huelle, f) {
     const d = document.createElement("div"); d.className = "merkkarte fertig";
     const k = document.createElement("b"); k.textContent = "✓ ERINNERUNG GESPEICHERT";
-    const t = document.createElement("span"); t.textContent = alsDu(f);
+    const t = document.createElement("span"); t.textContent = alsSie(f);
     d.append(k, t); huelle.appendChild(d);
     fenster.scrollTop = fenster.scrollHeight;
   }
@@ -729,7 +729,7 @@
     const d = document.createElement("div"); d.className = "merkkarte";
     const k = document.createElement("b"); k.textContent = "SOLL ICH MIR DAS MERKEN?";
     d.appendChild(k);
-    fakten.forEach((f) => { const t = document.createElement("span"); t.textContent = alsDu(f); d.appendChild(t); });
+    fakten.forEach((f) => { const t = document.createElement("span"); t.textContent = alsSie(f); d.appendChild(t); });
     const knoepfe = document.createElement("div"); knoepfe.className = "merkknoepfe";
     const ja = document.createElement("button"); ja.type = "button"; ja.textContent = "Ja, merken";
     const nein = document.createElement("button"); nein.type = "button"; nein.textContent = "Nein";
@@ -933,7 +933,7 @@
         eingabe.dispatchEvent(new Event("input"));
       };
       sr.onerror = (ev) => {
-        if (ev.error === "not-allowed") platzhalter("Mikrofon nicht erlaubt. Erlaube es in der Adressleiste.", 6000);
+        if (ev.error === "not-allowed") platzhalter("Mikrofon nicht erlaubt. Erlauben Sie es in der Adressleiste.", 6000);
         else if (ev.error === "network") platzhalter("Spracherkennung braucht Internet.", 6000);
         else if (ev.error !== "no-speech" && ev.error !== "aborted") platzhalter("Mikro-Fehler: " + ev.error, 6000);
       };
@@ -949,7 +949,7 @@
     try {
       mikroStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
-      platzhalter("Mikrofon nicht erlaubt. Erlaube es in der Adressleiste.", 6000);
+      platzhalter("Mikrofon nicht erlaubt. Erlauben Sie es in der Adressleiste.", 6000);
       return;
     }
     stuecke = [];
@@ -1146,7 +1146,7 @@
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
-    const url = await holeAudio("Guten Abend. Ich bin Hermes. So klinge ich, wenn ich dir antworte.");
+    const url = await holeAudio("Guten Abend. Ich bin Hermes. So klinge ich, wenn ich Ihnen antworte.");
     if (url) await abspielen(url);
     b.classList.remove("spielt");
   }));
@@ -1194,7 +1194,7 @@
     window.hermesFroh = performance.now();
     platzhalter("Timer abgelaufen", 6000);
     piepen();
-    setTimeout(() => sagen("Dein Timer ist abgelaufen.", lauschLauf), 1300);
+    setTimeout(() => sagen("Ihr Timer ist abgelaufen.", lauschLauf), 1300);
   }
   function piepen() {  // drei kurze, weiche Pieptöne
     try {
@@ -1380,7 +1380,7 @@
       const res = await fetch("/chats", { method: "DELETE" });
       if (!res.ok) throw new Error("Serverfehler");
     } catch (e) {
-      alert("Löschen hat nicht geklappt. Hast du die neue server.py gestartet?");
+      alert("Löschen hat nicht geklappt. Läuft die neue server.py?");
       return;
     }
     neuerChat();
