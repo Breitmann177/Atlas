@@ -790,12 +790,15 @@ def wohnort() -> str:
     return ""
 
 
+ANREDE = re.compile(r"^\W*(?:(?:hey|hallo|hi|ok|okay)\s+)?hermes\b\W*", re.I)
 # Damit die Websuche nicht zu erfundenen Antworten führt: das Modell muss die Quellen prüfen, nicht nur nacherzählen
 QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Nutze nur, was dort wirklich steht. Nichts aus dem Gedächtnis ergänzen, auch keine Namen, Zahlen oder Daten.
 - Beantworten die Quellen genau diese Frage? Passt ein Text nur ungefähr zum Thema, zählt er nicht.
 - Achte auf das Datum und nimm bei aktuellen Fragen die neueste Angabe. Nenne das Datum, wenn es wichtig ist.
 - Widersprechen sich Quellen, sag das offen und nenne beide Angaben.
+- Ist die Frage mehrdeutig (zum Beispiel Grenzwerte in Mathe oder bei Schadstoffen) oder passen die Quellen zu einem anderen
+  Thema, dann erfinde keinen Zusammenhang, sondern sag das und frag nach, was gemeint ist.
 - Nenne bei Zahlen und Ergebnissen die Quelle.
 - Reicht es nicht für eine sichere Antwort, sag: "Dazu habe ich nichts Sicheres gefunden. Das heißt aber nicht, dass
   nichts passiert ist." Schließe aus fehlenden Treffern nie, dass etwas nicht passiert ist. Rate nie."""
@@ -828,8 +831,9 @@ def letzter_wurf(text: str, verlauf: list[dict]) -> str | None:
 
 # Fragen nach den eigenen Fähigkeiten: feste, wahre Liste. Die Websuche fand sonst das fremde Produkt "Hermes Agent",
 # und das Modell gab dessen Funktionen als seine eigenen aus.
-FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|\bfähigkeiten von hermes\b|"
-                        r"\b(deine|hermes)\b.*\b(fähigkeit\w*|funktion\w*|features?)\b|\b(fähigkeit\w*|funktion\w*|features?)\b.*\b(du|hermes)\b", re.I)
+FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|"
+                        r"\b(deine|dein|von hermes|hermes)\s+(fähigkeit\w*|funktion(en)?|features?)\b|"
+                        r"\b(fähigkeit\w*|funktion(en)?|features?)\b.*\b(hast du|du hast|von dir|von hermes|kannst du)\b", re.I)
 NOCH_MEHR = re.compile(r"\b(was noch|sonst noch|und noch|alles|liste)\b", re.I)
 FAEHIGKEITEN_LISTE = """Das kann ich:
 
@@ -1434,6 +1438,8 @@ def chat_stream(frage: Frage):
         return
 
     messages = [{"role": "system", "content": system_prompt()}] + kuerzen(verlauf)
+    # "Hermes, ..." am Satzanfang ist die Anrede, kein Thema: Das Modell hielt es sonst für den Paketdienst
+    messages[-1] = {**messages[-1], "content": ANREDE.sub("", messages[-1]["content"]) or messages[-1]["content"]}
     if bilder:
         messages[-1] = {**messages[-1], "images": bilder}  # Bilder hängen an der letzten Nutzernachricht
     if dokumente:

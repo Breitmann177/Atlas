@@ -65,7 +65,8 @@ WEGE = [
     ("Wirf eine Münze", "münze"), ("Kannst du eine Münze werfen?", "münze"), ("Kopf oder Zahl?", "münze"),
     ("Was ist eine Münze?", "suche"), ("Würfel mal", "würfel"), ("Was ist ein Würfel?", "suche"),
     ("Was kannst du so alles?", "fähigkeiten"), ("Was sind die Fähigkeiten von Hermes?", "fähigkeiten"),
-    ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
+    ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("hermes wie funktioniert das Thema grenzwerte", "suche"),
+    ("Hermes, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
     ("Wer ist Hermes in der griechischen Mythologie?", "suche"), ("Wie hoch ist der Eiffelturm?", "suche"),
     ("Was sind 18 Prozent von 2450?", "router"), ("Wie schreibe ich eine Schleife in Python?", "router"),
     ("Schreib mir ein Gedicht über Katzen", "kein werkzeug"), ("Stimmt das?", "router"),
@@ -87,6 +88,7 @@ ANTWORTEN = [
     ("Was sind 18 Prozent von 2450?", ["441"], []),
     ("Wie spät ist es in Tokio?", ["Tokio"], []),
     ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
+    ("hermes wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
 ]
 GESPRAECHE = [
     (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
