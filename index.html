@@ -832,7 +832,6 @@
     if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";
     inhalt.classList.remove("typing");
     if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
-    if (karte) karte.open = false;
     window.hermesDenkt = false; window.hermesSucht = false;
     beschaeftigt = false;
     sendeStatus();
@@ -965,7 +964,7 @@
 
   // Nimmt eine Äußerung auf: Aufnahme läuft schon vorher (damit das erste Wort nicht fehlt),
   // endet nach "stille" ms Ruhe. Gibt einen Blob zurück, oder null, wenn niemand gesprochen hat.
-  function aeusserung(lauf, { maxWarten = 8000, maxDauer = 30000, stille = 1100 } = {}) {
+  function aeusserung(lauf, { maxWarten = 8000, maxDauer = 30000, stille = 1500 } = {}) {
     return new Promise((fertig) => {
       const rec = new MediaRecorder(ohr.stream), teile = [];
       rec.ondataavailable = (e) => { if (e.data.size) teile.push(e.data); };
