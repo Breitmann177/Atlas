@@ -85,6 +85,11 @@ SPRUCH_ERLAUBT = {"Poah, heute muss ich echt viel machen": True, "Ich bin so mü
                   "Mein Opa ist gestorben, ich bin traurig": False, "Was muss ich für die Klausur lernen?": False}
 PDF_WUNSCH = {"Mach mir ein PDF über Istanbul": True, "Schreib mir aus dem PDF raus, wann meine Tests sind": False,
               "Was steht im PDF?": False, "Kannst du das als PDF speichern?": True}
+STIL = {"Antworte ab jetzt kürzer": True, "Hermes, sei in Zukunft lockerer": True, "Sprich nicht mehr so förmlich": True,
+        "Ich möchte, dass du ab jetzt ausführlicher antwortest": True, "Schreib das kürzer": False,
+        "Schreib mir einen Text, der immer lustig ist": False, "Ab jetzt regnet es immer": False}
+KORREKTUREN = {"Nein, das stimmt nicht, der Eiffelturm ist 330 Meter hoch": True, "Das ist falsch": True,
+               "Nicht Scholz, sondern Merz": True, "Danke, das war hilfreich": False}
 ORTE = {"Wie wird das Wetter morgen in Bad Homburg?": "Bad Homburg", "Wetter in Frankfurt am Main": "Frankfurt am Main",
         "wetter in köln": "Köln", "Regnet es in der Nacht?": ""}
 # Stichwort: Eins davon muss vorkommen. falsch: Das darf nicht vorkommen.
@@ -131,6 +136,17 @@ for text, soll in PDF_WUNSCH.items():
     pruefe(f"PDF: {text}", server.pdf_gewuenscht(text), soll)
 for text, soll in ORTE.items():
     pruefe(f"Ort: {text}", server.ort_aus_text(text), soll)
+for text, soll in STIL.items():
+    pruefe(f"Stil: {text}", bool(server.STIL_WUNSCH.search(server.ANREDE.sub("", text))), soll)
+for text, soll in KORREKTUREN.items():
+    pruefe(f"Korrektur: {text}", bool(server.KORREKTUR.search(text)), soll)
+server.erinnerung_speichern("Korrektur: Der Hund von Alex heißt Bello.")
+pruefe("Gelernt passt", server.gelerntes_passt("Wie heißt der Hund von Alex?"), True)
+pruefe("Gelernt passt nicht", server.gelerntes_passt("Wie heißt der Hund von Obama?"), False)
+pruefe("Gelernt passt nicht zum Thema", server.gelerntes_passt("Wie hoch ist der Eiffelturm?"), False)
+for e in server.alle_erinnerungen():
+    with server.db() as c:
+        c.execute("DELETE FROM erinnerungen WHERE id=?", (e["id"],))
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
 pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)

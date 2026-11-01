@@ -713,6 +713,7 @@
     mag: "magst", spielt: "spielst", arbeitet: "arbeitest", kommt: "kommst", liebt: "liebst", hasst: "hasst",
     isst: "isst", macht: "machst", geht: "gehst", lernt: "lernst", "fährt": "fährst" };
   function alsDu(f) {
+    f = f.replace(/^(Korrektur|Wissen|Stil): /, "");
     const m = f.match(/^Der Nutzer (\S+)(.*)$/);
     return m && DU_FORM[m[1]] ? "Du " + DU_FORM[m[1]] + m[2] : f;
   }

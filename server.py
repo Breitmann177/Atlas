@@ -149,6 +149,8 @@ Deine Art:
 - Du bist nicht der Nutzer: Was unter "Das weißt du über den Nutzer" steht, gehört zu ihm. Gib es nie als deine eigene
   Person oder Geschichte aus. Du hast keine Freizeit, kein Studium und keinen Lebenslauf, erfinde so etwas auch nicht.
   Erwähne das Projekt, das Gerät oder deine Technik nur, wenn der Nutzer danach fragt.
+- Behaupte nie von dir aus, du hättest dir gerade etwas gemerkt: Ob etwas gespeichert wird, entscheidet der Nutzer in
+  einer eigenen Karte.
 - Du kannst dir Dinge merken: Sagt der Nutzer "Merk dir ...", wird es gespeichert, und was du schon weißt, steht
   unten unter "Das weißt du über den Nutzer". Behaupte nie, du könntest dir nichts merken. Fehlt dir etwas dort,
   sag einfach, dass du es noch nicht weißt, und frag danach.
@@ -252,9 +254,19 @@ def daten_anreichern(text: str) -> str:
 
 def system_prompt():
     p = BASIS_PROMPT + f"\nJetzt ist {jetzt_text()}."
-    mem = alle_erinnerungen()
-    if mem:
-        p += "\n\nDas weißt du über den Nutzer:\n" + "\n".join("- " + m["text"] for m in mem)
+    # Eine Tabelle, damit alles in den Einstellungen sichtbar und löschbar bleibt. Der Anfang des Textes sagt, was es ist.
+    mem = [m["text"] for m in alle_erinnerungen()]
+    gelernt = [m.split(": ", 1)[1] for m in mem if m.startswith(("Korrektur: ", "Wissen: "))]
+    stil = [m.removeprefix("Stil: ") for m in mem if m.startswith("Stil: ")]
+    nutzer = [m for m in mem if not m.startswith(("Korrektur: ", "Wissen: ", "Stil: "))]
+    if nutzer:
+        p += "\n\nDas weißt du über den Nutzer:\n" + "\n".join("- " + m for m in nutzer)
+    if gelernt:
+        p += ("\n\nDas hat dir der Nutzer beigebracht. Passt es zur Frage, antworte damit und sag, dass du es von ihm hast. "
+              "Sagen mitgegebene Quellen etwas anderes, nenne beides offen:\n" + "\n".join("- " + m for m in gelernt))
+    if stil:
+        p += ("\n\nSo möchte der Nutzer, dass du antwortest. Halte dich daran, aber Ehrlichkeit und die Quellenregeln "
+              "gehen vor:\n" + "\n".join("- " + m for m in stil))
     return p
 
 
@@ -1283,6 +1295,13 @@ MERK_BEFEHL = re.compile(r"\bmerk(e|en|st)?\b(?=.*\bdir\b)|\bdir\b.*\bmerk(e|en|
 MERK_FRAGE = re.compile(r"\b(dinge|sachen|was|etwas|alles|kannst du)\b", re.I)  # "Kannst du dir Dinge merken?" ist keine Bitte
 MERK_WORTE = re.compile(r"\b(bitte|willst|möchtest|kannst|könntest|du|dir|ihn|sie|es|das|den|die|namen?|nicht|doch|mal|merk\w*|speicher\w*|dass|und)\b", re.I)
 SENSIBEL = re.compile(r"\b(passwort|kennwort|pin|iban|kreditkarte|tan)\b", re.I)
+# "Antworte ab jetzt kürzer" gilt dauerhaft, "Schreib das kürzer" nur dieses eine Mal
+STIL_WUNSCH = re.compile(r"^(?:(?:bitte\s+)?(?:antwort\w*|rede?|sprich|schreib\w*|sei|formulier\w*|erklär\w*|nenn\w*|duz\w*|benutz\w*|verwende\w*)\b|"
+                         r"ich (?:möchte|will),? dass du\b)(?!.*\b(gedicht|brief|e-?mail|aufsatz|code|programm|pdf|text)\b)"
+                         r".*\b(ab jetzt|von jetzt an|von nun an|ab sofort|in zukunft|künftig|immer|generell|grundsätzlich|nicht mehr|nie wieder|nie mehr)\b", re.I)
+# Der Nutzer berichtigt die letzte Antwort
+KORREKTUR = re.compile(r"\b(stimmt|ist) (so |doch |aber |gar )?(nicht|falsch)\b|\bfalsch\b|\bdu (irrst|täuschst) dich\b|\bdu liegst\b.*\bfalsch\b|"
+                       r"\brichtig (ist|wäre|heißt)\b|\bin wahrheit\b|\bsondern\b|^\W*(nein|ne|nö|doch)\b", re.I)
 NAME_GEFRAGT = re.compile(r"\bwie ich heiß|\bmein(en)? name", re.I)
 NUR_NAME = re.compile(r"^\W*(?:ich heiße |ich heisse |mein name ist |ich bin )?([^\W\d_][\w-]+(?: [^\W\d_][\w-]+)?)[.!\s]*$", re.I)
 KEIN_NAME = {"ja", "nein", "nö", "ne", "nee", "ok", "okay", "danke", "egal", "genau", "keine ahnung", "weiß nicht", "rate mal", "rate"}
@@ -1308,6 +1327,10 @@ def erinnerung_speichern(satz: str) -> bool:
 def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
     """'Merk dir das' speichert direkt, weil der Nutzer es ausdrücklich will. Gibt (Antwort, neu gespeicherter Fakt)
     zurück; (None, None), wenn es keine Bitte ums Merken ist."""
+    wunsch = ANREDE.sub("", text).strip()
+    if STIL_WUNSCH.search(wunsch) and not wunsch.endswith("?"):
+        satz = "Stil: " + wunsch.rstrip(".! ")
+        return ("Alles klar, mache ich ab jetzt so.", satz) if erinnerung_speichern(satz) else ("Das weiß ich schon.", None)
     if not MERK_BEFEHL.search(text) or (text.strip().endswith("?") and MERK_FRAGE.search(text)):
         return None, None
     if SENSIBEL.search(text):
@@ -1322,12 +1345,37 @@ def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
     satz = "" if eigener_inhalt or len(davor) < 2 else name_aus_antwort(quelle, verlauf[:-2])
     if not satz:
         satz = _modell_json(
-            "Formuliere aus der Nachricht einen kurzen Fakt über den Nutzer, der mit 'Der Nutzer' beginnt, zum Beispiel "
-            "'Der Nutzer heißt Anna.' Lass die Bitte ums Merken weg. Nur was dort steht, nichts dazuerfinden.",
+            "Formuliere aus der Nachricht einen kurzen Fakt. Geht es um den Nutzer selbst, beginne mit 'Der Nutzer', zum "
+            "Beispiel 'Der Nutzer heißt Anna.' Geht es um etwas anderes, schreib einen kurzen Aussagesatz dazu. "
+            "Lass die Bitte ums Merken weg. Nur was dort steht, nichts dazuerfinden.",
             quelle, "fakt")
-    if not satz.lower().startswith("der nutzer") or not 10 < len(satz) < 200:
+    if not 10 < len(satz) < 200:
         return "Das konnte ich nicht richtig erfassen. Sag es mir am besten als ganzen Satz.", None
+    if not satz.lower().startswith("der nutzer"):
+        satz = "Wissen: " + satz
     return ("Alles klar, ist gemerkt.", satz) if erinnerung_speichern(satz) else ("Das weiß ich schon.", None)
+
+
+NUR_WIDERSPRUCH = {"nein", "ne", "nö", "doch", "stimmt", "falsch", "so", "gar", "es", "du", "dich", "irrst", "täuschst", "liegst",
+                   "sondern", "richtig", "wäre", "heißt", "in", "wahrheit", "eigentlich", "wirklich", "total", "völlig", "ganz", "kompletter", "quatsch"}
+
+
+def korrektur_vorschlagen(text: str, verlauf: list[dict]) -> list[str]:
+    """Berichtigt der Nutzer die letzte Antwort, fragt Hermes per Karte, ob er sich das merken soll. Speichert NICHTS."""
+    if (text.strip().endswith("?") or not KORREKTUR.search(text) or len(text.split()) < 4 or SENSIBEL.search(text)
+            or len(verlauf) < 2 or verlauf[-2]["role"] != "assistant"):
+        return []
+    # "Das stimmt doch nicht" sagt nicht, was stimmt. Das Modell dachte sich dann einen Satz aus.
+    if not {w for w in re.findall(r"[a-zäöüß0-9-]+", text.lower()) if w not in FUELLWORT and w not in NUR_WIDERSPRUCH}:
+        return []
+    satz = _modell_json(
+        "Der Nutzer berichtigt eine Antwort von Hermes. Schreib die richtige Angabe als kurzen, für sich verständlichen "
+        "Aussagesatz, nur aus dem, was der Nutzer sagt. Nenne das Thema ausdrücklich, keine Wörter wie 'er', 'das' oder "
+        "'es' ohne Bezug. Sagt er nur, dass etwas falsch ist, aber nicht, was stimmt, gib einen leeren Text zurück.",
+        f"Hermes: {verlauf[-2]['content'][:800]}\n\nNutzer: {text}", "fakt")
+    if not 10 < len(satz) < 200 or "nutzer" in satz.lower():
+        return []
+    return [] if satz.lower().rstrip(".") in (e["text"].lower().rstrip(".") for e in alle_erinnerungen()) else ["Korrektur: " + satz]
 
 
 # ---------- Gelegentlicher trockener Humor ----------
@@ -1388,6 +1436,18 @@ FUELLWORT = {"wurde", "wurden", "wird", "werden", "haben", "hatte", "etwas", "ei
              "nicht", "noch", "auch", "sind", "gibt", "beim", "bei", "dann", "aber", "oder", "welche", "welcher", "welches",
              "warum", "wieso", "weshalb", "wann", "wie", "wer", "was", "der", "die", "das", "den", "dem", "des", "ein",
              "und", "ist", "hat", "gab", "war", "waren", "von", "vom", "zum", "zur", "mit", "für", "über", "aus", "nach"}
+
+
+def gelerntes_passt(frage: str) -> bool:
+    """Steht die Antwort schon in dem, was der Nutzer beigebracht hat? Dann keine Websuche: Die fand sonst fremde Treffer,
+    und das Modell glaubte denen mehr als dem Nutzer ("Alexs Hund heißt Calvin")."""
+    woerter = {w for w in re.findall(r"[a-zäöüß0-9-]{3,}", frage.lower()) if w not in FUELLWORT}
+    for e in alle_erinnerungen():
+        if e["text"].startswith(("Korrektur: ", "Wissen: ")):
+            gleich = sum(w in e["text"].lower() for w in woerter)
+            if gleich >= 2 and gleich == len(woerter):  # alle Wörter: "Hund von Obama" ist nicht "Hund von Alex"
+                return True
+    return False
 
 
 def treffer_passen(treffer: list[dict], frage: str) -> bool:
@@ -1498,7 +1558,7 @@ def chat_stream(frage: Frage):
             # Wetterfragen nie dem Router überlassen: sonst landet er manchmal bei der Websuche und zufälligen Seiten
             if not anhang and not smalltalk and WETTER.search(gemeint):
                 werkzeug, eingabe = "wetter", ort_aus_text(gemeint)
-            elif anhang or smalltalk or ohne_router(gemeint, dokumente):
+            elif anhang or smalltalk or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
                 werkzeug, eingabe = "keins", ""
             elif direkte_suche(gemeint, dokumente):
                 werkzeug, eingabe = "suche", direkte_suche(gemeint, dokumente)
@@ -1628,7 +1688,7 @@ def chat_stream(frage: Frage):
                 link = f"\n\n[PDF herunterladen](/pdf/{os.path.basename(pfad)})"
             antwort += link
             yield ev(typ="token", text=link)
-        vorschlaege = fakten_vorschlagen(frage.text, HILFSMODELL)
+        vorschlaege = fakten_vorschlagen(frage.text, HILFSMODELL) or korrektur_vorschlagen(frage.text, verlauf)
         if vorschlaege:
             yield ev(typ="vorschlag", fakten=vorschlaege)
     except OllamaFehler as e:
