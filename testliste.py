@@ -124,6 +124,16 @@ ANALYSE = {
                  "Wie warm wird eine Herdplatte?",
                  "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
 }
+# Bezug: vorige Frage, Antwort, neue Frage, das muss in die Suche, das darf nicht hinein
+BEZUG = [
+    ("wie lange ist der weg von freiburg bis heilbronn techcampus?", "Der Abstand beträgt etwa 9,8 km (Quelle: x).\n\n---\n**Quellen**\n- [a](https://a.de)",
+     "wie lange dauert die fahrt mit dem auto?", ["freiburg", "heilbronn"], []),
+    ("Wie komme ich von Stuttgart nach Berlin?", "Mit dem Zug oder dem Auto.", "Und wie teuer ist der Zug?", ["stuttgart", "berlin"], []),
+    ("Wie hoch ist der Eiffelturm?", "330 Meter.", "Und wann wurde er gebaut?", ["eiffelturm"], []),
+    ("Was kostet das iPhone 16?", "Etwa 900 Euro.", "Wo kann ich das kaufen?", ["iphone"], []),
+    ("Wer ist Friedrich Merz?", "Der Bundeskanzler.", "Wie hoch ist der Eiffelturm?", ["eiffelturm"], ["merz"]),
+    ("Wie weit ist es von Köln nach Bonn?", "Etwa 30 Kilometer.", "Wie mache ich Pizzateig?", ["pizza"], ["köln", "bonn"]),
+]
 GESPRAECHE = [
     (["ist es morgen kalt?", "freiburg"], ["Freiburg"]),
     (["Wie alt bin ich?", "19", "Wie alt bin ich?"], ["19"]),
@@ -200,6 +210,13 @@ if "--voll" in sys.argv:
             ohne_werkzeug = ("hermes", "gespraech", "aufgabe")
             pruefe(f"Analyse: {text}", "ohne werkzeug" if art in ohne_werkzeug else art, "ohne werkzeug" if soll in ohne_werkzeug else soll)
     pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
+    print("Bezug:")
+    for vorher, antwort, neu, muss, nicht in BEZUG:
+        verlauf = [{"role": "user", "content": vorher}, {"role": "assistant", "content": antwort}, {"role": "user", "content": neu}]
+        gemeint = server.frage_aufloesen(neu, verlauf) if server.ist_folgefrage(neu, verlauf) else neu
+        art, anfrage = server.analysieren(gemeint, verlauf)
+        print(f"  {art:9} {neu!r} -> {anfrage!r}", flush=True)
+        pruefe(f"Bezug: {neu}", art == "internet" and all(w in anfrage.lower() for w in muss) and not any(w in anfrage.lower() for w in nicht), True)
     print("Antworten:")
     for text, muss, darf_nicht in ANTWORTEN:
         t = time.time()

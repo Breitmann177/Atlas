@@ -1282,12 +1282,12 @@ art:
 - internet: Sachfrage über die Welt, die man nachschlagen kann: Personen, Ereignisse, Zahlen, Orte, Preise, Begriffe, Anleitungen, Gesundheit, Rechte. Auch wenn sie mit "ich" oder "mein" formuliert ist ("Wie mache ich Pizza?"). Im Zweifel internet.
 - wetter: fragt nach dem Wetter an einem Ort auf der Erde, jetzt oder in den nächsten Tagen, auch ohne das Wort Wetter: kalt, warm, Regen, Schnee, Wind, Grad, oder ob man Jacke oder Schirm braucht ("Ist es morgen kalt?", "Brauche ich heute einen Schirm?"). Nur wenn die Antwort die aktuelle Vorhersage für einen Ort auf der Erde braucht. Alles andere ist internet: Temperaturen von Dingen und Himmelskörpern ("Wie heiß ist die Sonne?"), Erklärungen ("Warum ...", "Wie entsteht ..."), Kaufberatung und Wetter in der Vergangenheit.
 - nutzer: fragt nach Tatsachen über genau diesen Nutzer, die nur er oder sein Assistent wissen kann ("Wie heiße ich?", "Wie heißt mein Hund?", "Was weißt du über mich?").
-- hermes: fragt nach dem Assistenten selbst, seinen Stärken, seiner Technik, seinem Befinden.
-- gespraech: Reaktion oder Nachfrage zur letzten Antwort, Kritik, Dank, Plauderei ("Stimmt das?", "Warum?", "du lügst").
+- hermes: fragt nach dem Assistenten selbst, seinen Stärken, seiner Technik, seinem Befinden. Der griechische Gott Hermes, der Paketdienst oder die Marke sind internet.
+- gespraech: Reaktion auf die letzte Antwort, Kritik, Dank, Plauderei ("Stimmt das?", "Warum?", "du lügst"). Eine neue Sachfrage zum selben Thema ist internet.
 - aufgabe: Text schreiben, übersetzen, Code schreiben oder erklären, Gedicht, ohne dass Fakten nachgeschlagen werden müssen.
-- rechnen: konkrete Rechenaufgabe mit Zahlen.
+- rechnen: konkrete Rechenaufgabe, deren Zahlen in der letzten Nachricht selbst stehen.
 
-suchanfrage: Nur bei art=internet, sonst leer. Formuliere die beste Google-Suche auf Deutsch, höchstens 8 Wörter, nur Stichwörter ohne Füllwörter und ohne die Anrede Hermes. Korrigiere Hör- und Tippfehler. Behalte alle Namen, Zahlen und Jahre aus der Frage genau bei. Füge keine Jahreszahl hinzu und erfinde keine Tatsachen oder Antworten."""
+suchanfrage: Immer ausfüllen. Formuliere die beste Google-Suche auf Deutsch, höchstens 8 Wörter, nur Stichwörter ohne Füllwörter und ohne die Anrede Hermes. Korrigiere Hör- und Tippfehler. Behalte alle Namen, Zahlen und Jahre aus der Frage genau bei. Bezieht sich die Nachricht auf das bisherige Gespräch, übernimm Namen, Orte und Jahre von dort, damit die Suche für sich allein verständlich ist. Bei einem neuen Thema nimm nichts aus dem Gespräch. Füge keine Jahreszahl hinzu und erfinde keine Tatsachen oder Antworten."""
 # Das Modell allein traf hier nur 9 von 17 neuen Sätzen: Es hielt fast alles mit "kalt" oder "warm" für Wetter (Lava, Winterjacken).
 # Deshalb zählt seine Wahl nur, wenn die Frage auch nach jetzt oder bald klingt.
 WETTER_BALD = re.compile(r"\b(heute|morgen|übermorgen|gerade|jetzt|draußen|aktuell|momentan|nacht|abend|wochenende|wetter|"
@@ -1301,7 +1301,8 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     """Der erste Schritt bei jeder offenen Frage: Was ist gemeint, muss das ins Internet, und wie sucht man es am besten?
     Gibt (art, suchanfrage) zurück, bei einem Fehler ("", ""). Dauert gut 2 s. Gemessen an 48 Nachrichten: 46 richtig."""
     frage = ANREDE.sub("", text) or text  # "hermes wie heiße ich" hielt es sonst für eine Frage nach Hermes
-    kontext = "\n".join(f"{m['role']}: {m['content'][:300]}" for m in verlauf[-3:-1])
+    # Ohne Quellenliste: Sie lenkte die Einordnung nur ab
+    kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
     try:
         r = requests.post(
             OLLAMA_URL + "/api/chat",
@@ -1323,9 +1324,17 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     if art not in ANALYSE_ARTEN:
         return "", ""
     if art == "wetter" and (not WETTER_BALD.search(frage) or re.search(r"\b(19|20)\d\d\b", frage)):
-        art, anfrage = "internet", FUELLWOERTER.sub("", frage).strip(" ?!.,")
+        art = "internet"
+    # "9,8 km" in der letzten Antwort machte aus "Wie lange dauert die Fahrt?" eine Rechenaufgabe, und der Bezug ging verloren
+    if art == "rechnen" and not RECHENFRAGE.search(frage):
+        art = "internet"
+    # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Hermes ist nicht der Assistent
+    if art == "hermes" and re.search(r"griech|mytholog|\bgott\b|götter|olymp|\bpaket|sendung|tasche", frage, re.I):
+        art = "internet"
+    anfrage = anfrage or FUELLWOERTER.sub("", frage).strip(" ?!.,")
     # Das Modell schrieb im Test "Bundeskanzler Deutschland 2023" und ließ Zahlen und "aktuell" weg: Das darf nicht die Suche verfälschen
-    anfrage = veraltete_jahre_entfernen(anfrage, frage)
+    voriges = next((m["content"] for m in reversed(verlauf[:-1]) if m["role"] == "user"), "")
+    anfrage = veraltete_jahre_entfernen(anfrage, frage + " " + voriges)  # Jahre aus der vorigen Frage dürfen bleiben
     for zahl in re.findall(r"\b\d+\b", frage):
         if not re.search(rf"\b{zahl}\b", anfrage):
             anfrage += " " + zahl
