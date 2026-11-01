@@ -987,10 +987,16 @@ class FloskelFilter:
         return rest
 
 
+# Grenzen fürs Modell: Bei Tabellen dachte es im Test über 9 Minuten ohne Ende. Etwa 60 Stücke pro Sekunde.
+MAX_DENKEN = 900  # ~15 s, danach wird das Nachdenken abgebrochen und direkt geantwortet
+MAX_ANTWORT = 1500
+
+
 def modell_stream(messages, modus):
     body = {"model": modus["name"], "messages": messages, "stream": True, "think": modus["think"],
-            "keep_alive": HALTEN, "options": {"num_ctx": NUM_CTX, "temperature": 0.3}}
-    # timeout=900: das große Modell braucht beim ersten Laden und bei langem Denken Zeit
+            "keep_alive": HALTEN, "options": {"num_ctx": NUM_CTX, "temperature": 0.3, "num_predict": MAX_DENKEN + MAX_ANTWORT}}
+    denken = 0
+    # timeout=900: das Modell braucht beim ersten Laden Zeit
     with requests.post(OLLAMA_URL + "/api/chat", json=body, stream=True, timeout=900) as r:
         if r.status_code >= 400:
             # Ollama schreibt die Ursache in den Antworttext (z.B. "model not found" oder zu wenig Speicher)
@@ -1002,11 +1008,17 @@ def modell_stream(messages, modus):
                     raise OllamaFehler(str(teil["error"])[:300])
                 m = teil.get("message", {})
                 if m.get("thinking"):
+                    denken += 1
+                    if denken > MAX_DENKEN:
+                        break  # schließt die Verbindung, Ollama hört auf zu rechnen
                     yield "denkt", ""
                 if m.get("content"):
                     text = EMOJI.sub("", m["content"])
                     if text:
                         yield "token", text
+    if denken > MAX_DENKEN:
+        print("Nachdenken nach", MAX_DENKEN, "Stücken abgebrochen, antworte direkt", flush=True)
+        yield from modell_stream(messages, {**modus, "think": False})
 
 
 MAX_ZEICHEN = 12000  # grob 3000-4000 Token Verlauf
