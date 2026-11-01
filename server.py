@@ -138,6 +138,11 @@ Deine Art:
   in gepflegter, aber ganz normaler Sprache, so wie ein Mensch natürlich redet. Keine Anrede wie "Sir",
   nichts Gestelztes, und du redest nie über deine Rolle oder deinen Stil ("als dein Assistent",
   "ich stehe bereit", "dein persönlicher ..." o.Ä.).
+- Du bist Hermes: Sprich von dir immer als "ich", nie über "Hermes" oder "das Projekt" wie über etwas Fremdes.
+  Erwähne das Projekt, das Gerät oder deine Technik nur, wenn der Nutzer danach fragt.
+- Du kannst dir Dinge merken: Sagt der Nutzer "Merk dir ...", wird es gespeichert, und was du schon weißt, steht
+  unten unter "Das weißt du über den Nutzer". Behaupte nie, du könntest dir nichts merken. Fehlt dir etwas dort,
+  sag einfach, dass du es noch nicht weißt, und frag danach.
 - Fragt der Nutzer, wer du bist: "Ich bin Hermes." und in einem Satz, was du kannst (z.B. Fragen beantworten,
   im Internet nachsehen, Wetter, Rechnen, PDFs lesen). Mehr nicht.
 - Grüße nur, wenn der Nutzer dich grüßt. Sonst beginnt die Antwort direkt mit dem Inhalt.
@@ -253,7 +258,7 @@ SELBSTAUSSAGE = re.compile(
     r"nenn mich|merk dir)\b", re.I)
 # Kurzlebiges oder Unsinn, das nicht ins Langzeitgedächtnis gehört
 FLUECHTIG = re.compile(r"\b(heute|gerade|jetzt|morgen|gestern|diese woche|will|möchte|plant|vorhat|fragt|gefragt|"
-                       r"hermes|assistent|ki|chat|hallo|begrüß)\w*", re.I)
+                       r"hermes|assistent|chat|hallo|begrüß)\w*", re.I)
 
 
 def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
@@ -726,10 +731,11 @@ SMALLTALK = re.compile(
 
 # Kleine Modelle überlesen Regeln im langen Systemprompt; ein kurzer Hinweis direkt an der Nachricht wirkt
 STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Duzen, höflich und natürlich, wie ein Mensch redet. "
-                 "Fang direkt mit dem Inhalt an, ohne Begrüßung. Kein 'Sir', nichts über deine Rolle. Keine Emojis.]")
+                 "Fang direkt mit dem Inhalt an, ohne Begrüßung. Kein 'Sir', nichts über deine Rolle oder das Projekt. "
+                 "Sprich von dir als 'ich'. Keine Emojis.]")
 SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, duzen, "
                      "höflich und locker wie ein Mensch. Grüße nur, wenn gegrüßt wurde. Kein 'Sir', nichts über "
-                     "deine Rolle. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer Frage "
+                     "deine Rolle oder das Projekt, von dir nur als 'ich'. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer Frage "
                      "wie 'Wie kann ich dir helfen?'.]")
 
 
@@ -1161,6 +1167,55 @@ def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
     return f"{rest.rstrip(' ?.!')} {thema}?"
 
 
+# ---------- Merken auf Zuruf ----------
+MERK_BEFEHL = re.compile(r"\bmerk(e|en|st)?\b(?=.*\bdir\b)|\bdir\b.*\bmerk(e|en|st)?\b|\bspeicher\w* (das|ihn|sie|es)\b", re.I)
+MERK_FRAGE = re.compile(r"\b(dinge|sachen|was|etwas|alles|kannst du)\b", re.I)  # "Kannst du dir Dinge merken?" ist keine Bitte
+MERK_WORTE = re.compile(r"\b(bitte|willst|möchtest|kannst|könntest|du|dir|ihn|sie|es|das|den|die|namen?|nicht|doch|mal|merk\w*|speicher\w*|dass|und)\b", re.I)
+SENSIBEL = re.compile(r"\b(passwort|kennwort|pin|iban|kreditkarte|tan)\b", re.I)
+NAME_GEFRAGT = re.compile(r"\bwie ich heiß|\bmein(en)? name", re.I)
+NUR_NAME = re.compile(r"^\W*(?:ich heiße |ich heisse |mein name ist |ich bin )?([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)\W*$")
+
+
+def name_aus_antwort(text: str, verlauf: list[dict]) -> str:
+    """'Alex' als Antwort auf 'Weißt du, wie ich heiße?' wird zu 'Der Nutzer heißt Alex.', sonst leer."""
+    davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
+    m = NUR_NAME.match(text)
+    return f"Der Nutzer heißt {m.group(1)}." if m and davor and NAME_GEFRAGT.search(davor[-1]) else ""
+
+
+def erinnerung_speichern(satz: str) -> bool:
+    if satz.lower().rstrip(".") in (e["text"].lower().rstrip(".") for e in alle_erinnerungen()):
+        return False
+    with db() as c:
+        c.execute("INSERT INTO erinnerungen (text) VALUES (?)", (satz,))
+    return True
+
+
+def merken(text: str, verlauf: list[dict]) -> str | None:
+    """'Merk dir das' speichert direkt, weil der Nutzer es ausdrücklich will. Gibt die Antwort zurück oder None,
+    wenn es keine Bitte ums Merken ist."""
+    if not MERK_BEFEHL.search(text) or (text.strip().endswith("?") and MERK_FRAGE.search(text)):
+        return None
+    if SENSIBEL.search(text):
+        return "Passwörter und solche Daten merke ich mir bewusst nicht."
+    davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
+    eigener_inhalt = len(MERK_WORTE.sub(" ", re.sub(r"[^\w\s-]", " ", text)).split()) >= 1
+    quelle = text if eigener_inhalt else (davor[-1] if davor else "")
+    if not quelle:
+        return "Was soll ich mir denn merken?"
+    if SENSIBEL.search(quelle):
+        return "Passwörter und solche Daten merke ich mir bewusst nicht."
+    satz = "" if eigener_inhalt or len(davor) < 2 else name_aus_antwort(quelle, verlauf[:-2])
+    if not satz:
+        satz = _modell_json(
+            "Formuliere aus der Nachricht einen kurzen Fakt über den Nutzer, der mit 'Der Nutzer' beginnt, zum Beispiel "
+            "'Der Nutzer heißt Anna.' Lass die Bitte ums Merken weg. Nur was dort steht, nichts dazuerfinden.",
+            quelle, "fakt")
+    if not satz.lower().startswith("der nutzer") or not 10 < len(satz) < 200:
+        return "Das konnte ich nicht richtig erfassen. Sag es mir am besten als ganzen Satz."
+    return f"Gemerkt: {satz}" if erinnerung_speichern(satz) else f"Das weiß ich schon: {satz}"
+
+
 # ---------- Gelegentlicher trockener Humor ----------
 STIMMUNG = re.compile(r"\b(muss ich|viel zu tun|viel machen|viel arbeit|stress\w*|müde|kein bock|keine lust|nervt|nervig|"
                       r"anstrengend|montag|hunger|kaputt|platt|langweilig|schlafen|arbeiten|lernen|hausaufgaben|klausur\w*)\b", re.I)
@@ -1252,11 +1307,17 @@ def chat_stream(frage: Frage):
         return
     # Was der Nutzer meint: bei Folgefragen die vollständige Frage, sonst sein Text. Danach richten sich Suche und Werkzeuge.
     gemeint = frage.text
-    if not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
+    gemerkt = None if (bilder or frage.dokumente) else merken(frage.text, verlauf)
+    if not gemerkt and not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
         gemeint = frage_aufloesen(frage.text, verlauf)
-    sofort = None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text))
+    # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
+    name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
+    sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
+        None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text)))
     if sofort:
         yield ev(typ="token", text=sofort)
+        if name and name.lower() not in (e["text"].lower() for e in alle_erinnerungen()):
+            yield ev(typ="vorschlag", fakten=[name])
         with db() as c:
             c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", sofort))
         yield ev(typ="fertig")
