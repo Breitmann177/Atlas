@@ -110,6 +110,7 @@ ANTWORTEN = [
 ]
 # Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.
 ANALYSE = {
+    "route": ["Wie lange fahre ich von Köln nach Bonn?", "Wie weit ist es von München nach Salzburg?", "hermes wie lange dauert der weg von freiburg bis heilbronn techcampus"],
     "wetter": ["ist es morgen kalt?", "Brauche ich heute einen Schirm?", "Wird es am Wochenende warm?", "Soll ich eine Jacke mitnehmen?",
                "Schneit es morgen in München?", "wie warm ist es gerade in Rom"],
     "nutzer": ["hermes wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
@@ -119,10 +120,11 @@ ANALYSE = {
     "aufgabe": ["Schreib mir ein Gedicht über Katzen", "Übersetze guten Morgen ins Englische", "Wie schreibe ich eine Schleife in Python?"],
     "rechnen": ["Was sind 18 Prozent von 2450?", "Wie viel ist 12 mal 12?", "wurzel aus 144"],
     "internet": ["Wer ist aktuell Bundeskanzler?", "hermes wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
-                 "Wer ist Hermes in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?",
-                 "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne", "Wie kalt ist flüssiger Stickstoff?", "Wie kalt war der kälteste Winter in Deutschland?",
+                 "Wer ist Hermes in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?", "Wie weit ist der Mond von der Erde entfernt?",
+                 "Wie lange dauert ein Flug nach Rom?", "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne", "Wie kalt ist flüssiger Stickstoff?", "Wie kalt war der kälteste Winter in Deutschland?",
                  "Wie warm wird eine Herdplatte?",
-                 "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
+                 "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?",
+                 "Was kann ich gegen Kopfschmerzen tun?", "Was darf mein Chef von mir verlangen?"],
 }
 # Bezug: vorige Frage, Antwort, neue Frage, das muss in die Suche, das darf nicht hinein
 BEZUG = [
@@ -194,6 +196,21 @@ pruefe("Sprechmodus: kurze Vorstellung", server.faehigkeiten("Wer bist du?", "We
 pruefe("Chat: lange Vorstellung", server.faehigkeiten("Wer bist du?", "Wer bist du?", [], False), server.VORSTELLUNG_TEXT)
 pruefe("Sprechmodus: kurze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], True), server.FAEHIGKEITEN_GESPROCHEN)
 pruefe("Chat: ganze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], False), server.FAEHIGKEITEN_LISTE)
+for text, soll in {"Wie viel sind 5 Meilen in km": "5 Meilen sind 8,05 Kilometer.", "100 kg in Pfund": "100 Kilogramm sind 220,46 Pfund (lb).",
+                   "32 Fahrenheit in Celsius": "32 Fahrenheit sind 0 Celsius.", "2,5 Stunden in Minuten": "2,5 Stunden sind 150 Minuten.",
+                   "Wie viele Minuten sind 3 Stunden?": "3 Stunden sind 180 Minuten.", "1 GB in MB": "1 Gigabyte sind 1.000 Megabyte."}.items():
+    pruefe(f"Umrechnen: {text}", (server.werkzeuge.umrechnung_erkennen(text) or {}).get("antwort"), soll)
+for text in ["Wie weit ist Köln von Bonn?", "Ich habe 5 km in 30 Minuten geschafft", "Was sind 18 Prozent von 2450?", "Wie viel kostet 1 Liter Diesel in Deutschland?",
+             "Wer hat 2014 in Rio gewonnen?", "Treffen wir uns um 5 in Berlin?"]:
+    pruefe(f"Kein Umrechnen: {text}", server.werkzeuge.umrechnung_erkennen(text), None)
+for text, soll in {"hermes wie lange dauert der weg von freiburg bis heilbronn techcampus": ("freiburg", "heilbronn techcampus"),
+                   "Wie lange fahre ich von Köln nach Bonn?": ("Köln", "Bonn"), "Wie weit ist es von München nach Salzburg?": ("München", "Salzburg"),
+                   "wie lange von stuttgart hauptbahnhof zum flughafen frankfurt": ("stuttgart hauptbahnhof", "flughafen frankfurt"),
+                   "Wie lange brauche ich mit dem Auto von Ulm nach Augsburg?": ("Ulm", "Augsburg"), "wie lange von ulm nach augsburg mit dem auto": ("ulm", "augsburg"),
+                   "kannst du mir sagen wie lange der weg von freiburg bis heilbronn dauert?": ("freiburg", "heilbronn"),
+                   "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom")}.items():
+    pruefe(f"Route: {text}", server.route_orte(text, []), soll)
+pruefe("Umrechner öffnen", bool(server.werkzeuge.umrechnung_erkennen("Zeig mir den Umrechner")), True)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
 pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)
@@ -216,7 +233,7 @@ if "--voll" in sys.argv:
         gemeint = server.frage_aufloesen(neu, verlauf) if server.ist_folgefrage(neu, verlauf) else neu
         art, anfrage = server.analysieren(gemeint, verlauf)
         print(f"  {art:9} {neu!r} -> {anfrage!r}", flush=True)
-        pruefe(f"Bezug: {neu}", art == "internet" and all(w in anfrage.lower() for w in muss) and not any(w in anfrage.lower() for w in nicht), True)
+        pruefe(f"Bezug: {neu}", art in ("internet", "route") and all(w in anfrage.lower() for w in muss) and not any(w in anfrage.lower() for w in nicht), True)
     print("Antworten:")
     for text, muss, darf_nicht in ANTWORTEN:
         t = time.time()

@@ -102,6 +102,25 @@
                border:1px solid var(--rand); border-left:3px solid var(--fg); border-radius:10px; background:var(--feld); font-size:14px; }
   .merkkarte b { font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--dim); font-weight:600; }
   .merkkarte span { overflow-wrap:anywhere; }
+  /* Skills: eigene Fenster im Chat */
+  .skillkarte { display:flex; flex-direction:column; gap:12px; width:100%; max-width:560px; margin-top:12px; padding:14px;
+                border:1px solid var(--rand); border-radius:14px; background:var(--feld); font-size:14px; }
+  .skillkopf { font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--dim); }
+  .skillkarte select, .skillkarte input { min-width:0; width:100%; padding:9px 10px; border:1px solid var(--rand); border-radius:10px;
+                                          background:var(--bg); color:var(--fg); font:inherit; outline:none; }
+  .skillkarte select:focus, .skillkarte input:focus { border-color:var(--dim); }
+  .umrechenzeile { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; }
+  .umrechenzeile button { width:36px; height:36px; padding:0; border:1px solid var(--rand); border-radius:50%; background:none; color:var(--fg); cursor:pointer; font-size:15px; }
+  .umrechenzeile button:hover { border-color:var(--dim); }
+  .ergebnisgross { font-size:24px; font-weight:600; line-height:1.25; overflow-wrap:anywhere; }
+  .skillklein { color:var(--dim); font-size:12px; }
+  .routenziele { overflow-wrap:anywhere; }
+  .routenkarte { width:100%; height:300px; border:1px solid var(--rand); border-radius:10px; background:var(--bg); z-index:0; }
+  :root:not([data-theme="hell"]) .routenkarte .leaflet-tile-pane { filter:grayscale(1) invert(1) brightness(.95); }
+  .routenkarte .leaflet-control-attribution { background:var(--feld); color:var(--dim); }
+  .routenkarte .leaflet-control-attribution a { color:var(--dim); }
+  .skilllink { align-self:flex-start; padding:8px 14px; border:1px solid var(--rand); border-radius:999px; color:var(--fg); text-decoration:none; font-size:13px; }
+  .skilllink:hover { border-color:var(--dim); }
   .gemerkt { color:var(--dim); font-size:12px; margin-bottom:4px; padding-left:16px; }
   .merkknoepfe { display:flex; gap:8px; margin-top:4px; }
   .merkknoepfe button { border:1px solid var(--rand); background:none; color:var(--fg); border-radius:8px; padding:4px 12px; cursor:pointer; font:inherit; font-size:13px; }
@@ -731,6 +750,102 @@
     return m && SIE_FORM[m[1]] ? "Sie " + SIE_FORM[m[1]] + m[2] : f;
   }
   let offenerVorschlag = null;  // { fakten, karte }
+  // Skill: Umrechner. Rechnet im Browser, die Einheiten und Tageskurse kommen vom Server
+  const TEMPERATUR = ["Celsius", "Fahrenheit", "Kelvin"];
+  function zahlDeutsch(x) {
+    if (!Number.isFinite(x)) return "–";
+    return x.toLocaleString("de-DE", { maximumFractionDigits: Math.abs(x) >= 1 ? 2 : 4 });
+  }
+  function temperaturRechnen(x, von, nach) {
+    const c = von === "Celsius" ? x : von === "Fahrenheit" ? (x - 32) * 5 / 9 : x - 273.15;
+    return nach === "Celsius" ? c : nach === "Fahrenheit" ? c * 9 / 5 + 32 : c + 273.15;
+  }
+  async function umrechnerKarte(huelle, ev) {
+    const karte = document.createElement("div"); karte.className = "skillkarte";
+    const kopf = document.createElement("div"); kopf.className = "skillkopf"; kopf.textContent = "UMRECHNER";
+    const art = document.createElement("select"); art.setAttribute("aria-label", "Art");
+    const wert = document.createElement("input"); wert.type = "number"; wert.step = "any"; wert.setAttribute("aria-label", "Wert");
+    const von = document.createElement("select"); von.setAttribute("aria-label", "Von");
+    const nach = document.createElement("select"); nach.setAttribute("aria-label", "Nach");
+    const tausch = document.createElement("button"); tausch.type = "button"; tausch.textContent = "⇄"; tausch.title = "Tauschen";
+    const zeile = document.createElement("div"); zeile.className = "umrechenzeile"; zeile.append(von, tausch, nach);
+    const ergebnis = document.createElement("div"); ergebnis.className = "ergebnisgross"; ergebnis.setAttribute("aria-live", "polite");
+    const klein = document.createElement("div"); klein.className = "skillklein";
+    karte.append(kopf, art, wert, zeile, ergebnis, klein);
+    huelle.appendChild(karte);
+    let daten = { einheiten: {}, namen: {}, kursdatum: "" };
+    try { daten = await (await fetch("/umrechner")).json(); } catch (e) {}
+    const arten = { ...daten.einheiten, Temperatur: Object.fromEntries(TEMPERATUR.map((t) => [t, 1])) };
+    const name = (e) => daten.namen[e] || e;
+    Object.keys(arten).forEach((a) => art.add(new Option(a, a)));
+    const fuellen = (a, vonWahl, nachWahl) => {
+      const liste = Object.keys(arten[a]);
+      [von, nach].forEach((f) => { f.length = 0; liste.forEach((e) => f.add(new Option(a === "Währung" && daten.namen[e] ? e + " · " + name(e) : e, e))); });
+      von.value = liste.includes(vonWahl) ? vonWahl : liste[0];
+      nach.value = liste.includes(nachWahl) ? nachWahl : liste[1];
+    };
+    const rechnen = () => {
+      const a = art.value, x = parseFloat(wert.value);
+      if (Number.isNaN(x)) { ergebnis.textContent = "–"; klein.textContent = ""; return; }
+      const r = a === "Temperatur" ? temperaturRechnen(x, von.value, nach.value) : x * arten[a][von.value] / arten[a][nach.value];
+      ergebnis.textContent = zahlDeutsch(r) + " " + name(nach.value);
+      klein.textContent = zahlDeutsch(x) + " " + name(von.value) + (a === "Währung" && daten.kursdatum ? " · Kurs der EZB vom " + daten.kursdatum.split("-").reverse().join(".") : "");
+    };
+    const start = ev.kategorie && arten[ev.kategorie] ? ev.kategorie : Object.keys(arten)[0];
+    art.value = start; wert.value = ev.wert === "" || ev.wert === undefined ? 1 : ev.wert;
+    fuellen(start, ev.von, ev.nach); rechnen();
+    art.addEventListener("change", () => { fuellen(art.value); rechnen(); });
+    [wert, von, nach].forEach((f) => { f.addEventListener("input", rechnen); f.addEventListener("change", rechnen); });
+    tausch.addEventListener("click", () => { const v = von.value; von.value = nach.value; nach.value = v; rechnen(); });
+    fenster.scrollTop = fenster.scrollHeight;
+  }
+  // Skill: Route. Zahlen und Linie vom Server (ohne Verkehr), Karte von OpenStreetMap, den Verkehr zeigt der Link zu Google Maps
+  let leafletLaden = null;
+  function ladeLeaflet() {  // erst beim ersten Bedarf, damit die Seite sonst nichts davon lädt
+    if (leafletLaden) return leafletLaden;
+    leafletLaden = new Promise((fertig, fehler) => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+      const js = document.createElement("script"); js.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"; js.onload = fertig; js.onerror = fehler;
+      document.head.append(css, js);
+    });
+    return leafletLaden;
+  }
+  async function karteZeichnen(feld, linie) {
+    try { await ladeLeaflet(); } catch (e) { feld.remove(); return; }
+    const farbe = getComputedStyle(document.documentElement).getPropertyValue("--fg").trim() || "#e6e6e6";
+    const k = L.map(feld, { scrollWheelZoom: false });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
+      attribution: "© OpenStreetMap" }).addTo(k);
+    const strecke = L.polyline(linie, { color: farbe, weight: 4, opacity: .9 }).addTo(k);
+    [linie[0], linie[linie.length - 1]].forEach((p) => L.circleMarker(p, { radius: 6, color: farbe, fillColor: farbe, fillOpacity: 1 }).addTo(k));
+    k.fitBounds(strecke.getBounds(), { padding: [24, 24] });
+    new ResizeObserver(() => k.invalidateSize()).observe(feld);
+    fenster.scrollTop = fenster.scrollHeight;
+  }
+  function routeKarte(huelle, ev) {
+    const karte = document.createElement("div"); karte.className = "skillkarte";
+    const kopf = document.createElement("div"); kopf.className = "skillkopf"; kopf.textContent = "ROUTE";
+    const ziele = document.createElement("div"); ziele.className = "routenziele"; ziele.textContent = ev.start + " → " + ev.ziel;
+    karte.append(kopf, ziele);
+    if (ev.km !== null) {
+      const h = Math.floor(ev.minuten / 60), m = ev.minuten % 60;
+      const gross = document.createElement("div"); gross.className = "ergebnisgross";
+      gross.textContent = (h ? h + " Std. " : "") + (m || !h ? m + " Min." : "") + " · " + zahlDeutsch(ev.km) + " km";
+      const klein = document.createElement("div"); klein.className = "skillklein"; klein.textContent = "Mit dem Auto, ohne Verkehr. Den aktuellen Verkehr zeigt Google Maps.";
+      karte.append(gross, klein);
+    }
+    if (ev.linie) {
+      const feld = document.createElement("div"); feld.className = "routenkarte"; feld.setAttribute("aria-label", "Karte der Route");
+      karte.appendChild(feld);
+      karteZeichnen(feld, ev.linie);
+    }
+    if (/^https:\/\/www\.google\.com\/maps/.test(ev.link || "")) {
+      const link = document.createElement("a"); link.className = "skilllink"; link.href = ev.link; link.target = "_blank"; link.rel = "noopener noreferrer";
+      link.textContent = "In Google Maps öffnen"; karte.appendChild(link);
+    }
+    huelle.appendChild(karte);
+    fenster.scrollTop = fenster.scrollHeight;
+  }
   function gemerktKarte(huelle, f) {  // nur eine graue Zeile über der Antwort; was genau gespeichert ist, zeigt der Tooltip
     let d = huelle.querySelector(".gemerkt");
     if (!d) { d = document.createElement("div"); d.className = "gemerkt"; d.textContent = "Erinnerung gespeichert"; huelle.prepend(d); }
@@ -866,6 +981,8 @@
             vorschlaege(huelle, ev.fakten);
             if (aktiveKette) aktiveKette.ansage("Soll ich mir das merken?");
           }
+          else if (ev.typ === "umrechner") umrechnerKarte(huelle, ev);
+          else if (ev.typ === "route") routeKarte(huelle, ev);
           else if (ev.typ === "sprechgrenze") { if (aktiveKette) aktiveKette.begrenze(ev.saetze); }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
           else if (ev.typ === "wurf") wurfStarten(ev.art, ev.ergebnis);

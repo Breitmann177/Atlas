@@ -97,7 +97,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=ERLAUBTE_HOSTS)
 # Damit könnte auch eingeschleuster Code keine Daten an fremde Server schicken.
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; "
-       "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; "
+       "img-src 'self' data: blob: https://tile.openstreetmap.org; media-src 'self' blob:; connect-src 'self'; "
        "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 
@@ -811,9 +811,9 @@ ORT_ANFANG = re.compile(r"^(ich (bin|wohne|lebe) |wohne |bin )?(in|für|bei|nach
 KEIN_ORT_WORT = re.compile(r"\b(egal|nein|nö|lass|vergiss|danke|nichts|keine?|weiß|wieso|warum|stopp)\b|\d", re.I)
 
 
-def ort_nachgereicht(text: str, verlauf: list[dict]) -> str:
+def ort_nachgereicht(text: str, verlauf: list[dict], frage: str = WETTER_ORT_FRAGE) -> str:
     """Hermes hat nach dem Ort gefragt und der Nutzer antwortet: "Freiburg" ist dann ein Ort, kein neues Suchwort."""
-    if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or verlauf[-2]["content"] != WETTER_ORT_FRAGE
+    if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or verlauf[-2]["content"] != frage
             or text.strip().endswith("?") or KEIN_ORT_WORT.search(text)):
         return ""
     ort = ORT_ANFANG.sub("", ANREDE.sub("", text).strip(" .,!")).strip()
@@ -894,6 +894,8 @@ FAEHIGKEITEN_LISTE = """Das kann ich:
 
 - Fragen beantworten und dafür im Internet nachschauen, mit Quellen
 - Wetter und Vorhersage für jeden Ort
+- Umrechnen im eigenen Fenster: Währungen, Längen, Gewichte und mehr
+- Route und Fahrzeit mit Karte, den Verkehr zeigt Google Maps
 - Nachrichten von der Tagesschau und ein Morgen-Briefing auf „Guten Morgen“
 - Rechnen, auch Prozente und Tage zwischen zwei Daten
 - Timer stellen, Uhrzeit weltweit, Münze werfen, würfeln und Zufallszahlen
@@ -1275,11 +1277,12 @@ def _modell_json(system: str, nutzer: str, feld: str) -> str:
         return ""
 
 
-ANALYSE_ARTEN = ["internet", "wetter", "nutzer", "hermes", "gespraech", "aufgabe", "rechnen"]
+ANALYSE_ARTEN = ["internet", "route", "wetter", "nutzer", "hermes", "gespraech", "aufgabe", "rechnen"]
 ANALYSE_PROMPT = """Du analysierst die letzte Nachricht an den Sprachassistenten Hermes. Sie kann aus Spracherkennung stammen und Tipp- oder Hörfehler enthalten. Überlege, was gemeint ist, und ordne sie ein.
 
 art:
 - internet: Sachfrage über die Welt, die man nachschlagen kann: Personen, Ereignisse, Zahlen, Orte, Preise, Begriffe, Anleitungen, Gesundheit, Rechte. Auch wenn sie mit "ich" oder "mein" formuliert ist ("Wie mache ich Pizza?"). Im Zweifel internet.
+- route: Weg, Entfernung oder Fahrzeit auf der Straße zwischen Orten, mit dem Auto oder ohne genanntes Verkehrsmittel ("Wie lange von Köln nach Bonn?", "Wie weit ist es nach Paris?", "Wie lange dauert die Fahrt?"). Mit Zug, Bus, Flugzeug oder Fahrrad oder im Weltall: internet.
 - wetter: fragt nach dem Wetter an einem Ort auf der Erde, jetzt oder in den nächsten Tagen, auch ohne das Wort Wetter: kalt, warm, Regen, Schnee, Wind, Grad, oder ob man Jacke oder Schirm braucht ("Ist es morgen kalt?", "Brauche ich heute einen Schirm?"). Nur wenn die Antwort die aktuelle Vorhersage für einen Ort auf der Erde braucht. Alles andere ist internet: Temperaturen von Dingen und Himmelskörpern ("Wie heiß ist die Sonne?"), Erklärungen ("Warum ...", "Wie entsteht ..."), Kaufberatung und Wetter in der Vergangenheit.
 - nutzer: fragt nach Tatsachen über genau diesen Nutzer, die nur er oder sein Assistent wissen kann ("Wie heiße ich?", "Wie heißt mein Hund?", "Was weißt du über mich?").
 - hermes: fragt nach dem Assistenten selbst, seinen Stärken, seiner Technik, seinem Befinden. Der griechische Gott Hermes, der Paketdienst oder die Marke sind internet.
@@ -1328,6 +1331,13 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     # "9,8 km" in der letzten Antwort machte aus "Wie lange dauert die Fahrt?" eine Rechenaufgabe, und der Bezug ging verloren
     if art == "rechnen" and not RECHENFRAGE.search(frage):
         art = "internet"
+    # Das Modell hielt "Was kann ich gegen Kopfschmerzen tun?" für Plauderei und hätte aus dem Gedächtnis geantwortet.
+    # Klingt es nach einer Sachfrage, wird gesucht: Lieber einmal zu viel im Netz nachsehen, als etwas zu erfinden.
+    if art in ("gespraech", "aufgabe") and direkte_suche(frage, []) and len(FUELLWOERTER.sub("", frage).split()) >= 3:
+        art = "internet"
+    # Gerechnet wird nur die Fahrt mit dem Auto. Flug, Zug und Fahrrad muss die Suche beantworten
+    if art == "route" and re.search(r"\b(flug\w*|fliegen|fliegt|flieger|zug|züge|bahn|bus|fahrrad|rad|e-bike|zu fuß|laufen|wandern|schiff|fähre)\b", frage, re.I):
+        art = "internet"
     # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Hermes ist nicht der Assistent
     if art == "hermes" and re.search(r"griech|mytholog|\bgott\b|götter|olymp|\bpaket|sendung|tasche", frage, re.I):
         art = "internet"
@@ -1341,6 +1351,50 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     if AKTUELL.search(frage) and not AKTUELL.search(anfrage):
         anfrage += " aktuell"
     return art, anfrage.strip()
+
+
+ROUTE_START_FRAGE = "Von wo aus soll ich rechnen?"
+ROUTE_PROMPT = ("Nenne Start und Ziel der gefragten Strecke im Format 'Start | Ziel'. Schreibe die Orte genau wie genannt, mit allen Zusätzen, "
+                "zum Beispiel 'Flughafen Köln'. Bezieht sich die Nachricht auf das Gespräch ('die Fahrt'), nimm die Orte von dort. "
+                "Fehlt der Start, lass ihn leer: ' | Bonn'. Erfinde keine Orte.")
+
+
+ROUTE_ENDE = r"(?:\s+(?:mit dem auto|mit auto|per auto|fahren|fährt|dauert|braucht?|brauche|entfernt|sind|ist))*\W*$"
+ROUTE_VON_NACH = re.compile(rf"\bvon\s+(.+?)\s+(?:nach|bis zum|bis zur|bis nach|bis|zum|zur|zu)\s+(.+?){ROUTE_ENDE}", re.I)
+ROUTE_ENTFERNT = re.compile(r"\b(?:ist|liegt)\s+(.+?)\s+von\s+(.+?)\s+entfernt\b", re.I)
+ROUTE_NUR_ZIEL = re.compile(rf"\b(?:nach|zum|zur)\s+(.+?){ROUTE_ENDE}", re.I)
+
+
+def route_orte(text: str, verlauf: list[dict]) -> tuple[str, str]:
+    """Start und Ziel. "Von X nach Y" liest der Code: Das Modell ließ Köln weg und erfand Zusätze. Es hilft nur noch bei Bezügen
+    wie "die Fahrt". Ein Ort zählt nur, wenn seine Wörter wirklich in der Frage oder im Gespräch vorkommen."""
+    satz = ANREDE.sub("", text)
+    m = ROUTE_VON_NACH.search(satz)
+    if m:
+        return m.group(1).strip(" .,?!"), m.group(2).strip(" .,?!")
+    m = ROUTE_ENTFERNT.search(satz)
+    if m:
+        return m.group(2).strip(" .,?!"), m.group(1).strip(" .,?!")
+    m = ROUTE_NUR_ZIEL.search(satz)
+    if m:
+        return "", m.group(1).strip(" .,?!")
+    kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
+    teile = _modell_json(ROUTE_PROMPT, f"Gespräch:\n{kontext or '(leer)'}\n\nLetzte Nachricht: {text}", "route").split("|")
+    if len(teile) != 2:
+        return "", ""
+    quelle = (text + " " + kontext).lower()
+    start, ziel = (t.strip(" .,?!") for t in teile)
+    gesichert = lambda o: o if o and all(w in quelle for w in re.findall(r"[\wäöüß-]{3,}", o.lower())) else ""
+    return gesichert(start), gesichert(ziel)
+
+
+def route_antwort(r: dict) -> str:
+    if r["km"] is None:
+        return f"Die Strecke von {r['start_kurz']} nach {r['ziel_kurz']} konnte ich nicht berechnen. Vielleicht findet Google Maps den Weg."
+    h, m = divmod(r["minuten"], 60)
+    dauer = f"{h} Stunde{'n' if h > 1 else ''}" + (f" {m} Minuten" if m else "") if h else f"{m} Minuten"
+    return (f"Von {r['start_kurz']} nach {r['ziel_kurz']} sind es {werkzeuge.zahl_text(r['km'])} Kilometer, mit dem Auto etwa {dauer} ohne Verkehr. "
+            "Den aktuellen Verkehr sehen Sie in Google Maps.")
 
 
 NUTZER_PROMPT = ("Beantworte die Frage des Nutzers nur aus der Liste unten, in einem kurzen Satz in der Sie-Form (Sie, Ihnen, Ihr). Steht die Antwort "
@@ -1479,8 +1533,8 @@ def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
     zurück; (None, None), wenn es keine Bitte ums Merken ist."""
     if MERK_PRUEFUNG.search(text):
         return merk_pruefung(verlauf), None
-    # "ach egal" auf die Frage nach dem Ort: Das Modell erfand sonst Wetter für eine unbekannte Gegend
-    if (len(verlauf) >= 2 and verlauf[-2]["role"] == "assistant" and verlauf[-2]["content"] == WETTER_ORT_FRAGE
+    # "ach egal" auf die Frage nach dem Ort: Das Modell erfand sonst Wetter für eine unbekannte Gegend, die Route fragte endlos weiter
+    if (len(verlauf) >= 2 and verlauf[-2]["role"] == "assistant" and verlauf[-2]["content"] in (WETTER_ORT_FRAGE, ROUTE_START_FRAGE)
             and KEIN_ORT_WORT.search(text) and not text.strip().endswith("?")):
         return "Alles klar, dann lasse ich es.", None
     fakt = antwort_auf_nachfrage(text, verlauf)
@@ -1655,6 +1709,15 @@ def chat_stream(frage: Frage):
             c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", bestaetigung))
         yield ev(typ="fertig")
         return
+    # Umrechnen braucht kein Modell: Fenster im Chat und ein fertiger Satz
+    umrechnung = None if (bilder or frage.dokumente) else werkzeuge.umrechnung_erkennen(frage.text)
+    if umrechnung:
+        yield ev(typ="umrechner", **{k: v for k, v in umrechnung.items() if k != "antwort"})
+        yield ev(typ="token", text=umrechnung["antwort"])
+        with db() as c:
+            c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", umrechnung["antwort"]))
+        yield ev(typ="fertig")
+        return
     # Was der Nutzer meint: bei Folgefragen die vollständige Frage, sonst sein Text. Danach richten sich Suche und Werkzeuge.
     gemeint = letzter_wurf(frage.text, verlauf) or frage.text
     gemerkt, neuer_fakt = (None, None) if (bilder or frage.dokumente) else merken(frage.text, verlauf)
@@ -1663,6 +1726,7 @@ def chat_stream(frage: Frage):
     wetter_ort = ort_nachgereicht(frage.text, verlauf)
     if wetter_ort:
         gemeint = f"{verlauf[-3]['content'].rstrip(' ?.!')} in {wetter_ort}"
+    route_start = ort_nachgereicht(frage.text, verlauf, ROUTE_START_FRAGE)
     # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
@@ -1722,7 +1786,7 @@ def chat_stream(frage: Frage):
             elif anhang or smalltalk or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
                 werkzeug, eingabe = "keins", ""
             else:
-                art, anfrage = ("", "") if dokumente else analysieren(gemeint, verlauf)
+                art, anfrage = ("route", "") if route_start else ("", "") if dokumente else analysieren(gemeint, verlauf)
                 if SUCH_BEFEHL.search(gemeint) and not dokumente:
                     art = "internet"
                 # "Ich heiße Alex" erzählt etwas, statt zu fragen: normal antworten, damit die Merken-Karte kommen kann
@@ -1735,6 +1799,25 @@ def chat_stream(frage: Frage):
                         c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", text))
                     yield ev(typ="fertig")
                     return
+                if art == "route":
+                    start, ziel = route_orte(verlauf[-3]["content"], verlauf[:-2]) if route_start else route_orte(gemeint, verlauf)
+                    start = route_start or start or wohnort()
+                    if ziel and not start:
+                        yield ev(typ="token", text=ROUTE_START_FRAGE)
+                        with db() as c:
+                            c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", ROUTE_START_FRAGE))
+                        yield ev(typ="fertig")
+                        return
+                    if ziel:
+                        strecke = werkzeuge.route(start, ziel)
+                        text = route_antwort(strecke)
+                        yield ev(typ="route", **strecke)
+                        yield ev(typ="token", text=text)
+                        with db() as c:
+                            c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", text))
+                        yield ev(typ="fertig")
+                        return
+                    art = "internet"  # kein Ziel erkannt: lieber normal suchen
                 if art in ("hermes", "gespraech", "aufgabe"):
                     werkzeug, eingabe = "keins", ""
                 elif art == "wetter" and WETTER_ZU_WEIT.search(gemeint):
@@ -2000,6 +2083,11 @@ def chat_loeschen(cid: int):
 # ---------- Erinnerungen ----------
 class Erinnerung(BaseModel):
     text: str = Field(min_length=1, max_length=300)
+
+
+@app.get("/umrechner")
+def umrechner():
+    return werkzeuge.umrechner_daten()
 
 
 @app.get("/erinnerungen")

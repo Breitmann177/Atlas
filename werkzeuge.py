@@ -1,4 +1,4 @@
-"""Werkzeuge, die Hermes benutzen darf: Websuche, Seiten lesen, Wetter, Rechner, PDF erstellen.
+"""Werkzeuge, die Hermes benutzen darf: Websuche, Seiten lesen, Wetter, Rechner, Umrechner, Route, PDF erstellen.
 
 Alles, was aus dem Internet kommt, ist UNVERTRAUTE Eingabe. Deshalb:
 - nur http/https
@@ -17,7 +17,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
@@ -221,6 +221,149 @@ def wetter(ort: str) -> str:
                       f"Regenwahrscheinlichkeit {d['precipitation_probability_max'][i]} %, Wind bis {d['wind_speed_10m_max'][i]} km/h"
                       + (f", Rat: {rat}" if rat else ""))
     return "\n".join(zeilen)
+
+
+# ---------- Umrechnen: Einheiten rechnet der Code, Kurse kommen täglich von der EZB (frankfurter.dev, ohne Konto) ----------
+EINHEITEN = {
+    "Länge": {"Kilometer": 1000, "Meter": 1, "Zentimeter": 0.01, "Millimeter": 0.001, "Meilen": 1609.344, "Yard": 0.9144, "Fuß": 0.3048, "Zoll": 0.0254},
+    "Gewicht": {"Tonnen": 1e6, "Kilogramm": 1000, "Gramm": 1, "Milligramm": 0.001, "Pfund (lb)": 453.59237, "Unzen": 28.349523125},
+    "Volumen": {"Kubikmeter": 1000, "Liter": 1, "Milliliter": 0.001, "Gallonen (US)": 3.785411784},
+    "Fläche": {"Quadratkilometer": 1e6, "Hektar": 1e4, "Quadratmeter": 1, "Quadratfuß": 0.09290304},
+    "Geschwindigkeit": {"km/h": 1, "m/s": 3.6, "mph": 1.609344, "Knoten": 1.852},
+    "Zeit": {"Sekunden": 1, "Minuten": 60, "Stunden": 3600, "Tage": 86400, "Wochen": 604800},
+    "Daten": {"Byte": 1, "Kilobyte": 1e3, "Megabyte": 1e6, "Gigabyte": 1e9, "Terabyte": 1e12},
+}
+WAEHRUNGEN = {"EUR": "Euro", "USD": "US-Dollar", "GBP": "Britische Pfund", "CHF": "Schweizer Franken", "TRY": "Türkische Lira", "JPY": "Yen"}
+NAMEN = {
+    "km": "Kilometer", "kilometer": "Kilometer", "m": "Meter", "meter": "Meter", "cm": "Zentimeter", "zentimeter": "Zentimeter", "mm": "Millimeter",
+    "millimeter": "Millimeter", "meile": "Meilen", "meilen": "Meilen", "miles": "Meilen", "yard": "Yard", "fuß": "Fuß", "fuss": "Fuß", "feet": "Fuß", "ft": "Fuß",
+    "zoll": "Zoll", "inch": "Zoll", "inches": "Zoll", "t": "Tonnen", "tonne": "Tonnen", "tonnen": "Tonnen", "kg": "Kilogramm", "kilo": "Kilogramm",
+    "kilogramm": "Kilogramm", "g": "Gramm", "gramm": "Gramm", "mg": "Milligramm", "milligramm": "Milligramm", "lb": "Pfund (lb)", "lbs": "Pfund (lb)",
+    "unze": "Unzen", "unzen": "Unzen", "oz": "Unzen", "l": "Liter", "liter": "Liter", "ml": "Milliliter", "milliliter": "Milliliter", "kubikmeter": "Kubikmeter",
+    "gallone": "Gallonen (US)", "gallonen": "Gallonen (US)", "qkm": "Quadratkilometer", "km²": "Quadratkilometer", "quadratkilometer": "Quadratkilometer",
+    "hektar": "Hektar", "qm": "Quadratmeter", "m²": "Quadratmeter", "quadratmeter": "Quadratmeter", "quadratfuß": "Quadratfuß", "km/h": "km/h", "kmh": "km/h",
+    "m/s": "m/s", "mph": "mph", "knoten": "Knoten", "sekunde": "Sekunden", "sekunden": "Sekunden", "minute": "Minuten", "minuten": "Minuten", "stunde": "Stunden",
+    "stunden": "Stunden", "tag": "Tage", "tage": "Tage", "tagen": "Tage", "woche": "Wochen", "wochen": "Wochen", "byte": "Byte", "kb": "Kilobyte", "kilobyte": "Kilobyte",
+    "mb": "Megabyte", "megabyte": "Megabyte", "gb": "Gigabyte", "gigabyte": "Gigabyte", "tb": "Terabyte", "terabyte": "Terabyte",
+    "°c": "Celsius", "grad celsius": "Celsius", "celsius": "Celsius", "°f": "Fahrenheit", "grad fahrenheit": "Fahrenheit", "fahrenheit": "Fahrenheit", "kelvin": "Kelvin",
+    "euro": "EUR", "eur": "EUR", "€": "EUR", "dollar": "USD", "us-dollar": "USD", "usd": "USD", "$": "USD", "pfund": "GBP", "gbp": "GBP", "£": "GBP", "pfund sterling": "GBP",
+    "franken": "CHF", "chf": "CHF", "lira": "TRY", "tl": "TRY", "try": "TRY", "yen": "JPY", "jpy": "JPY",
+}
+_MUSTER_EINHEIT = "|".join(sorted((re.escape(n) for n in NAMEN), key=len, reverse=True))
+UMRECHNUNG = re.compile(rf"(?<![\w.,])(\d+(?:[.,]\d+)?)\s*({_MUSTER_EINHEIT})(?![\w²/])\s+(?:in|nach|zu|auf)\s+({_MUSTER_EINHEIT})(?![\w²/])", re.I)
+UMRECHNUNG_FRAGE = re.compile(rf"\bwie ?viel\w*\s+({_MUSTER_EINHEIT})\s+(?:sind|ist|entsprechen|entspricht|ergeben|ergibt)\s+(\d+(?:[.,]\d+)?)\s*({_MUSTER_EINHEIT})(?![\w²/])", re.I)
+UMRECHNER_OEFFNEN = re.compile(r"\b(öffne|zeig\w*|mach|gib|brauch\w*)\b.*\b(umrechner|währungsrechner)\b|^\W*(umrechner|währungsrechner)\W*$", re.I)
+_kurse = {"zeit": 0.0, "datum": "", "werte": {}}
+
+
+def kurse() -> dict:
+    """Tageskurse, eine Stunde zwischengespeichert: {'datum': ..., 'werte': {'USD': 1.08, ...}} je 1 Euro, bei Fehlern leer."""
+    if time.time() - _kurse["zeit"] < 3600 and _kurse["werte"]:
+        return _kurse
+    try:
+        d = requests.get("https://api.frankfurter.dev/v1/latest", params={"base": "EUR"}, headers=HEADERS, timeout=8).json()
+        _kurse.update(zeit=time.time(), datum=d["date"], werte={"EUR": 1.0, **d["rates"]})
+    except (requests.RequestException, ValueError, KeyError):
+        pass
+    return _kurse
+
+
+def umrechner_daten() -> dict:
+    """Alles, was das Fenster im Chat zum Rechnen braucht. Währungen sind wie alle anderen Einheiten Faktoren zu einer Grundeinheit."""
+    k = kurse()
+    return {"einheiten": {**({"Währung": {c: 1 / r for c, r in k["werte"].items()}} if k["werte"] else {}), **EINHEITEN},
+            "namen": WAEHRUNGEN, "kursdatum": k["datum"]}
+
+
+def _temperatur(x: float, von: str, nach: str) -> float:
+    c = x if von == "Celsius" else (x - 32) * 5 / 9 if von == "Fahrenheit" else x - 273.15
+    return c if nach == "Celsius" else c * 9 / 5 + 32 if nach == "Fahrenheit" else c + 273.15
+
+
+def zahl_text(x: float) -> str:
+    """Deutsche Schreibweise ohne unnötige Stellen: 1234.5 -> '1.234,5'."""
+    stellen = 2 if abs(x) >= 1 else 4
+    t = f"{x:,.{stellen}f}".rstrip("0").rstrip(".") if "." in f"{x:,.{stellen}f}" else f"{x:,.{stellen}f}"
+    return t.replace(",", "§").replace(".", ",").replace("§", ".")
+
+
+def umrechnung_erkennen(text: str) -> dict | None:
+    """'50 Dollar in Euro' -> Werte fürs Fenster und ein fertiger Antwortsatz. Nur wenn beide Einheiten sicher bekannt sind."""
+    if UMRECHNER_OEFFNEN.search(text):
+        return {"antwort": "Bitte sehr, hier ist der Umrechner.", "kategorie": "", "wert": "", "von": "", "nach": ""}
+    m, f = UMRECHNUNG.search(text), UMRECHNUNG_FRAGE.search(text)
+    if not m and not f:
+        return None
+    wert_text, von_wort, nach_wort = m.groups() if m else (f.group(2), f.group(3), f.group(1))
+    wert = float(wert_text.replace(",", "."))
+    von, nach = NAMEN[von_wort.lower()], NAMEN[nach_wort.lower()]
+    # "Pfund" ist Währung oder Gewicht: Das andere Wort entscheidet
+    gewichte = EINHEITEN["Gewicht"]
+    if von == "GBP" and nach in gewichte:
+        von = "Pfund (lb)"
+    if nach == "GBP" and von in gewichte:
+        nach = "Pfund (lb)"
+    temperatur = {"Celsius", "Fahrenheit", "Kelvin"}
+    if von in temperatur and nach in temperatur:
+        return {"antwort": f"{zahl_text(wert)} {von} sind {zahl_text(_temperatur(wert, von, nach))} {nach}.", "kategorie": "Temperatur", "wert": wert, "von": von, "nach": nach}
+    k = kurse() if von in NAMEN.values() and len(von) == 3 and von.isupper() else {"werte": {}}
+    if von.isupper() and nach.isupper() and len(von) == 3 and len(nach) == 3:
+        if von not in k["werte"] or nach not in k["werte"]:
+            return {"antwort": "Die aktuellen Kurse konnte ich gerade nicht abrufen.", "kategorie": "", "wert": "", "von": "", "nach": ""}
+        ergebnis = wert / k["werte"][von] * k["werte"][nach]
+        datum = date.fromisoformat(k["datum"])
+        name = lambda c: WAEHRUNGEN.get(c, c)
+        return {"antwort": f"{zahl_text(wert)} {name(von)} sind {zahl_text(ergebnis)} {name(nach)} (Kurs der EZB vom {datum:%d.%m.}).",
+                "kategorie": "Währung", "wert": wert, "von": von, "nach": nach}
+    for kategorie, einheiten in EINHEITEN.items():
+        if von in einheiten and nach in einheiten:
+            return {"antwort": f"{zahl_text(wert)} {von} sind {zahl_text(wert * einheiten[von] / einheiten[nach])} {nach}.",
+                    "kategorie": kategorie, "wert": wert, "von": von, "nach": nach}
+    return None
+
+
+# ---------- Route: Ort über Photon, Strecke über OSRM (beide offen, ohne Konto). Den Verkehr zeigt der Link zu Google Maps ----------
+def _ort_daten(name: str) -> dict | None:
+    f = []
+    for _ in range(2):  # Der Dienst antwortet manchmal beim ersten Mal nicht
+        try:
+            f = requests.get("https://photon.komoot.io/api/", timeout=8, headers=HEADERS,
+                             params={"q": name, "limit": 1, "lang": "de"}).json().get("features") or []
+            break
+        except (requests.RequestException, ValueError):
+            time.sleep(1)
+    if not f:
+        return None
+    p = {k: v.strip(" .,") if isinstance(v, str) else v for k, v in f[0]["properties"].items()}
+    teile = [p.get("name"), p.get("city") if p.get("city") != p.get("name") else None, p.get("state") if not p.get("city") else None,
+             p.get("country") if p.get("country") not in (None, "Deutschland") else None]
+    voll = ", ".join(t for t in teile if t)
+    # Photon liefert auch zu Unsinn irgendeinen Treffer: Das längste Wort der Eingabe muss im Ergebnis vorkommen
+    wichtig = max(re.findall(r"[\wäöüß-]{2,}", name.lower()) or [""], key=len)
+    if wichtig not in voll.lower():
+        return None
+    lon, lat = f[0]["geometry"]["coordinates"]
+    return {"name": voll, "kurz": p.get("name") or name, "lat": lat, "lon": lon}
+
+
+def route(start: str, ziel: str) -> dict:
+    """Strecke mit dem Auto. km und minuten fehlen, wenn ein Dienst nicht antwortet; der Google-Link funktioniert trotzdem."""
+    a, b = _ort_daten(start), _ort_daten(ziel)
+    name_a, name_b = a["name"] if a else start, b["name"] if b else ziel
+    ergebnis = {"start": name_a, "ziel": name_b, "start_kurz": a["kurz"] if a else start, "ziel_kurz": b["kurz"] if b else ziel, "km": None, "minuten": None,
+                "linie": None,
+                "link": "https://www.google.com/maps/dir/?" + urlencode({"api": 1, "origin": name_a, "destination": name_b, "travelmode": "driving"})}
+    if not a or not b:
+        return ergebnis
+    try:
+        r = requests.get(f"https://router.project-osrm.org/route/v1/driving/{a['lon']},{a['lat']};{b['lon']},{b['lat']}",
+                         params={"overview": "simplified", "geometries": "geojson"}, headers=HEADERS, timeout=10).json()["routes"][0]
+    except (requests.RequestException, ValueError, KeyError, IndexError):
+        return ergebnis
+    # Für die Karte als [Breite, Länge]
+    ergebnis.update(km=round(r["distance"] / 1000, 1), minuten=max(1, round(r["duration"] / 60)),
+                    linie=[[lat, lon] for lon, lat in r["geometry"]["coordinates"]])
+    return ergebnis
 
 
 # ---------- Weltzeit (Zeitzone kommt aus der Open-Meteo-Ortssuche) ----------
