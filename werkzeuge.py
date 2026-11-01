@@ -14,9 +14,10 @@ import operator
 import re
 import socket
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import requests
 import trafilatura
@@ -28,23 +29,88 @@ MAX_SEKUNDEN = 20  # Gesamtzeit pro Seite
 HEADERS = {"User-Agent": "Mozilla/5.0 (HermesBox; +lokal)"}
 
 PDF_ORDNER = Path("pdfs")
+WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
 
-def suche(frage: str, n: int = 5) -> list[dict]:
-    """Websuche. Bei Fehlern (z.B. kurzzeitige Sperre einer Suchmaschine) wird einmal neu versucht."""
+# Quellen-Qualität: seriöse Seiten nach vorn, Foren/Social Media/Content-Farmen raus
+SERIOES = ("wikipedia.org", "tagesschau.de", "zdf.de", "zdfheute.de", "deutschlandfunk.de", "br.de", "ndr.de",
+           "wdr.de", "swr.de", "mdr.de", "hr.de", "rbb24.de", "sportschau.de", "spiegel.de", "zeit.de", "faz.net",
+           "sueddeutsche.de", "handelsblatt.com", "tagesspiegel.de", "welt.de", "n-tv.de", "dw.com", "reuters.com",
+           "apnews.com", "bbc.com", "bbc.co.uk", "heise.de", "golem.de", "kicker.de", "bundesregierung.de",
+           "bund.de", "destatis.de", "europa.eu", "who.int", "duden.de", "britannica.com", "nasa.gov")
+UNSERIOES = ("pinterest.", "quora.com", "gutefrage.net", "youtube.com", "tiktok.com", "facebook.com",
+             "instagram.com", "x.com", "twitter.com", "reddit.com", "wikihow.", "answers.", "brainly.",
+             "lyrics", "fandom.com")
+# Bei solchen Fragen zählt Aktualität: dann zusätzlich die Nachrichtensuche (mit Datum)
+ZEITNAH = re.compile(r"\b(aktuell\w*|heute|gestern|neueste\w*|letzte\w*|gerade|news|diese woche|wahl\w*|ergebnis\w*|"
+                     r"gewonnen|gestorben|tot|spiel\w*|tabelle|kurs|preis\w*|20\d\d)\b", re.I)
+
+
+MAX_MELDUNG_TAGE = 60
+
+
+def _datum_iso(wert) -> str:
+    """'2026-10-12T08:00:00+00:00' -> '2026-10-12'; Unbrauchbares wie 'Vor einem Tag' -> ''."""
+    try:
+        return date.fromisoformat(str(wert)[:10]).isoformat()
+    except ValueError:
+        return ""
+
+
+def _domain(url: str) -> str:
+    return (urlparse(url).hostname or "").lower().removeprefix("www.")
+
+
+def _seriositaet(url: str) -> int:
+    d = _domain(url)
+    if any(u in d for u in UNSERIOES):
+        return -1
+    return 2 if any(d == s or d.endswith("." + s) for s in SERIOES) or d.endswith(".gov") else 0
+
+
+def suche(frage: str, n: int = 6) -> list[dict]:
+    """Websuche mit Qualitätsfilter. Unseriöse Seiten fliegen raus, seriöse kommen nach vorn; bei zeitnahen
+    Fragen kommen Nachrichten mit Datum dazu. Bei Fehlern wird einmal neu versucht."""
+    treffer, meldungen = [], []
     for versuch in range(2):
         try:
             with DDGS() as d:
-                treffer = d.text(frage, region="de-de", max_results=n) or []
-            if treffer:
+                treffer = d.text(frage, region="de-de", max_results=12) or []
+                if ZEITNAH.search(frage):
+                    try:
+                        meldungen = d.news(frage, region="de-de", max_results=5) or []
+                    except Exception:
+                        meldungen = []
+            if treffer or meldungen:
                 break
         except Exception:
             treffer = []
         time.sleep(1)
-    return [
-        {"titel": t.get("title", ""), "url": t.get("href", ""), "text": t.get("body", "")}
-        for t in treffer if t.get("href", "").startswith(("http://", "https://"))
-    ]
+    liste, gesehen = [], set()
+    for m in meldungen:  # Nachrichten zuerst, mit Datum, damit das Modell das Neueste erkennt
+        url = m.get("url", "")
+        datum = _datum_iso(m.get("date"))
+        if not datum or (date.today() - date.fromisoformat(datum)).days > MAX_MELDUNG_TAGE:
+            continue  # ohne verlässliches Datum oder veraltet: als "aktuelle Meldung" wertlos
+        if url.startswith(("http://", "https://")) and _seriositaet(url) >= 0 and url not in gesehen:
+            gesehen.add(url)
+            liste.append({"titel": m.get("title", ""), "url": url, "datum": datum,
+                          "text": m.get("body", ""), "rang": _seriositaet(url) + 1})
+    for t in treffer:
+        url = t.get("href", "")
+        if url.startswith(("http://", "https://")) and _seriositaet(url) >= 0 and url not in gesehen:
+            gesehen.add(url)
+            liste.append({"titel": t.get("title", ""), "url": url, "datum": "", "text": t.get("body", ""),
+                          "rang": _seriositaet(url)})
+    liste.sort(key=lambda x: -x["rang"])  # stabil: innerhalb gleicher Qualität bleibt die Suchreihenfolge
+    # höchstens zwei Treffer pro Seite, damit das Modell wirklich verschiedene Quellen vergleichen kann
+    auswahl, pro_seite = [], {}
+    for x in liste:
+        d = _domain(x["url"])
+        if pro_seite.get(d, 0) < 2:
+            pro_seite[d] = pro_seite.get(d, 0) + 1
+            auswahl.append(x)
+    return auswahl[:n]
 
 
 def url_erlaubt(url: str) -> bool:
@@ -130,6 +196,20 @@ def wetter(ort: str) -> str:
                       f"{WETTERCODES.get(d['weather_code'][i], 'unbekannt')}, "
                       f"Regenwahrscheinlichkeit {d['precipitation_probability_max'][i]} %")
     return "\n".join(zeilen)
+
+
+# ---------- Weltzeit (Zeitzone kommt aus der Open-Meteo-Ortssuche) ----------
+def weltzeit(ort: str) -> str:
+    """Aktuelle Uhrzeit an einem Ort als kurzer Satz, oder '' wenn der Ort nicht gefunden wird."""
+    try:
+        g = requests.get("https://geocoding-api.open-meteo.com/v1/search", timeout=10,
+                         params={"name": ort, "count": 1, "language": "de"}).json().get("results") or []
+        if not g or not g[0].get("timezone"):
+            return ""
+        jetzt = datetime.now(ZoneInfo(g[0]["timezone"]))
+    except (requests.RequestException, ValueError, KeyError, ZoneInfoNotFoundError):
+        return ""
+    return f"In {g[0]['name']} ist es gerade {jetzt:%H:%M} Uhr ({WOCHENTAGE[jetzt.weekday()]}, {jetzt:%d.%m.})."
 
 
 # ---------- Nachrichten (Tagesschau-RSS: frei, seriös, ohne Konto) ----------
