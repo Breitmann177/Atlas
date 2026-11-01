@@ -36,6 +36,8 @@ def weg(text, verlauf=()):
         return "würfel"
     if server.VORSTELLUNG.search(text):
         return "vorstellung"
+    if server.HERKUNFT.search(text):
+        return "herkunft"
     if server.FAEHIGKEIT.search(text):
         return "fähigkeiten"
     if server.UHRZEIT_ORT.search(text):
@@ -70,6 +72,8 @@ WEGE = [
     ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("hermes wie funktioniert das Thema grenzwerte", "suche"),
     ("hermes wir sind hier in einem bewerbungsgespräch sag mal was über dich was du kannst etc", "vorstellung"),
     ("Wer bist du?", "vorstellung"), ("Stell dich mal kurz vor", "vorstellung"), ("Erzähl mir was über dich", "vorstellung"),
+    ("Hermes, wer hat dich gebaut?", "herkunft"), ("Von wem wurdest du entwickelt?", "herkunft"),
+    ("Hat Alex dich komplett selbst programmiert?", "herkunft"), ("Wer hat das iPhone erfunden?", "suche"),
     ("Kannst du dich vorstellen?", "vorstellung"), ("Kannst du dir vorstellen, dass es regnet?", "wetter"),
     ("Erzähl mir was über Rom", "router"), ("Mach einfach, was du kannst", "router"),
     ("Hermes, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),

@@ -128,10 +128,17 @@ app.add_middleware(SicherheitsHeader)
 BASIS_PROMPT = """Du bist Hermes, ein persönlicher KI-Assistent: kompetent, ehrlich und aufmerksam. Du läufst lokal
 auf dem Laptop des Nutzers in der "Hermes Box".
 
-Über dich und das Projekt (mehr weißt du nicht, erfinde keine Details dazu):
-- Die Hermes Box ist ein geplantes Gerät mit Raspberry Pi, Display, LED-Ring und Wake-Word "Hermes".
-- Du läufst mit Ollama und einem eigenen Python-Server (FastAPI). Über Tailscale soll alles verbunden werden,
-  auch ein Smart Mirror ist geplant. Frag nach, wenn dir zu einer Projektfrage Infos fehlen.
+Deine eigenen Erinnerungen, das ist alles, was du über dich weißt (erfinde nichts dazu):
+- Du bist Alexs Projekt. Wer welchen Teil gebaut oder programmiert hat, weißt du nicht genauer. Sag das, wenn jemand fragt.
+- Du bist ein Programm auf einem Laptop: ein Python-Server (FastAPI), Ollama und ein kleines Sprachmodell (qwen3:8b).
+  Dein Modell läuft lokal, ins Internet gehst du nur für Suche, Wetter, Nachrichten und deine Stimme.
+- Die Hermes Box ist noch nicht gebaut. Geplant sind ein eigenes Gehäuse mit Raspberry Pi, Display und LED-Ring, vielleicht
+  ein Smart Mirror. Sag nie, dass es das schon gibt.
+- Deine echten Stärken: Du schaust im Internet nach und nennst Quellen, man kann mit dir reden und dir ins Wort fallen,
+  deine Daten bleiben auf dem Laptop. Andere Stärken wie Einfühlungsvermögen oder Flexibilität behauptest du nicht.
+- Deine echten Schwächen: Dein Modell ist klein und irrt sich manchmal, Internet-Fragen dauern einige Sekunden, und auf
+  Dateien oder Programme des Laptops hast du keinen Zugriff.
+- Fragen nach deinen Stärken, Schwächen oder deiner Herkunft beantwortest du nur hieraus, kurz und ohne Websuche.
 
 Deine Art:
 - Du sprichst Deutsch und duzt den Nutzer. Dein Ton: höflich, ruhig, aufmerksam, diskret und vorausschauend,
@@ -840,6 +847,11 @@ FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|"
 VORSTELLUNG = re.compile(r"\b(wer|was) bist du\b|\bstell\w* dich\b.*\bvor\b|\bdich\b.*\bvorstellen\b|"
                          r"\büber dich( selbst)? (sagen|erzählen|berichten)\b|"
                          r"\b(sag|erzähl|erzaehl|bericht|beschreib)\w*\b.*\b(über dich|von dir|was du (so |alles )?kannst|wer du bist)\b", re.I)
+# Hier erfand das Modell trotz Regel "ein Team" und "mehrere Leute", also feste Antwort
+HERKUNFT = re.compile(r"\b(wer|von wem)\b.*\b(dich|du)\b.*\b(gebaut|entwickelt|programmiert|gemacht|erschaffen|erstellt|geschrieben|erfunden)\b|"
+                      r"\bwer ist dein\w* (entwickler|erbauer|schöpfer|ersteller|programmierer)\b|"
+                      r"\bhat \w+ dich\b.*\b(gebaut|entwickelt|programmiert|gemacht|geschrieben)\b", re.I)
+HERKUNFT_TEXT = "Ich bin Alexs Projekt. Wer welchen Teil im Einzelnen gebaut oder programmiert hat, kann ich nicht sagen."
 NOCH_MEHR = re.compile(r"\b(was noch|sonst noch|und noch|alles|liste)\b", re.I)
 FAEHIGKEITEN_LISTE = """Das kann ich:
 
@@ -863,6 +875,8 @@ Ich beantworte Fragen und schaue dafür im Internet nach, mit Quellen. Außerdem
 def faehigkeiten(text: str, gemeint: str, verlauf: list[dict]) -> str | None:
     if VORSTELLUNG.search(text) or VORSTELLUNG.search(gemeint):
         return VORSTELLUNG_TEXT
+    if HERKUNFT.search(text) or HERKUNFT.search(gemeint):
+        return HERKUNFT_TEXT
     davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
     nachfrage = bool(NOCH_MEHR.search(text)) and bool(davor) and bool(FAEHIGKEIT.search(davor[-1]) or VORSTELLUNG.search(davor[-1]))
     return FAEHIGKEITEN_LISTE if FAEHIGKEIT.search(text) or FAEHIGKEIT.search(gemeint) or nachfrage else None
