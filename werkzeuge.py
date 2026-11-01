@@ -43,7 +43,7 @@ UNSERIOES = ("pinterest.", "quora.com", "gutefrage.net", "youtube.com", "tiktok.
              "lyrics", "fandom.com")
 # Bei solchen Fragen zählt Aktualität: dann zusätzlich die Nachrichtensuche (mit Datum)
 ZEITNAH = re.compile(r"\b(aktuell\w*|heute|gestern|neueste\w*|letzte\w*|gerade|news|diese woche|wahl\w*|ergebnis\w*|"
-                     r"gewonnen|gestorben|tot|spiel\w*|tabelle|kurs|preis\w*|20\d\d)\b", re.I)
+                     r"gewonnen|gestorben|tot|spiel\w*|tabelle\w*|kurs\w*|preis\w*|kostet|20\d\d)\b", re.I)
 
 
 MAX_MELDUNG_TAGE = 60

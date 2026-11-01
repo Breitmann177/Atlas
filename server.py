@@ -21,14 +21,15 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 import werkzeuge
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-# Zwei Modi: schnell = kleines Modell, gruendlich = größeres Modell mit "Nachdenken".
-# Die Antwort nutzt das gewählte Modell. Router und Erinnerungsvorschläge nutzen immer das kleine HILFSMODELL.
-# Bilder gehen immer an das gruendlich-Modell (qwen3:8b kann keine Bilder).
+# Beide Modi nutzen dasselbe Modell und dürfen ins Internet: schnell antwortet sofort, gruendlich denkt vorher nach.
+# Gemessen: Kleinere Modelle (qwen3:4b, qwen3.5:4b) rechnen schneller, denken aber 3-5x länger; mit Nachdenken
+# sind sie langsamer als qwen3:8b. Nur für Bilder braucht es qwen3.5:4b, qwen3:8b kann keine.
 MODELLE = {
     "schnell": {"name": "qwen3:8b", "think": False},
-    "gruendlich": {"name": "qwen3.8-27b", "think": True},
+    "gruendlich": {"name": "qwen3:8b", "think": True},
+    "bild": {"name": "qwen3.5:4b", "think": False},
 }
-HILFSMODELL = MODELLE["schnell"]["name"]  # kleines, schnelles Modell für Router und Erinnerungen
+HILFSMODELL = MODELLE["schnell"]["name"]  # für Router und Erinnerungen; dasselbe Modell, damit nichts neu laden muss
 # Überall dieselbe Kontextgröße: sonst lädt Ollama das Modell bei jedem Wechsel neu (kostet auf CPU Sekunden)
 NUM_CTX = 8192
 HALTEN = "30m"  # so lange bleibt ein Modell nach der letzten Anfrage im Speicher
@@ -172,8 +173,9 @@ Quellen und Internet:
 # Kommt dazu, wenn der Nutzer im Live-Sprachmodus spricht
 LIVE_PROMPT = """Ihr sprecht gerade miteinander (Live-Sprachmodus): Deine Antwort wird laut vorgelesen.
 Antworte deshalb wie im Gespräch: meist 1 bis 3 Sätze, außer der Nutzer will ausdrücklich mehr.
-Keine Listen, keine Tabellen, kein Markdown, keine Formeln, keine URLs, keine Emojis. Schreib Zahlen und
-Einheiten so, wie man sie ausspricht (z.B. "zwölf Grad")."""
+Keine Listen, keine Tabellen, kein Markdown, keine Formeln, keine URLs, keine Emojis, kein Programmcode. Schreib
+Zahlen und Einheiten so, wie man sie ausspricht (z.B. "zwölf Grad"). Wird nach Code gefragt, sag kurz, dass das
+im Chat besser geht."""
 
 # Kommt dazu, wenn der Nutzer ein PDF möchte
 PDF_PROMPT = """Der Nutzer möchte ein PDF. Schreibe jetzt den fertigen Inhalt des Dokuments.
@@ -606,6 +608,20 @@ async def stt(datei: UploadFile = File(...), schnell: bool = Form(False)):
 
 
 # ---------- Status ----------
+def grafikkarte_aktiv() -> bool:
+    """False, wenn Hermes ohne Grafikkarte läuft: Karte aus (ASUS-Eco-Modus) oder Ollama hat sie beim Start nicht
+    gesehen. Dann ist alles vielfach langsamer, und das soll man sehen, bevor man jemandem etwas vorführt."""
+    import subprocess
+
+    try:
+        if subprocess.run(["nvidia-smi", "-L"], capture_output=True, timeout=5).returncode != 0:
+            return False
+        geladen = requests.get(OLLAMA_URL + "/api/ps", timeout=2).json().get("models", [])
+    except Exception:
+        return False
+    return all(m.get("size_vram", 0) > 0 for m in geladen)
+
+
 @app.get("/status")
 def status():
     try:
@@ -616,7 +632,7 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY)}
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "grafikkarte": grafikkarte_aktiv()}
 
 
 # ---------- Chat: erst prüfen ob gesucht werden muss, dann antworten ----------
@@ -1031,20 +1047,40 @@ def briefing_daten(messages: list[dict], mit_wetter: bool):
     yield ev(typ="status", text="denkt nach")
 
 
-OHNE_ROUTER = re.compile(r"^\W*(hermes\W*)?(warum|wieso|weshalb|erklär\w*|wie funktioniert|wie geht|wie mache|wie kann ich|"
-                         r"schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*|hilf|gib mir (einen|ein paar) tipp)\b", re.I)
+OHNE_ROUTER = re.compile(r"^\W*(hermes\W*)?(schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*)\b", re.I)
+# Auto-Modus: Bei solchen Fragen lohnt sich das Nachdenken
+KOMPLEX = re.compile(r"\b(erklär\w*|warum|wieso|weshalb|vergleich\w*|unterschied\w*|analysier\w*|begründ\w*|"
+                     r"vor- und nachteile|beweis\w*|schritt für schritt|plan\w*|programmier\w*|code|fehler|berechne\w*)\b", re.I)
+# "Google mal ...", "Schau im Internet nach ...": dann wird immer gesucht, egal was das Modell meint
+SUCH_BEFEHL = re.compile(r"\b(googl\w*|such\w*|recherchier\w*|im internet|im netz|online nach|schau nach|guck nach)\b", re.I)
+FUELLWOERTER = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?((kannst|könntest) du( mir)?( mal| bitte)* )?"
+                          r"((googl\w*|such\w*|recherchier\w*|schau|guck)( mal| bitte| doch| im internet| im netz| nach| online)*\W*)?", re.I)
+FRAGEWORT = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?(wer|wen|wem|wessen|was|wann|wo|wohin|woher|wie|warum|wieso|weshalb|"
+                       r"welche\w*|wieviel\w*|gibt es|gibt's|stimmt es|ist|sind|hat|haben|war|waren)\b", re.I)
+AN_HERMES = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
+RECHENFRAGE = re.compile(r"\d.*(%|\bprozent\b|\bmal\b|\bplus\b|\bminus\b|\bgeteilt\b|\bwurzel\b|[+*/=])", re.I)
 
 
 def ohne_router(text: str, dokumente: list) -> bool:
-    """Erklär- und Schreibaufgaben brauchen kein Werkzeug: Router sparen (~2,5 s). Im Zweifel fragt er den Router."""
+    """Schreibaufgaben brauchen kein Werkzeug: Router sparen (~2,5 s). Im Zweifel fragt er den Router."""
     return not dokumente and bool(OHNE_ROUTER.search(text)) and not werkzeuge.ZEITNAH.search(text)
+
+
+def direkte_suche(text: str, live: bool, dokumente: list) -> str | None:
+    """Gibt die Suchanfrage zurück, wenn ohne Router gesucht werden soll. Im Sprechmodus geht jede Sachfrage
+    ins Internet: das Modell soll dort nichts aus dem Gedächtnis vortragen."""
+    befehl = bool(SUCH_BEFEHL.search(text))
+    sachfrage = live and not dokumente and bool(FRAGEWORT.search(text)) and not AN_HERMES.search(FUELLWOERTER.sub("", text))
+    if not befehl and (not sachfrage or RECHENFRAGE.search(text)):
+        return None
+    return (FUELLWOERTER.sub("", text).strip(" ?!.,") or text)[:200]
 
 
 def chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
     if bilder:
-        modus = MODELLE["gruendlich"]  # nur das große Modell kann Bilder
+        modus = MODELLE["bild"]  # das normale Modell kann keine Bilder
     pdf_modus = pdf_gewuenscht(frage.text)
     with db() as c:
         cid = frage.chat_id
@@ -1119,6 +1155,8 @@ def chat_stream(frage: Frage):
                 werkzeug, eingabe = "wetter", ort_aus_text(frage.text)
             elif anhang or smalltalk or ohne_router(frage.text, dokumente):
                 werkzeug, eingabe = "keins", ""
+            elif direkte_suche(frage.text, frage.live, dokumente):
+                werkzeug, eingabe = "suche", direkte_suche(frage.text, frage.live, dokumente)
             else:
                 werkzeug, eingabe = werkzeug_waehlen(frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
         if werkzeug == "rechnen" and "heute" in eingabe:
@@ -1166,7 +1204,9 @@ def chat_stream(frage: Frage):
             # Höchstens 5 s warten: eine langsame Seite soll nicht die ganze Antwort aufhalten
             pool = ThreadPoolExecutor(3)
             frist = time.time() + 5
-            laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in treffer[:3]]
+            # Pro Seite nur einen Treffer lesen: sonst liest er zweimal Wikipedia statt der aktuellen Sportschau-Tabelle
+            zu_lesen = list({werkzeuge._domain(t["url"]).split(".", 1)[-1]: t for t in reversed(treffer)}.values())[::-1][:3]
+            laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in zu_lesen]
             for url, lauf in laeufe:
                 yield ev(typ="status", text="liest", detail=url)
                 try:
@@ -1189,15 +1229,15 @@ def chat_stream(frage: Frage):
             messages[0]["content"] += "\n\n" + PDF_PROMPT
         elif frage.live:
             messages[0]["content"] += "\n\n" + LIVE_PROMPT
-        # Bei Dokumenten erst nachdenken lassen: dauert länger, aber das kleine Modell verwechselt sonst Zeilen
-        # und Daten. Im Live-Modus zählt Tempo, da bleibt es aus.
-        if dokumente and not frage.live:
+        # Bei Websuche und Dokumenten immer erst nachdenken, auch im Gespräch und im Modus "schnell". Im Test hat das
+        # Fangfragen abgefangen: ohne Nachdenken erfand das Modell einen Hund für Olaf Scholz, mit gab es das zu.
+        if not bilder and (quellen or dokumente):
             modus = {**modus, "think": True}
         if frage.modus == "auto":
-            # Gemessen auf der RTX 5070: klein ~2 s, klein mit Nachdenken 5-7 s, groß 28-58 s.
-            # Das große Modell nur bei Bildern (das kleine kann keine). Bei der Websuche kein Nachdenken: mit dem
-            # langen Kontext dauerte das 15-29 s; die Quellen-Regeln schützen auch ohne vor Erfundenem.
-            yield ev(typ="modus", text="großes Modell" if bilder else "denkt nach" if modus["think"] else "schnell")
+            # Erklärungen im Chat lohnen das Nachdenken ebenfalls; Smalltalk und Tagesnachrichten kommen sofort.
+            if not bilder and not frage.live and not smalltalk and not news and not briefing and KOMPLEX.search(frage.text):
+                modus = {**modus, "think": True}
+            yield ev(typ="modus", text="Bildmodell" if bilder else "denkt nach" if modus["think"] else "schnell")
         letztes_denken = 0.0
         # Beim PDF-Wunsch nicht filtern: dort ist der Text ein Dokument, keine Gesprächsantwort
         filter_ = None if pdf_modus else FloskelFilter()

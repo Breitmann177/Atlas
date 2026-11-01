@@ -124,6 +124,7 @@
   #live.an path:nth-child(3) { animation-delay:.4s; }
   @keyframes welle { 50% { transform:scaleY(.35); } }
   #livestatus { margin-left:10px; color:var(--rot); letter-spacing:.14em; }
+  #gpuwarnung { margin-left:10px; color:var(--rot); letter-spacing:.1em; cursor:help; }
   #livestatus i { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--rot);
                   margin-right:6px; animation:blink 1s infinite; }
   .mic:disabled { opacity:.4; cursor:default; }
@@ -322,7 +323,7 @@
 </main>
 
 <form id="form" autocomplete="off">
-  <div class="modus" id="modus"><button type="button" data-m="auto">AUTO</button><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span></div>
+  <div class="modus" id="modus"><button type="button" data-m="auto">AUTO</button><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Hermes neu starten.">GRAFIKKARTE AUS · LANGSAM</span></div>
   <div id="vorschau" hidden></div>
   <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
@@ -547,8 +548,8 @@
     sendeStatus();
     if (typeof modusHinweis === "function") {
       if (anhang.length) {
-        const i = modiInfo && modiInfo.gruendlich;
-        document.getElementById("modushinweis").textContent = "Mit Bild: " + (i ? i.name : "Gründlich-Modell") + " · braucht länger";
+        const i = modiInfo && modiInfo.bild;
+        document.getElementById("modushinweis").textContent = "Mit Bild: " + (i ? i.name : "Bildmodell");
       } else modusHinweis();
     }
   }
@@ -1235,6 +1236,7 @@
       modiInfo = s.modi; modusHinweis();
       statuspunkt.className = s.ollama ? "an" : "aus";
       statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
+      document.getElementById("gpuwarnung").hidden = s.grafikkarte;
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
       statuspunkt.className = "aus";
@@ -1529,6 +1531,7 @@
   ladeChats();
   ladeErinnerungen(true);
   ladeStatus();
+  setInterval(ladeStatus, 60000);  // merkt auch, wenn die Grafikkarte zwischendurch abgeschaltet wird
 </script>
 </body>
 </html>
