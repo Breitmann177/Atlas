@@ -797,10 +797,22 @@ QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte nur mit de
 # ---------- Sofort-Antworten: dafür braucht es kein Sprachmodell, also auch keine Halluzinationen ----------
 UHRZEIT_ORT = re.compile(r"\b(wie spät|wie viel uhr|wieviel uhr|uhrzeit)\b.*\b(?:in|auf) "
                          r"([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)", re.I)
-WURF_SEKUNDEN = 1.5  # so lange wie die Animation im Browser
+WURF_SEKUNDEN = 3.0  # so lange wie die Animation im Browser (WURF_DAUER)
+NOCHMAL = re.compile(r"^\W*(hermes\W*)?(noch ?mal|noch ein(mal|e|en)?|wieder|nochmal werfen|nochmal würfeln|noch einer)"
+                     r"(\s+(bitte|werfen|würfeln|versuchen))*\W*$", re.I)
 MUENZE = re.compile(r"(?=.*\bm(?:ü|ue)nze\w*\b)(?=.*\b(?:wirf\w*|werf\w*|schnipp\w*|flip\w*)\b)|\bm(?:ü|ue)nzwurf\b|\bkopf oder zahl\b", re.I)
 WUERFEL = re.compile(r"^\W*(hermes\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfel doch|würfeln|wirf (einen|den|nen|ne) würfel)\b", re.I)
 ZUFALL = re.compile(r"\b(?:zufallszahl|zufällige zahl)\b(?:.*?(\d+)\D+(\d+))?", re.I)
+
+
+def letzter_wurf(text: str, verlauf: list[dict]) -> str | None:
+    """'Nochmal' nach einem Münzwurf oder Würfel meint denselben Wurf: gibt die ursprüngliche Bitte zurück."""
+    if not NOCHMAL.search(text):
+        return None
+    for m in reversed(verlauf[:-1]):
+        if m["role"] == "user" and not NOCHMAL.search(m["content"]):
+            return m["content"] if MUENZE.search(m["content"]) or WUERFEL.search(m["content"]) else None
+    return None
 
 
 def sofort_antwort(text: str) -> str | None:
@@ -1318,7 +1330,7 @@ def chat_stream(frage: Frage):
         yield ev(typ="fertig")
         return
     # Was der Nutzer meint: bei Folgefragen die vollständige Frage, sonst sein Text. Danach richten sich Suche und Werkzeuge.
-    gemeint = frage.text
+    gemeint = letzter_wurf(frage.text, verlauf) or frage.text
     gemerkt, neuer_fakt = (None, None) if (bilder or frage.dokumente) else merken(frage.text, verlauf)
     if not gemerkt and not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
         gemeint = frage_aufloesen(frage.text, verlauf)
