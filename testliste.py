@@ -27,7 +27,7 @@ def pruefe(name, ist, soll):
 
 
 def weg(text, verlauf=()):
-    """Wohin geht eine Frage? Dieselbe Reihenfolge wie im Chat, ohne das Modell zu fragen."""
+    """Wohin geht eine Frage, wenn das Modell nicht gefragt wird? Die Festen zuerst, zuletzt der Rückweg ohne Analyse."""
     if server.timer_erkennen(text):
         return "timer"
     if server.MUENZE.search(text):
@@ -104,8 +104,23 @@ ANTWORTEN = [
     ("Wie spät ist es in Tokio?", ["Tokio"], []),
     ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
     ("hermes wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
+    ("hermes wie heiße ich", ["nicht", "noch"], ["Ich heiße [", "testedich"]),
+    ("Wie lange muss ich Eier kochen?", ["Minuten"], []),
     ("hermes wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Hermes"], ["Ich bin Alex", "studiere"]),
 ]
+# Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.
+ANALYSE = {
+    "nutzer": ["hermes wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
+               "Weißt du, wie ich heiße?", "Wie heißt mein Hund?", "was weißt du über mich", "Habe ich einen Bruder?"],
+    "hermes": ["Was sind deine Stärken?", "Welches Modell benutzt du?", "Bist du schon in einer Box eingebaut?", "Was machst du in deiner Freizeit?"],
+    "gespraech": ["Stimmt das?", "Warum?", "du lügst doch", "Ok danke dir", "Das war aber eine schlechte Antwort"],
+    "aufgabe": ["Schreib mir ein Gedicht über Katzen", "Übersetze guten Morgen ins Englische", "Wie schreibe ich eine Schleife in Python?"],
+    "rechnen": ["Was sind 18 Prozent von 2450?", "Wie viel ist 12 mal 12?", "wurzel aus 144"],
+    "internet": ["Wer ist aktuell Bundeskanzler?", "hermes wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
+                 "Wer ist Hermes in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?",
+                 "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne",
+                 "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
+}
 GESPRAECHE = [
     (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
     (["Wie wird das Wetter morgen in Köln?", "Und in Hamburg?"], ["Hamburg"]),
@@ -154,12 +169,21 @@ server.SPRUCH_CHANCE = 0
 
 if "--voll" in sys.argv:
     print("\nEchte Antworten (dauert einige Minuten):")
+    print("Analyse:")
+    for soll, saetze in ANALYSE.items():
+        for text in saetze:
+            art, anfrage = server.analysieren(text, [])
+            print(f"  {art:9} {text!r}" + (f" -> {anfrage!r}" if art == "internet" else ""), flush=True)
+            pruefe(f"Analyse: {text}", art, soll)
+    pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
+    print("Antworten:")
     for text, muss, darf_nicht in ANTWORTEN:
         t = time.time()
         a, _ = frag(text)
         ok = any(w.lower() in a.lower() for w in muss) and not any(w.lower() in a.lower() for w in darf_nicht) and "[FEHLER" not in a
         print(f"  {'ok    ' if ok else 'FEHLER'} [{time.time() - t:3.0f}s] {text}\n         {a[:150]!r}", flush=True)
         if not ok:
+            print(f"         ganz: {a!r}", flush=True)
             fehler.append(f"Antwort: {text}")
     for fragen, muss in GESPRAECHE:
         cid = None
