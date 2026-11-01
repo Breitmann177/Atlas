@@ -110,6 +110,8 @@ ANTWORTEN = [
 ]
 # Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.
 ANALYSE = {
+    "wetter": ["ist es morgen kalt?", "Brauche ich heute einen Schirm?", "Wird es am Wochenende warm?", "Soll ich eine Jacke mitnehmen?",
+               "Schneit es morgen in München?", "wie warm ist es gerade in Rom"],
     "nutzer": ["hermes wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
                "Weißt du, wie ich heiße?", "Wie heißt mein Hund?", "was weißt du über mich", "Habe ich einen Bruder?"],
     "hermes": ["Was sind deine Stärken?", "Welches Modell benutzt du?", "Bist du schon in einer Box eingebaut?", "Was machst du in deiner Freizeit?"],
@@ -118,7 +120,8 @@ ANALYSE = {
     "rechnen": ["Was sind 18 Prozent von 2450?", "Wie viel ist 12 mal 12?", "wurzel aus 144"],
     "internet": ["Wer ist aktuell Bundeskanzler?", "hermes wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
                  "Wer ist Hermes in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?",
-                 "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne",
+                 "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne", "Wie kalt ist flüssiger Stickstoff?", "Wie kalt war der kälteste Winter in Deutschland?",
+                 "Wie warm wird eine Herdplatte?",
                  "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?"],
 }
 GESPRAECHE = [
@@ -175,7 +178,9 @@ if "--voll" in sys.argv:
         for text in saetze:
             art, anfrage = server.analysieren(text, [])
             print(f"  {art:9} {text!r}" + (f" -> {anfrage!r}" if art == "internet" else ""), flush=True)
-            pruefe(f"Analyse: {text}", art, soll)
+            # hermes, gespraech und aufgabe nehmen denselben Weg: antworten ohne Werkzeug
+            ohne_werkzeug = ("hermes", "gespraech", "aufgabe")
+            pruefe(f"Analyse: {text}", "ohne werkzeug" if art in ohne_werkzeug else art, "ohne werkzeug" if soll in ohne_werkzeug else soll)
     pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
     print("Antworten:")
     for text, muss, darf_nicht in ANTWORTEN:

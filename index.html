@@ -217,9 +217,9 @@
   .einst { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:22px; padding-right:2px; }
   .einst .listen { flex:none; overflow:visible; }
   .abschnitt { margin:0 0 10px; font-family:var(--mono); font-size:11px; letter-spacing:.25em; color:var(--dim); font-weight:600; }
-  .gefahr { width:100%; padding:12px; border-radius:14px; border:1px dashed var(--rot); background:none; color:var(--rot);
+  .gefahr { width:100%; padding:12px; border-radius:14px; border:1px solid var(--rand); background:none; color:var(--dim);
             font-family:var(--mono); font-size:12px; letter-spacing:.15em; cursor:pointer; transition:.2s; }
-  .gefahr:hover { background:var(--rot); color:#000; border-style:solid; }
+  .gefahr:hover { color:var(--fg); border-color:var(--dim); }
   .suche { width:100%; background:var(--feld); border:1px solid var(--rand); color:var(--fg); border-radius:12px;
            padding:10px 14px; font-size:14px; outline:none; }
   .suche:focus { border-color:var(--dim); }
@@ -258,7 +258,7 @@
             color:var(--dim); cursor:pointer; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; transition:.2s; }
   .stimme small { display:block; margin-top:3px; font-size:9.5px; letter-spacing:.04em; opacity:.75; }
   .stimme:hover { color:var(--fg); }
-  .stimme.aktiv { border-color:#34c759; color:#34c759; }
+  .stimme.aktiv { border-color:var(--fg); color:var(--fg); }
   .stimme.spielt { animation:blink 1s infinite; }
   /* An/Aus-Schalter (Wake-Word): man sieht am Knopf-Ort UND an der Farbe, ob er an ist */
   .schalter-zeile { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px;
@@ -269,10 +269,10 @@
               border:1px solid var(--rand); background:var(--feld); transition:background .2s, border-color .2s; }
   .schalter::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
                      background:var(--dim); transition:transform .2s, background .2s; }
-  .schalter[aria-checked="true"] { background:#34c759; border-color:#34c759; }
-  .schalter[aria-checked="true"]::after { transform:translateX(28px); background:#fff; }
-  .schalter-zeile.an { border-color:#34c759; }
-  .schalter-zeile.an b { color:#34c759; }
+  .schalter[aria-checked="true"] { background:var(--fg); border-color:var(--fg); }
+  .schalter[aria-checked="true"]::after { transform:translateX(28px); background:var(--panel); }
+  .schalter-zeile.an { border-color:var(--dim); }
+  .schalter-zeile.an b { color:var(--fg); }
   .fuss { display:flex; align-items:center; gap:10px; padding-top:12px; border-top:1px dashed var(--line);
           font-family:var(--mono); font-size:11px; letter-spacing:.12em; color:var(--dim); }
   .fuss i { width:8px; height:8px; border-radius:50%; border:1px solid var(--dim); flex-shrink:0; }
@@ -305,7 +305,6 @@
   .einst .listen { gap:6px; }
   #neu { border-top:0; padding-top:8px; }
   .kachel { height:72px; }
-  .gefahr { border-style:solid; border-color:rgba(255,90,90,.45); }
   .zurueck { padding:6px 14px 6px 10px; border:1px solid var(--rand); border-radius:999px; }
   .zurueck:hover { border-color:var(--dim); }
   .fuss { border-top:1px solid var(--line); }
@@ -317,7 +316,14 @@
   /* ---- Einstellungen: flacher, ohne Kartenrahmen ---- */
   .einst { gap:0; }
   .einst section { background:none; border:0; border-radius:0; padding:20px 2px; border-top:1px solid var(--line); }
-  .einst section:first-child { border-top:0; padding-top:6px; }
+  .einst section { border-top:0; padding-top:6px; }
+  #einstMenue { display:flex; flex-direction:column; gap:2px; }
+  #einstMenue[hidden] { display:none; }
+  #einstMenue button { display:flex; align-items:center; gap:14px; width:100%; padding:13px 12px; background:none; border:0;
+                       border-radius:12px; color:var(--fg); font:inherit; font-size:15px; text-align:left; cursor:pointer; transition:background .15s; }
+  #einstMenue button:hover { background:var(--karte); }
+  #einstMenue .symbol { font-size:19px; line-height:1; filter:grayscale(1); }  /* Emojis ohne Farbe, passend zum Rest */
+  #einstMenue .pfeil { margin-left:auto; color:var(--dim); }
   .einst .abschnitt::after { display:none; }
   .einst .abschnitt { margin:0 0 10px; }
   .einst .hinweis { margin-bottom:8px; }
@@ -420,14 +426,22 @@
   <div class="bereich" id="ansicht-einstellungen" hidden>
     <button class="zurueck" id="zurueck">← ZURÜCK</button>
     <div class="einst">
-      <section>
+      <nav id="einstMenue" aria-label="Einstellungen">
+        <button type="button" data-oeffnet="erinnerungen"><span class="symbol" aria-hidden="true">🧠</span>Erinnerungen<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="design"><span class="symbol" aria-hidden="true">🎨</span>Design<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="stimme"><span class="symbol" aria-hidden="true">🔊</span>Stimme<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="wake"><span class="symbol" aria-hidden="true">🎙️</span>Wake-Word<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="daten"><span class="symbol" aria-hidden="true">🗂️</span>Daten<span class="pfeil" aria-hidden="true">›</span></button>
+      </nav>
+
+      <section data-bereich="erinnerungen" hidden>
         <h3 class="abschnitt">ERINNERUNGEN</h3>
         <p class="hinweis">Das weiß Hermes über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
         <ul class="listen" id="liste"></ul>
         <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
       </section>
 
-      <section>
+      <section data-bereich="design" hidden>
         <h3 class="abschnitt">DESIGN</h3>
         <div class="kacheln">
           <button class="kachel" data-design="dunkel">DUNKEL</button>
@@ -436,7 +450,7 @@
         </div>
       </section>
 
-      <section>
+      <section data-bereich="stimme" hidden>
         <h3 class="abschnitt">STIMME</h3>
         <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Stimmen brauchen Internet (der Text geht dafür an Microsoft); ohne Internet springt eine lokale Stimme ein.</p>
         <div class="stimmen">
@@ -446,7 +460,7 @@
         </div>
       </section>
 
-      <section>
+      <section data-bereich="wake" hidden>
         <h3 class="abschnitt">WAKE-WORD</h3>
         <p class="hinweis">Sagen Sie „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
         <div class="schalter-zeile" id="wakeZeile">
@@ -455,7 +469,7 @@
         </div>
       </section>
 
-      <section>
+      <section data-bereich="daten" hidden>
         <h3 class="abschnitt">DATEN</h3>
         <button class="gefahr" id="alleLoeschen">ALLE CHATS LÖSCHEN</button>
         <button class="gefahr abmelden" id="abmelden" hidden>ABMELDEN</button>
@@ -1357,17 +1371,26 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") schliesseSeite(); });
 
   // Zwei Ansichten in der Seitenleiste: Chats und Einstellungen (Zahnrad)
+  // In den Einstellungen zeigt das Menü die Bereiche, ein Klick öffnet genau einen
+  function zeigeBereich(name) {
+    document.getElementById("einstMenue").hidden = !!name;
+    document.querySelectorAll(".einst section").forEach((b) => { b.hidden = b.dataset.bereich !== name; });
+    if (name === "erinnerungen") ladeErinnerungen(true);  // erst jetzt sichtbar: Im versteckten Bereich wären die Zeilen 0 hoch
+  }
+  document.querySelectorAll("#einstMenue button").forEach((b) => b.addEventListener("click", () => zeigeBereich(b.dataset.oeffnet)));
   function zeigeAnsicht(name) {
     const einst = name === "einstellungen";
+    zeigeBereich("");
     document.getElementById("ansicht-chats").hidden = einst;
     document.getElementById("ansicht-einstellungen").hidden = !einst;
     document.getElementById("zahnrad").classList.toggle("aktiv", einst);
-    if (einst) ladeErinnerungen(true);
   }
   document.getElementById("zahnrad").addEventListener("click", () => {
     zeigeAnsicht(document.getElementById("ansicht-einstellungen").hidden ? "einstellungen" : "chats");
   });
-  document.getElementById("zurueck").addEventListener("click", () => zeigeAnsicht("chats"));
+  document.getElementById("zurueck").addEventListener("click", () => {
+    if (document.getElementById("einstMenue").hidden) zeigeBereich(""); else zeigeAnsicht("chats");
+  });
 
   document.getElementById("alleLoeschen").addEventListener("click", async () => {
     if (!chatsAlle.length) { alert("Es gibt keine Chats zum Löschen."); return; }
