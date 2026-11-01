@@ -1173,14 +1173,17 @@ MERK_FRAGE = re.compile(r"\b(dinge|sachen|was|etwas|alles|kannst du)\b", re.I)  
 MERK_WORTE = re.compile(r"\b(bitte|willst|möchtest|kannst|könntest|du|dir|ihn|sie|es|das|den|die|namen?|nicht|doch|mal|merk\w*|speicher\w*|dass|und)\b", re.I)
 SENSIBEL = re.compile(r"\b(passwort|kennwort|pin|iban|kreditkarte|tan)\b", re.I)
 NAME_GEFRAGT = re.compile(r"\bwie ich heiß|\bmein(en)? name", re.I)
-NUR_NAME = re.compile(r"^\W*(?:ich heiße |ich heisse |mein name ist |ich bin )?([A-ZÄÖÜ][\wäöüß-]+(?: [A-ZÄÖÜ][\wäöüß-]+)?)\W*$")
+NUR_NAME = re.compile(r"^\W*(?:ich heiße |ich heisse |mein name ist |ich bin )?([^\W\d_][\w-]+(?: [^\W\d_][\w-]+)?)[.!\s]*$", re.I)
+KEIN_NAME = {"ja", "nein", "nö", "ne", "nee", "ok", "okay", "danke", "egal", "genau", "keine ahnung", "weiß nicht", "rate mal", "rate"}
 
 
 def name_aus_antwort(text: str, verlauf: list[dict]) -> str:
     """'Alex' als Antwort auf 'Weißt du, wie ich heiße?' wird zu 'Der Nutzer heißt Alex.', sonst leer."""
     davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
     m = NUR_NAME.match(text)
-    return f"Der Nutzer heißt {m.group(1)}." if m and davor and NAME_GEFRAGT.search(davor[-1]) else ""
+    if not m or m.group(1).lower() in KEIN_NAME or not davor or not NAME_GEFRAGT.search(davor[-1]):
+        return ""
+    return f"Der Nutzer heißt {m.group(1).title()}."
 
 
 def erinnerung_speichern(satz: str) -> bool:
@@ -1191,20 +1194,20 @@ def erinnerung_speichern(satz: str) -> bool:
     return True
 
 
-def merken(text: str, verlauf: list[dict]) -> str | None:
-    """'Merk dir das' speichert direkt, weil der Nutzer es ausdrücklich will. Gibt die Antwort zurück oder None,
-    wenn es keine Bitte ums Merken ist."""
+def merken(text: str, verlauf: list[dict]) -> tuple[str | None, str | None]:
+    """'Merk dir das' speichert direkt, weil der Nutzer es ausdrücklich will. Gibt (Antwort, neu gespeicherter Fakt)
+    zurück; (None, None), wenn es keine Bitte ums Merken ist."""
     if not MERK_BEFEHL.search(text) or (text.strip().endswith("?") and MERK_FRAGE.search(text)):
-        return None
+        return None, None
     if SENSIBEL.search(text):
-        return "Passwörter und solche Daten merke ich mir bewusst nicht."
+        return "Passwörter und solche Daten merke ich mir bewusst nicht.", None
     davor = [m["content"] for m in verlauf[:-1] if m["role"] == "user"]
     eigener_inhalt = len(MERK_WORTE.sub(" ", re.sub(r"[^\w\s-]", " ", text)).split()) >= 1
     quelle = text if eigener_inhalt else (davor[-1] if davor else "")
     if not quelle:
-        return "Was soll ich mir denn merken?"
+        return "Was soll ich mir denn merken?", None
     if SENSIBEL.search(quelle):
-        return "Passwörter und solche Daten merke ich mir bewusst nicht."
+        return "Passwörter und solche Daten merke ich mir bewusst nicht.", None
     satz = "" if eigener_inhalt or len(davor) < 2 else name_aus_antwort(quelle, verlauf[:-2])
     if not satz:
         satz = _modell_json(
@@ -1212,8 +1215,8 @@ def merken(text: str, verlauf: list[dict]) -> str | None:
             "'Der Nutzer heißt Anna.' Lass die Bitte ums Merken weg. Nur was dort steht, nichts dazuerfinden.",
             quelle, "fakt")
     if not satz.lower().startswith("der nutzer") or not 10 < len(satz) < 200:
-        return "Das konnte ich nicht richtig erfassen. Sag es mir am besten als ganzen Satz."
-    return f"Gemerkt: {satz}" if erinnerung_speichern(satz) else f"Das weiß ich schon: {satz}"
+        return "Das konnte ich nicht richtig erfassen. Sag es mir am besten als ganzen Satz.", None
+    return ("Alles klar, ist gemerkt.", satz) if erinnerung_speichern(satz) else ("Das weiß ich schon.", None)
 
 
 # ---------- Gelegentlicher trockener Humor ----------
@@ -1307,7 +1310,7 @@ def chat_stream(frage: Frage):
         return
     # Was der Nutzer meint: bei Folgefragen die vollständige Frage, sonst sein Text. Danach richten sich Suche und Werkzeuge.
     gemeint = frage.text
-    gemerkt = None if (bilder or frage.dokumente) else merken(frage.text, verlauf)
+    gemerkt, neuer_fakt = (None, None) if (bilder or frage.dokumente) else merken(frage.text, verlauf)
     if not gemerkt and not bilder and not frage.dokumente and not dokumente and ist_folgefrage(frage.text, verlauf):
         gemeint = frage_aufloesen(frage.text, verlauf)
     # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
@@ -1316,6 +1319,8 @@ def chat_stream(frage: Frage):
         None if (bilder or frage.dokumente) else (sofort_antwort(gemeint) or humor_spruch(frage.text)))
     if sofort:
         yield ev(typ="token", text=sofort)
+        if neuer_fakt:
+            yield ev(typ="gemerkt", fakt=neuer_fakt)
         if name and name.lower() not in (e["text"].lower() for e in alle_erinnerungen()):
             yield ev(typ="vorschlag", fakten=[name])
         with db() as c:

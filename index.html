@@ -94,12 +94,21 @@
   .schritt span { overflow-wrap:anywhere; min-width:0; }
   .schritt i { margin-left:auto; font-style:normal; color:var(--dim); flex:none; }
   .schritt i.puls::after { content:""; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--fg); animation:blink 1s infinite; }
-  .vorschlag { display:flex; flex-wrap:wrap; gap:8px; align-items:center; border:1px dashed var(--rand); border-radius:12px;
-               padding:8px 12px; margin-top:8px; font-size:13.5px; max-width:100%; }
-  .vorschlag span { flex:1; min-width:0; overflow-wrap:anywhere; }
-  .vorschlag button { border:1px solid var(--rand); background:none; color:var(--fg); border-radius:8px; padding:3px 10px;
-                      cursor:pointer; font:inherit; font-size:12.5px; }
-  .vorschlag button:hover { background:var(--btn); color:var(--btnfg); }
+  /* Merken: sieht bewusst anders aus als normale Nachrichten */
+  .merkkarte { display:flex; flex-direction:column; gap:6px; margin-top:10px; padding:10px 14px; max-width:420px;
+               border:1px solid var(--rand); border-left:3px solid var(--fg); border-radius:10px; background:var(--feld); font-size:14px; }
+  .merkkarte b { font-family:var(--mono); font-size:10px; letter-spacing:.14em; color:var(--dim); font-weight:600; }
+  .merkkarte span { overflow-wrap:anywhere; }
+  .merkkarte.fertig { border-left-color:#34c759; }
+  .merkkarte.fertig b { color:#34c759; }
+  .merkknoepfe { display:flex; gap:8px; margin-top:4px; }
+  .merkknoepfe button { border:1px solid var(--rand); background:none; color:var(--fg); border-radius:8px; padding:4px 12px; cursor:pointer; font:inherit; font-size:13px; }
+  .merkknoepfe button:first-child { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
+  .merkknoepfe button:hover { opacity:.8; }
+  /* i-Zeichen in den Einstellungen: Erklärung nur, wenn man sie lesen will */
+  .info { flex-shrink:0; width:16px; height:16px; padding:0; border:1px solid var(--rand); border-radius:50%; background:none;
+          color:var(--dim); font:600 10px/1 Georgia,serif; cursor:pointer; letter-spacing:0; }
+  .info:hover, .info[aria-expanded="true"] { color:var(--btnfg); background:var(--btn); border-color:var(--btn); }
 
   /* Eingabeleiste */
   #form { max-width:780px; width:100%; margin:0 auto; padding:10px 18px 20px; }
@@ -461,7 +470,10 @@
   senden.addEventListener("click", (e) => {
     if (beschaeftigt) { e.preventDefault(); if (abbruch) abbruch.abort(); }
   });
-  function wachse() { eingabe.style.height = "auto"; eingabe.style.height = Math.min(eingabe.scrollHeight, 180) + "px"; }
+  function wachse() {
+    eingabe.style.height = "auto";
+    if (eingabe.value) eingabe.style.height = Math.min(eingabe.scrollHeight, 180) + "px";  // leer bleibt einzeilig
+  }
   eingabe.addEventListener("input", () => { wachse(); sendeStatus(); });
   eingabe.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
@@ -657,21 +669,55 @@
   }
   document.querySelectorAll("#modus button").forEach((b) => b.addEventListener("click", () => setzeModus(b.dataset.m)));
 
-  function vorschlaege(huelle, fakten) {
-    fakten.forEach((f) => {
-      const d = document.createElement("div"); d.className = "vorschlag";
-      const t = document.createElement("span"); t.textContent = "Soll ich mir merken: „" + f + "“?";
-      const ja = document.createElement("button"); ja.type = "button"; ja.textContent = "Merken";
-      const nein = document.createElement("button"); nein.type = "button"; nein.textContent = "Nein";
-      ja.addEventListener("click", async () => {
-        await fetch("/erinnerungen", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: f }) });
-        d.textContent = "Gespeichert ✓"; setTimeout(() => d.remove(), 1500); ladeErinnerungen(true);
-      });
-      nein.addEventListener("click", () => d.remove());
-      d.append(t, ja, nein); huelle.appendChild(d);
-    });
+  // Merken: Hermes fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
+  const DU_FORM = { "heißt": "heißt", wohnt: "wohnst", lebt: "lebst", studiert: "studierst", hat: "hast", ist: "bist",
+    mag: "magst", spielt: "spielst", arbeitet: "arbeitest", kommt: "kommst", liebt: "liebst", hasst: "hasst",
+    isst: "isst", macht: "machst", geht: "gehst", lernt: "lernst", "fährt": "fährst" };
+  function alsDu(f) {
+    const m = f.match(/^Der Nutzer (\S+)(.*)$/);
+    return m && DU_FORM[m[1]] ? "Du " + DU_FORM[m[1]] + m[2] : f;
+  }
+  let offenerVorschlag = null;  // { fakten, karte }
+  function gemerktKarte(huelle, f) {
+    const d = document.createElement("div"); d.className = "merkkarte fertig";
+    const k = document.createElement("b"); k.textContent = "✓ ERINNERUNG GESPEICHERT";
+    const t = document.createElement("span"); t.textContent = alsDu(f);
+    d.append(k, t); huelle.appendChild(d);
     fenster.scrollTop = fenster.scrollHeight;
   }
+  function vorschlaege(huelle, fakten) {
+    const d = document.createElement("div"); d.className = "merkkarte";
+    const k = document.createElement("b"); k.textContent = "SOLL ICH MIR DAS MERKEN?";
+    d.appendChild(k);
+    fakten.forEach((f) => { const t = document.createElement("span"); t.textContent = alsDu(f); d.appendChild(t); });
+    const knoepfe = document.createElement("div"); knoepfe.className = "merkknoepfe";
+    const ja = document.createElement("button"); ja.type = "button"; ja.textContent = "Ja, merken";
+    const nein = document.createElement("button"); nein.type = "button"; nein.textContent = "Nein";
+    knoepfe.append(ja, nein); d.appendChild(knoepfe); huelle.appendChild(d);
+    const eintrag = { fakten, karte: d };
+    offenerVorschlag = eintrag;
+    ja.addEventListener("click", () => vorschlagBeantworten(eintrag, true));
+    nein.addEventListener("click", () => vorschlagBeantworten(eintrag, false));
+    fenster.scrollTop = fenster.scrollHeight;
+  }
+  // Gibt zurück, was Hermes danach sagt, und schreibt es als normale Nachricht weiter
+  async function vorschlagBeantworten(eintrag, ja) {
+    if (offenerVorschlag === eintrag) offenerVorschlag = null;
+    const huelle = eintrag.karte.parentNode;
+    eintrag.karte.remove();
+    if (!ja) { const a = "Alles klar, dann nicht."; nachricht(a, "bot"); return a; }
+    for (const f of eintrag.fakten) {
+      await fetch("/erinnerungen", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: f }) });
+      if (huelle) gemerktKarte(huelle, f);
+    }
+    ladeErinnerungen(true);
+    const name = eintrag.fakten.map((f) => f.match(/^Der Nutzer heißt (.+?)\.?$/)).find(Boolean);
+    const a = name ? "Alles klar, " + name[1] + ", das weiß ich ab jetzt." : "Alles klar, das weiß ich ab jetzt.";
+    nachricht(a, "bot");
+    return a;
+  }
+  const JA_WORTE = /^\W*(ja|jo|jap|jep|genau|gerne?|klar|bitte|ok(ay)?|mach( das)?( bitte)?|merk( dir das)?( bitte)?|ja,? (bitte|gerne?|merken?|merk dir das|mach das))\W*$/i;
+  const NEIN_WORTE = /^\W*(nein|nö|ne|nee|lass( mal| es)?|nicht nötig|nein,? danke)\W*$/i;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -679,6 +725,17 @@
     const meinePdfs = pdfs.slice();
     const text = eingabe.value.trim() || (meinePdfs.length ? "Fasse das Dokument kurz zusammen." : meineBilder.length ? "Beschreibe, was auf dem Bild zu sehen ist." : "");
     if (!text || beschaeftigt) return;
+    if (offenerVorschlag && (JA_WORTE.test(text) || NEIN_WORTE.test(text)) && !meineBilder.length && !meinePdfs.length) {
+      // "ja" auf die Merken-Frage braucht kein Sprachmodell
+      eingabe.value = ""; wachse(); sendeStatus();
+      nachricht(text, "user");
+      const eintrag = offenerVorschlag;
+      const a = await vorschlagBeantworten(eintrag, JA_WORTE.test(text));
+      if (aktiveKette) aktiveKette.rein(a);
+      if (antwortWarter) { const w = antwortWarter; antwortWarter = null; w(a); }
+      return;
+    }
+    offenerVorschlag = null;  // anderes Thema: die Karte bleibt anklickbar, "ja" meint aber nicht mehr sie
     eingabe.value = "";
     wachse();
     anhang = []; pdfs = []; zeichneVorschau();
@@ -750,7 +807,11 @@
             roh += ev.text; zeige();
             if (aktiveKette) aktiveKette.rein(ev.text);
           } else if (ev.typ === "modus") modusHinweis(ev.text);
-          else if (ev.typ === "vorschlag") vorschlaege(huelle, ev.fakten);
+          else if (ev.typ === "gemerkt") gemerktKarte(huelle, ev.fakt);
+          else if (ev.typ === "vorschlag") {
+            vorschlaege(huelle, ev.fakten);
+            if (aktiveKette) aktiveKette.rein(" Soll ich mir das merken?");
+          }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
           else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); if (aktiveKette) aktiveKette.rein("\n" + ev.text); }
         }
@@ -1521,6 +1582,21 @@
     }
     requestAnimationFrame(zeichne);
   })();
+
+  // Einstellungen: Erklärtexte hinter einem i-Zeichen an der Überschrift
+  document.querySelectorAll(".einst section").forEach((abschnitt) => {
+    const text = abschnitt.querySelector(".hinweis"), titel = abschnitt.querySelector(".abschnitt");
+    if (!text || !titel) return;
+    const knopf = document.createElement("button");
+    knopf.type = "button"; knopf.className = "info"; knopf.textContent = "i";
+    knopf.setAttribute("aria-label", "Erklärung anzeigen"); knopf.setAttribute("aria-expanded", "false");
+    text.hidden = true;
+    knopf.addEventListener("click", () => {
+      text.hidden = !text.hidden;
+      knopf.setAttribute("aria-expanded", String(!text.hidden));
+    });
+    titel.appendChild(knopf);
+  });
 
   // ---------- Start ----------
   let gespeichert = "dunkel";
