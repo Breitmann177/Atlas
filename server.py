@@ -1154,7 +1154,7 @@ def _modell_json(system: str, nutzer: str, feld: str) -> str:
 
 
 VERWEIS_AM_ENDE = re.compile(r"\b(der|die|das|den|dem|er|sie|ihm|ihn|ihr|dort|da)\b(?=\W*$)", re.I)
-VERWEIS = re.compile(r"\b(er|sie|ihm|ihn|dort|dessen|deren)\b", re.I)
+VERWEIS = re.compile(r"\b(er|sie|ihm|ihn|dort|da|dabei|damals|davon|dazu|dessen|deren)\b", re.I)
 
 
 def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
@@ -1198,6 +1198,8 @@ def frage_aufloesen(text: str, verlauf: list[dict]) -> str:
     rest = rest[:1].upper() + rest[1:]
     if VERWEIS_AM_ENDE.search(rest):
         return VERWEIS_AM_ENDE.sub(thema, rest)
+    # "Wurde da etwas geklaut" + Thema: Das Verweiswort würde die Suche nur stören
+    rest = re.sub(r"\s+", " ", re.sub(r"\b(da|dort|dabei|damals|davon|dazu)\b", "", rest, flags=re.I)).strip()
     return f"{rest.rstrip(' ?.!')} {thema}?"
 
 
