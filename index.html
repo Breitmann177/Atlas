@@ -80,7 +80,8 @@
   .modus button { background:var(--feld); border:1px solid var(--rand); color:var(--dim); padding:6px 16px;
                   font:inherit; cursor:pointer; transition:.2s; }
   .modus button:first-of-type { border-radius:999px 0 0 999px; }
-  .modus button:nth-of-type(2) { border-radius:0 999px 999px 0; border-left:0; }
+  .modus button:nth-of-type(n+2) { border-left:0; }
+  .modus button:last-of-type { border-radius:0 999px 999px 0; }
   .modus button:hover:not(.aktiv) { color:var(--fg); }
   .modus button.aktiv { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
   #modushinweis { color:var(--dim); margin-left:6px; letter-spacing:.04em; }
@@ -321,7 +322,7 @@
 </main>
 
 <form id="form" autocomplete="off">
-  <div class="modus" id="modus"><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span></div>
+  <div class="modus" id="modus"><button type="button" data-m="auto">AUTO</button><button type="button" data-m="schnell">SCHNELL</button><button type="button" data-m="gruendlich">GRÜNDLICH</button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span></div>
   <div id="vorschau" hidden></div>
   <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
@@ -635,9 +636,13 @@
   }
 
   // ---------- Modus ----------
-  let modus = "schnell", modiInfo = null;
-  try { if (localStorage.getItem("hermes-modus") === "gruendlich") modus = "gruendlich"; } catch (e) {}
-  function modusHinweis() {
+  let modus = "auto", modiInfo = null;
+  try { const m = localStorage.getItem("hermes-modus2"); if (m === "schnell" || m === "gruendlich") modus = m; } catch (e) {}
+  function modusHinweis(gewaehlt) {
+    if (modus === "auto") {
+      document.getElementById("modushinweis").textContent = gewaehlt ? "gewählt: " + gewaehlt : "wählt selbst";
+      return;
+    }
     const i = modiInfo && modiInfo[modus];
     document.getElementById("modushinweis").textContent = !i ? "" : i.da
       ? i.name + (modus === "gruendlich" ? " · denkt länger" : "")
@@ -645,7 +650,7 @@
   }
   function setzeModus(m) {
     modus = m;
-    try { localStorage.setItem("hermes-modus", m); } catch (e) {}
+    try { localStorage.setItem("hermes-modus2", m); } catch (e) {}
     document.querySelectorAll("#modus button").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
     modusHinweis();
   }
@@ -740,9 +745,11 @@
           } else if (ev.typ === "token") {
             inhalt.classList.remove("typing"); window.hermesDenkt = false; window.hermesSucht = false;
             roh += ev.text; zeige();
-          } else if (ev.typ === "vorschlag") vorschlaege(huelle, ev.fakten);
+            if (aktiveKette) aktiveKette.rein(ev.text);
+          } else if (ev.typ === "modus") modusHinweis(ev.text);
+          else if (ev.typ === "vorschlag") vorschlaege(huelle, ev.fakten);
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
-          else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); }
+          else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; zeige(); if (aktiveKette) aktiveKette.rein("\n" + ev.text); }
         }
         fenster.scrollTop = fenster.scrollHeight;
       }
@@ -920,8 +927,7 @@
     } catch (e) { return ""; }
   }
 
-  // Vorlesen: der Server streamt die ganze Antwort als eine Aufnahme. Der Browser spielt schon ab,
-  // während der Rest noch ankommt: keine Pausen zwischen Sätzen, eine Stimme von Anfang bis Ende.
+  // Vorlesen: der Server streamt jeden Text als Aufnahme, der Browser spielt schon ab, während der Rest noch ankommt.
   async function holeAudio(text) {
     try {
       const res = await fetch("/tts", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -929,9 +935,9 @@
       return res.ok ? (await res.json()).url : null;
     } catch (e) { return null; }
   }
-  function abspielen(url) {
+  function abspielen(quelle) {  // URL oder schon vorgeladenes Audio
     return new Promise((fertig) => {
-      sprecher = new Audio(url); window.hermesSpricht = true;
+      sprecher = typeof quelle === "string" ? new Audio(quelle) : quelle; window.hermesSpricht = true;
       sprecher.onended = sprecher.onerror = sprecher.onpause = fertig;
       sprecher.play().catch(fertig);
     }).finally(() => {
@@ -942,6 +948,47 @@
   async function sagen(text, lauf) {
     const url = await holeAudio(text);
     if (url && lauf === lauschLauf) await abspielen(url);
+  }
+
+  // Live: Hermes fängt schon an zu sprechen, während die Antwort noch entsteht. Der erste Satz geht sofort los,
+  // danach werden die Sätze zu längeren Stücken gebündelt und vorgeladen, damit zwischen ihnen keine Lücke entsteht.
+  let aktiveKette = null;
+  function satzGrenze(t, min) {
+    const muster = /[.!?…]+["“”)]*\s+(?=\S)|\n+(?=\S)/g;
+    let x;
+    while ((x = muster.exec(t))) {
+      const ende = x.index + x[0].length;
+      if (ende < min) continue;
+      // "am 1. November", "z. B.", "Dr. Müller" sind kein Satzende
+      if (t[x.index] === "." && /(^|\s)(\d+|\p{L}{1,2}|usw|bzw|ca|etc|Nr|Dr|Prof|bspw)$/u.test(t.slice(0, x.index))) continue;
+      return ende;
+    }
+    return -1;
+  }
+  function sprechKette(lauf) {
+    let puffer = "", stumm = false, erster = true, kette = Promise.resolve();
+    const raus = (text) => {
+      if (!text.trim()) return;
+      const ton = holeAudio(text).then((url) => (url && lauf === lauschLauf ? new Audio(url) : null));
+      kette = kette.then(async () => {
+        const audio = await ton;
+        if (audio && lauf === lauschLauf) await abspielen(audio);
+      });
+    };
+    return {
+      rein(t) {
+        if (stumm) return;
+        puffer += t;
+        const q = puffer.indexOf("\n---");  // die Quellenliste wird nicht vorgelesen
+        if (q >= 0) { puffer = puffer.slice(0, q); stumm = true; }
+        if ((puffer.match(/```/g) || []).length % 2) return;  // Codeblock noch offen: abwarten
+        let g;
+        while ((g = satzGrenze(puffer, erster ? 15 : 120)) >= 0) {
+          raus(puffer.slice(0, g)); puffer = puffer.slice(g); erster = false;
+        }
+      },
+      async ende() { raus(puffer); puffer = ""; stumm = true; await kette; },
+    };
   }
 
   // Stimmenauswahl (Einstellungen)
@@ -1011,6 +1058,7 @@
       if (beschaeftigt) { fertig(""); return; }
       antwortWarter = fertig;
       eingabe.value = text;
+      eingabe.dispatchEvent(new Event("input"));  // wie beim Tippen: sonst bleibt das Feld nach dem Senden riesig
       form.requestSubmit();
     });
   }
@@ -1042,10 +1090,14 @@
       leer = 0;
       if (ENDE.test(frage)) { await sagen("Alles klar.", lauf); break; }
       platzhalter("Live · Denkt nach ...");
-      const antwort = await liveFragen(frage);
+      const kette = sprechKette(lauf);
+      aktiveKette = kette;
+      await liveFragen(frage);
+      aktiveKette = null;
       frage = "";
       if (!liveAn || lauf !== lauschLauf) break;
-      if (antwort) { platzhalter("Live · Spricht ..."); await sagen(antwort, lauf); }
+      platzhalter("Live · Spricht ...");
+      await kette.ende();
     }
     if (lauf === lauschLauf) liveBeenden();
   }

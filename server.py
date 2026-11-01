@@ -412,6 +412,7 @@ async def _online_strom(text: str, stimme: tuple[str, str, str]):
 # GET /tts/{id} liefert das Audio als Stream. So kann der Browser schon abspielen, während der Rest noch kommt:
 # keine Pause nach dem ersten Satz und eine einzige Stimme für die ganze Antwort.
 _tts_auftraege: dict[str, tuple[str, str, float]] = {}
+_online_pause_bis = 0.0
 
 
 @app.post("/tts")
@@ -447,7 +448,8 @@ async def tts_stream(tid: str):
             print("ElevenLabs nicht erreichbar, nehme Florian:", repr(e), flush=True)
 
     online = STIMMEN.get(wahl, STIMMEN[STANDARD_STIMME])
-    if online and STIMME_ONLINE.lower() != "aus":
+    global _online_pause_bis
+    if online and STIMME_ONLINE.lower() != "aus" and time.time() >= _online_pause_bis:
         # Auf das erste Audio-Stück warten (mit einem zweiten Versuch), erst dann zusagen. Bricht der Dienst
         # danach ab, endet der Ton einfach früher; er springt nie mitten in der Antwort auf eine andere Stimme.
         for versuch in range(2):
@@ -469,6 +471,8 @@ async def tts_stream(tid: str):
 
             return StreamingResponse(weiter(), media_type="audio/mpeg")
         print("Online-Stimme nicht erreichbar, nehme die lokale Stimme", flush=True)
+        # Im Live-Modus kommt jeder Satz einzeln: nicht bei jedem Satz neu probieren und zwischen Stimmen springen
+        _online_pause_bis = time.time() + 60
 
     def erzeugen():
         puffer = io.BytesIO()
@@ -573,7 +577,7 @@ MAX_DOK_ZEICHEN = 9000  # gesamt; bei num_ctx 8192 muss neben dem Dokument noch 
 class Frage(BaseModel):
     text: str
     chat_id: int | None = None
-    modus: str = "schnell"
+    modus: str = "auto"  # auto, schnell oder gruendlich
     dokumente: list[Dokument] = []  # aus /pdf-lesen: gelesener Text angehängter PDFs
     bilder: list[str] = []  # base64 (mit oder ohne "data:image/...;base64,"-Anfang)
     live: bool = False  # Live-Sprachmodus: Antwort wird vorgelesen, also kurz und ohne Markdown
@@ -973,6 +977,11 @@ def briefing_daten(messages: list[dict], mit_wetter: bool):
     yield ev(typ="status", text="denkt nach")
 
 
+# Auto-Modus: Bei solchen Fragen lohnt sich das Nachdenken
+KOMPLEX = re.compile(r"\b(erklär\w*|erkläre\w*|warum|wieso|weshalb|vergleich\w*|unterschied\w*|analysier\w*|begründ\w*|"
+                     r"vor- und nachteile|beweis\w*|schritt für schritt|plan\w*|programmier\w*|code|fehler|berechne\w*)\b", re.I)
+
+
 def chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
@@ -1047,11 +1056,13 @@ def chat_stream(frage: Frage):
             yield from briefing_daten(messages, mit_wetter=briefing)
             werkzeug, eingabe = "keins", ""
         else:
-            werkzeug, eingabe = ("keins", "") if (anhang or smalltalk) else werkzeug_waehlen(
-                frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
-        # Wetterfragen nie dem Router überlassen: sonst landet er manchmal bei der Websuche und zufälligen Seiten
-        if not anhang and WETTER.search(frage.text):
-            werkzeug, eingabe = "wetter", ort_aus_text(frage.text)
+            # Wetterfragen nie dem Router überlassen: sonst landet er manchmal bei der Websuche und zufälligen Seiten
+            if not anhang and WETTER.search(frage.text):
+                werkzeug, eingabe = "wetter", ort_aus_text(frage.text)
+            elif anhang or smalltalk:
+                werkzeug, eingabe = "keins", ""
+            else:
+                werkzeug, eingabe = werkzeug_waehlen(frage.text, HILFSMODELL, verlauf, [d["name"] for d in dokumente])
         if werkzeug == "rechnen" and "heute" in eingabe:
             eingabe = eingabe.replace("heute", datetime.now().strftime("%d.%m.%Y"))
         if werkzeug == "wetter":
@@ -1115,10 +1126,16 @@ def chat_stream(frage: Frage):
         elif frage.live:
             messages[0]["content"] += "\n\n" + LIVE_PROMPT
         # Bei Dokumenten erst nachdenken lassen: dauert länger, aber das kleine Modell verwechselt sonst Zeilen
-        # und Daten. Bei Suchergebnissen nicht: der lange Kontext macht das Denken auf der CPU minutenlang.
-        # Im Live-Modus zählt Tempo, da bleibt es ebenfalls aus.
+        # und Daten. Im Live-Modus zählt Tempo, da bleibt es aus.
         if dokumente and not frage.live:
             modus = {**modus, "think": True}
+        if frage.modus == "auto":
+            # Gemessen auf der RTX 5070: klein ~2 s, klein mit Nachdenken 5-7 s, groß 28-58 s.
+            # Deshalb kommt das große Modell nur bei Bildern zum Einsatz (das kleine kann keine).
+            if not bilder and not frage.live and not smalltalk and not news and not briefing and (
+                    quellen or KOMPLEX.search(frage.text) or len(frage.text) > 200):
+                modus = {**modus, "think": True}
+            yield ev(typ="modus", text="großes Modell" if bilder else "denkt nach" if modus["think"] else "schnell")
         letztes_denken = 0.0
         # Beim PDF-Wunsch nicht filtern: dort ist der Text ein Dokument, keine Gesprächsantwort
         filter_ = None if pdf_modus else FloskelFilter()
