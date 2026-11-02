@@ -233,7 +233,21 @@ EINHEITEN = {
     "Zeit": {"Sekunden": 1, "Minuten": 60, "Stunden": 3600, "Tage": 86400, "Wochen": 604800},
     "Daten": {"Byte": 1, "Kilobyte": 1e3, "Megabyte": 1e6, "Gigabyte": 1e9, "Terabyte": 1e12},
 }
-WAEHRUNGEN = {"EUR": "Euro", "USD": "US-Dollar", "GBP": "Britische Pfund", "CHF": "Schweizer Franken", "TRY": "Türkische Lira", "JPY": "Yen"}
+# Code: (Anzeige, Adjektiv ohne Endung oder leer, Hauptwörter)
+_WAEHRUNG_NAMEN = {
+    "EUR": ("Euro", "", ["euro", "euros", "eur", "€"]), "USD": ("US-Dollar", "amerikanisch", ["dollar", "dollars", "usd", "$"]), "GBP": ("Britische Pfund", "britisch", ["pfund", "gbp", "£"]),
+    "CHF": ("Schweizer Franken", "", ["franken", "chf", "schweizer franken"]), "TRY": ("Türkische Lira", "türkisch", ["lira", "liras", "tl", "try"]),
+    "JPY": ("Japanische Yen", "japanisch", ["yen", "jpy"]), "CAD": ("Kanadische Dollar", "kanadisch", ["dollar", "cad"]), "AUD": ("Australische Dollar", "australisch", ["dollar", "aud"]),
+    "NZD": ("Neuseeland-Dollar", "neuseeländisch", ["dollar", "nzd"]), "HKD": ("Hongkong-Dollar", "", ["hongkong-dollar", "hkd"]), "SGD": ("Singapur-Dollar", "", ["singapur-dollar", "sgd"]),
+    "SEK": ("Schwedische Kronen", "schwedisch", ["kronen", "krone", "sek"]), "NOK": ("Norwegische Kronen", "norwegisch", ["kronen", "krone", "nok"]),
+    "DKK": ("Dänische Kronen", "dänisch", ["kronen", "krone", "dkk"]), "CZK": ("Tschechische Kronen", "tschechisch", ["kronen", "krone", "czk"]),
+    "ISK": ("Isländische Kronen", "isländisch", ["kronen", "krone", "isk"]), "PLN": ("Polnische Złoty", "polnisch", ["zloty", "złoty", "pln"]), "HUF": ("Ungarische Forint", "ungarisch", ["forint", "huf"]),
+    "RON": ("Rumänische Leu", "rumänisch", ["leu", "ron"]), "INR": ("Indische Rupien", "indisch", ["rupien", "rupie", "inr"]), "IDR": ("Indonesische Rupiah", "indonesisch", ["rupiah", "idr"]),
+    "CNY": ("Chinesische Yuan", "chinesisch", ["yuan", "renminbi", "cny"]), "KRW": ("Südkoreanische Won", "südkoreanisch", ["won", "krw"]), "MXN": ("Mexikanische Pesos", "mexikanisch", ["pesos", "peso", "mxn"]),
+    "PHP": ("Philippinische Pesos", "philippinisch", ["pesos", "peso", "php"]), "BRL": ("Brasilianische Real", "brasilianisch", ["real", "brl"]), "ZAR": ("Südafrikanische Rand", "südafrikanisch", ["rand", "zar"]),
+    "THB": ("Thailändische Baht", "thailändisch", ["baht", "thb"]), "ILS": ("Israelische Schekel", "israelisch", ["schekel", "ils"]), "MYR": ("Malaysische Ringgit", "malaysisch", ["ringgit", "myr"]),
+}
+WAEHRUNGEN = {code: werte[0] for code, werte in _WAEHRUNG_NAMEN.items()}
 NAMEN = {
     "km": "Kilometer", "kilometer": "Kilometer", "m": "Meter", "meter": "Meter", "cm": "Zentimeter", "zentimeter": "Zentimeter", "mm": "Millimeter",
     "millimeter": "Millimeter", "meile": "Meilen", "meilen": "Meilen", "miles": "Meilen", "yard": "Yard", "fuß": "Fuß", "fuss": "Fuß", "feet": "Fuß", "ft": "Fuß",
@@ -246,9 +260,13 @@ NAMEN = {
     "stunden": "Stunden", "tag": "Tage", "tage": "Tage", "tagen": "Tage", "woche": "Wochen", "wochen": "Wochen", "byte": "Byte", "kb": "Kilobyte", "kilobyte": "Kilobyte",
     "mb": "Megabyte", "megabyte": "Megabyte", "gb": "Gigabyte", "gigabyte": "Gigabyte", "tb": "Terabyte", "terabyte": "Terabyte",
     "°c": "Celsius", "grad celsius": "Celsius", "celsius": "Celsius", "°f": "Fahrenheit", "grad fahrenheit": "Fahrenheit", "fahrenheit": "Fahrenheit", "kelvin": "Kelvin",
-    "euro": "EUR", "eur": "EUR", "€": "EUR", "dollar": "USD", "us-dollar": "USD", "usd": "USD", "$": "USD", "pfund": "GBP", "gbp": "GBP", "£": "GBP", "pfund sterling": "GBP",
-    "franken": "CHF", "chf": "CHF", "lira": "TRY", "tl": "TRY", "try": "TRY", "yen": "JPY", "jpy": "JPY",
 }
+for _code, (_, _adjektiv, _woerter) in reversed(_WAEHRUNG_NAMEN.items()):  # reversed: Bei "dollar" und "krone" gewinnt die erste, also USD
+    for _wort in _woerter:
+        NAMEN[_wort] = _code
+        if _adjektiv:  # "türkische lira", "türkischen lira", "türkischer lira", "türkisch lira"
+            NAMEN.update({f"{_adjektiv}{_endung} {_wort}": _code for _endung in ("", "e", "en", "er")})
+NAMEN.update({"us dollar": "USD", "us-dollar": "USD", "pfund sterling": "GBP"})
 _MUSTER_EINHEIT = "|".join(sorted((re.escape(n) for n in NAMEN), key=len, reverse=True))
 UMRECHNUNG = re.compile(rf"(?<![\w.,])(\d+(?:[.,]\d+)?)\s*({_MUSTER_EINHEIT})(?![\w²/])\s+(?:in|nach|zu|auf)\s+({_MUSTER_EINHEIT})(?![\w²/])", re.I)
 UMRECHNUNG_FRAGE = re.compile(rf"\bwie ?viel\w*\s+({_MUSTER_EINHEIT})\s+(?:sind|ist|entsprechen|entspricht|ergeben|ergibt)\s+(\d+(?:[.,]\d+)?)\s*({_MUSTER_EINHEIT})(?![\w²/])", re.I)
@@ -335,7 +353,12 @@ def _ort_daten(name: str) -> dict | None:
     if not f:
         return None
     p = {k: v.strip(" .,") if isinstance(v, str) else v for k, v in f[0]["properties"].items()}
-    teile = [p.get("name"), p.get("city") if p.get("city") != p.get("name") else None, p.get("state") if not p.get("city") else None,
+    # Mit Hausnummer gefragt oder ohne Namen: Die Adresse zählt, sonst stünde dort die Firma im Haus. Sonst der Name ("TechCampus")
+    haus = f"{p['street']} {p['housenumber']}" if p.get("street") and p.get("housenumber") else ""
+    if not (re.search(r"\d", name) or not p.get("name")):
+        haus = ""
+    titel = haus or p.get("name") or p.get("street") or ""
+    teile = [titel, p.get("city") if p.get("city") != titel else None, p.get("state") if not p.get("city") else None,
              p.get("country") if p.get("country") not in (None, "Deutschland") else None]
     voll = ", ".join(t for t in teile if t)
     # Photon liefert auch zu Unsinn irgendeinen Treffer: Das längste Wort der Eingabe muss im Ergebnis vorkommen
@@ -343,7 +366,7 @@ def _ort_daten(name: str) -> dict | None:
     if wichtig not in voll.lower():
         return None
     lon, lat = f[0]["geometry"]["coordinates"]
-    return {"name": voll, "kurz": p.get("name") or name, "lat": lat, "lon": lon}
+    return {"name": voll, "kurz": f"{haus}, {p['city']}" if haus and p.get("city") else titel or name, "lat": lat, "lon": lon}
 
 
 def route(start: str, ziel: str) -> dict:

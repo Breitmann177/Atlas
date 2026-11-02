@@ -210,6 +210,12 @@ for text, soll in {"hermes wie lange dauert der weg von freiburg bis heilbronn t
                    "kannst du mir sagen wie lange der weg von freiburg bis heilbronn dauert?": ("freiburg", "heilbronn"),
                    "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom")}.items():
     pruefe(f"Route: {text}", server.route_orte(text, []), soll)
+for text, von, nach in [("wie viel ist 50 Euro in Türkische lira", "euro", "türkische lira"), ("100 euro in türkischen lira", "euro", "türkischen lira"),
+                        ("20 Schweizer Franken in Euro", "schweizer franken", "euro"), ("5000 Yen nach Euro", "yen", "euro"), ("10 kanadische Dollar in Euro", "kanadische dollar", "euro")]:
+    m = server.werkzeuge.UMRECHNUNG.search(text)
+    pruefe(f"Währung erkannt: {text}", bool(m) and (m.group(2).lower(), m.group(3).lower()), (von, nach))
+pruefe("Dollar heißt US-Dollar", server.werkzeuge.NAMEN["dollar"], "USD")
+pruefe("Kanadische Dollar", server.werkzeuge.NAMEN["kanadische dollar"], "CAD")
 pruefe("Umrechner öffnen", bool(server.werkzeuge.umrechnung_erkennen("Zeig mir den Umrechner")), True)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
