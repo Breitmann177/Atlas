@@ -363,7 +363,7 @@ def _ort_daten(name: str) -> dict | None:
     voll = ", ".join(t for t in teile if t)
     # Photon liefert auch zu Unsinn irgendeinen Treffer: Das längste Wort der Eingabe muss im Ergebnis vorkommen
     wichtig = max(re.findall(r"[\wäöüß-]{2,}", name.lower()) or [""], key=len)
-    if wichtig not in voll.lower():
+    if not re.search(rf"\b{re.escape(wichtig)}\b", voll.lower()):  # als ganzes Wort: "Eile" ist nicht "Eilean Siar"
         return None
     lon, lat = f[0]["geometry"]["coordinates"]
     return {"name": voll, "kurz": f"{haus}, {p['city']}" if haus and p.get("city") else titel or name, "lat": lat, "lon": lon}

@@ -1259,6 +1259,9 @@ def ist_folgefrage(text: str, verlauf: list[dict]) -> bool:
     return bool(FOLGEFRAGE.search(text)) or kurze_frage
 
 
+MODELL_START_SEKUNDEN = 120
+
+
 def _modell_json(system: str, nutzer: str, feld: str) -> str:
     """Kurze JSON-Antwort vom Modell; leer bei jedem Fehler."""
     try:
@@ -1270,7 +1273,7 @@ def _modell_json(system: str, nutzer: str, feld: str) -> str:
                 "format": {"type": "object", "properties": {feld: {"type": "string"}}, "required": [feld]},
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": nutzer}],
             },
-            timeout=30,
+            timeout=MODELL_START_SEKUNDEN,
         )
         return (json.loads(r.json()["message"]["content"]).get(feld) or "").strip()
     except Exception:
@@ -1318,7 +1321,7 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
                 "messages": [{"role": "system", "content": ANALYSE_PROMPT},
                              {"role": "user", "content": f"Bisheriges Gespräch:\n{kontext or '(leer)'}\n\nLetzte Nachricht: {frage}"}],
             },
-            timeout=30,
+            timeout=MODELL_START_SEKUNDEN,  # nach einem Neustart muss das Modell erst laden: Sonst fiele die Analyse aus
         )
         j = json.loads(r.json()["message"]["content"])
         art, anfrage = j.get("art", ""), re.sub(r"\s+", " ", j.get("suchanfrage") or "").strip(" ?!.,")[:200]
@@ -1336,7 +1339,7 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     if art in ("gespraech", "aufgabe") and direkte_suche(frage, []) and len(FUELLWOERTER.sub("", frage).split()) >= 3:
         art = "internet"
     # Gerechnet wird nur die Fahrt mit dem Auto. Flug, Zug und Fahrrad muss die Suche beantworten
-    if art == "route" and re.search(r"\b(flug\w*|fliegen|fliegt|flieger|zug|züge|bahn|bus|fahrrad|rad|e-bike|zu fuß|laufen|wandern|schiff|fähre)\b", frage, re.I):
+    if art == "route" and re.search(r"\b(flug(?!hafen)\w*|fliegen|fliegt|flieger|zug|züge|bahn|bus|fahrrad|rad|e-bike|zu fuß|laufen|wandern|schiff|fähre)\b", frage, re.I):
         art = "internet"
     # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Hermes ist nicht der Assistent
     if art == "hermes" and re.search(r"griech|mytholog|\bgott\b|götter|olymp|\bpaket|sendung|tasche", frage, re.I):
@@ -1360,7 +1363,9 @@ ROUTE_PROMPT = ("Nenne Start und Ziel der gefragten Strecke im Format 'Start | Z
 
 
 ROUTE_HIER = re.compile(r"^(hier|hier aus|zu ?hause|zu ?hause aus|daheim|mir|mir aus|mir zu ?hause|meinem zuhause|meinem standort)$", re.I)
-WOHNE_IN = re.compile(r"\b[Ii]ch (wohne|lebe|bin(?: gerade)?) in ([^\W\d_][\w-]*(?: (?:am |an der |im )?[A-ZÄÖÜ][\w-]*)?)")
+# "Ich bin gerade im Techcampus Heilbronn wie lange ...": Der Ort endet vor dem nächsten Satzteil
+WOHNE_IN = re.compile(r"\b(?:ich |wir )?(wohne|wohnen|lebe|leben|bin|sind|stehe|stehen|sitze|sitzen)(?: gerade| grad| hier| jetzt| momentan)* "
+                      r"(?:in|im|am|an der|auf dem|bei der|bei|beim)\s+(.+?)(?=\s*[,.?!]|\s+(?:und|aber|wie|was|wann|wo)\b|\s*$)", re.I)
 ROUTE_ENDE = r"(?:\s+(?:mit dem auto|mit auto|per auto|fahren|fährt|dauert|braucht?|brauche|entfernt|sind|ist))*\W*$"
 ROUTE_VON_NACH = re.compile(rf"\bvon\s+(.+?)\s+(?:nach|bis zum|bis zur|bis nach|bis|zum|zur|zu)\s+(.+?){ROUTE_ENDE}", re.I)
 ROUTE_ENTFERNT = re.compile(r"\b(?:ist|liegt)\s+(.+?)\s+von\s+(.+?)\s+entfernt\b", re.I)
@@ -1386,7 +1391,7 @@ def route_orte(text: str, verlauf: list[dict]) -> tuple[str, str]:
     elif (m := ROUTE_NUR_ZIEL.search(satz)):
         ziel = m.group(1)
     if ziel:
-        start, ziel = start.strip(" .,?!"), ziel.strip(" .,?!")
+        start, ziel = start.split(",")[0].strip(" .?!"), ziel.split(",")[0].strip(" .?!")
         return (eigener_ort if not start or ROUTE_HIER.match(start) else start), ziel
     kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
     teile = _modell_json(ROUTE_PROMPT, f"Gespräch:\n{kontext or '(leer)'}\n\nLetzte Nachricht: {text}", "route").split("|")
@@ -1395,7 +1400,7 @@ def route_orte(text: str, verlauf: list[dict]) -> tuple[str, str]:
     quelle = (text + " " + kontext).lower()
     start, ziel = (t.strip(" .,?!") for t in teile)
     gesichert = lambda o: o if o and all(w in quelle for w in re.findall(r"[\wäöüß-]{3,}", o.lower())) else ""
-    return gesichert(start), gesichert(ziel)
+    return eigener_ort or gesichert(start), gesichert(ziel)
 
 
 def route_antwort(r: dict) -> str:
@@ -1824,7 +1829,7 @@ def chat_stream(frage: Frage):
                         yield ev(typ="route", **strecke)
                         yield ev(typ="token", text=text)
                         wohnt = WOHNE_IN.search(frage.text)
-                        if wohnt and not wohnt.group(1).startswith("bin") and not wohnort():
+                        if wohnt and wohnt.group(1).lower() in ("wohne", "wohnen", "lebe", "leben") and not wohnort():
                             ort = wohnt.group(2)
                             yield ev(typ="vorschlag", fakten=[f"Der Nutzer wohnt in {ort[0].upper() + ort[1:]}."])
                         with db() as c:
