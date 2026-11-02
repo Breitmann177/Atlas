@@ -992,7 +992,9 @@
       }
     } catch (fehler) {
       if (fehler && fehler.name === "AbortError") gestoppt = true;
-      else if (!roh) roh = "Fehler: Läuft Ollama?";
+      // Ollama-Fehler meldet der Server selbst. Hier ist der Server gar nicht erreichbar oder hat abgelehnt.
+      else if (!roh) roh = fehler && fehler.message === "Serverfehler" ? "Der Hermes-Server hat die Anfrage abgelehnt. Bitte laden Sie die Seite neu."
+        : "Der Hermes-Server ist nicht erreichbar. Bitte starten Sie ihn über „Hermes starten“ im Ordner „Hermes Box“ auf dem Desktop.";
     }
     abbruch = null;
     if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";

@@ -1359,6 +1359,8 @@ ROUTE_PROMPT = ("Nenne Start und Ziel der gefragten Strecke im Format 'Start | Z
                 "Fehlt der Start, lass ihn leer: ' | Bonn'. Erfinde keine Orte.")
 
 
+ROUTE_HIER = re.compile(r"^(hier|hier aus|zu ?hause|zu ?hause aus|daheim|mir|mir aus|mir zu ?hause|meinem zuhause|meinem standort)$", re.I)
+WOHNE_IN = re.compile(r"\b[Ii]ch (wohne|lebe|bin(?: gerade)?) in ([^\W\d_][\w-]*(?: (?:am |an der |im )?[A-ZÄÖÜ][\w-]*)?)")
 ROUTE_ENDE = r"(?:\s+(?:mit dem auto|mit auto|per auto|fahren|fährt|dauert|braucht?|brauche|entfernt|sind|ist))*\W*$"
 ROUTE_VON_NACH = re.compile(rf"\bvon\s+(.+?)\s+(?:nach|bis zum|bis zur|bis nach|bis|zum|zur|zu)\s+(.+?){ROUTE_ENDE}", re.I)
 ROUTE_ENTFERNT = re.compile(r"\b(?:ist|liegt)\s+(.+?)\s+von\s+(.+?)\s+entfernt\b", re.I)
@@ -1369,15 +1371,23 @@ def route_orte(text: str, verlauf: list[dict]) -> tuple[str, str]:
     """Start und Ziel. "Von X nach Y" liest der Code: Das Modell ließ Köln weg und erfand Zusätze. Es hilft nur noch bei Bezügen
     wie "die Fahrt". Ein Ort zählt nur, wenn seine Wörter wirklich in der Frage oder im Gespräch vorkommen."""
     satz = ANREDE.sub("", text)
+    # "... nach Berlin? Ich wohne in Freiburg": Der Wohnort ist der Start, das Ziel endet mit dem Satz
+    wohne = WOHNE_IN.search(satz)
+    eigener_ort = wohne.group(2) if wohne else ""
+    satz = WOHNE_IN.sub("", satz)
+    saetze = [t for t in re.split(r"(?<=[?!.])\s+", satz) if t.strip(" .,?!")]
+    satz = next((t for t in saetze if re.search(r"\b(von|nach|zum|zur|entfernt)\b", t, re.I)), satz)
+    start, ziel = "", ""
     m = ROUTE_VON_NACH.search(satz)
     if m:
-        return m.group(1).strip(" .,?!"), m.group(2).strip(" .,?!")
-    m = ROUTE_ENTFERNT.search(satz)
-    if m:
-        return m.group(2).strip(" .,?!"), m.group(1).strip(" .,?!")
-    m = ROUTE_NUR_ZIEL.search(satz)
-    if m:
-        return "", m.group(1).strip(" .,?!")
+        start, ziel = m.group(1), m.group(2)
+    elif (m := ROUTE_ENTFERNT.search(satz)):
+        start, ziel = m.group(2), m.group(1)
+    elif (m := ROUTE_NUR_ZIEL.search(satz)):
+        ziel = m.group(1)
+    if ziel:
+        start, ziel = start.strip(" .,?!"), ziel.strip(" .,?!")
+        return (eigener_ort if not start or ROUTE_HIER.match(start) else start), ziel
     kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
     teile = _modell_json(ROUTE_PROMPT, f"Gespräch:\n{kontext or '(leer)'}\n\nLetzte Nachricht: {text}", "route").split("|")
     if len(teile) != 2:
@@ -1813,6 +1823,10 @@ def chat_stream(frage: Frage):
                         text = route_antwort(strecke)
                         yield ev(typ="route", **strecke)
                         yield ev(typ="token", text=text)
+                        wohnt = WOHNE_IN.search(frage.text)
+                        if wohnt and not wohnt.group(1).startswith("bin") and not wohnort():
+                            ort = wohnt.group(2)
+                            yield ev(typ="vorschlag", fakten=[f"Der Nutzer wohnt in {ort[0].upper() + ort[1:]}."])
                         with db() as c:
                             c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "assistant", text))
                         yield ev(typ="fertig")

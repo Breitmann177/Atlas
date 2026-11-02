@@ -208,7 +208,10 @@ for text, soll in {"hermes wie lange dauert der weg von freiburg bis heilbronn t
                    "wie lange von stuttgart hauptbahnhof zum flughafen frankfurt": ("stuttgart hauptbahnhof", "flughafen frankfurt"),
                    "Wie lange brauche ich mit dem Auto von Ulm nach Augsburg?": ("Ulm", "Augsburg"), "wie lange von ulm nach augsburg mit dem auto": ("ulm", "augsburg"),
                    "kannst du mir sagen wie lange der weg von freiburg bis heilbronn dauert?": ("freiburg", "heilbronn"),
-                   "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom")}.items():
+                   "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom"),
+                   "hermes wie weit ist es von hier nach berlin? ich wohne in freiburg": ("freiburg", "berlin"), "Ich wohne in Ulm. Wie weit ist es nach Berlin?": ("Ulm", "Berlin"),
+                   "Wie weit ist es von zuhause nach München?": ("", "München"), "wie lange von hier bis stuttgart": ("", "stuttgart"),
+                   "Ich wohne in Ulm. Wie lange von Köln nach Bonn?": ("Köln", "Bonn")}.items():
     pruefe(f"Route: {text}", server.route_orte(text, []), soll)
 for text, von, nach in [("wie viel ist 50 Euro in Türkische lira", "euro", "türkische lira"), ("100 euro in türkischen lira", "euro", "türkischen lira"),
                         ("20 Schweizer Franken in Euro", "schweizer franken", "euro"), ("5000 Yen nach Euro", "yen", "euro"), ("10 kanadische Dollar in Euro", "kanadische dollar", "euro")]:
