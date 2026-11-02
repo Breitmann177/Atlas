@@ -216,6 +216,10 @@ for text, von, nach in [("wie viel ist 50 Euro in Türkische lira", "euro", "tü
     pruefe(f"Währung erkannt: {text}", bool(m) and (m.group(2).lower(), m.group(3).lower()), (von, nach))
 pruefe("Dollar heißt US-Dollar", server.werkzeuge.NAMEN["dollar"], "USD")
 pruefe("Kanadische Dollar", server.werkzeuge.NAMEN["kanadische dollar"], "CAD")
+W = lambda km, minuten: {"distance": km * 1000, "duration": minuten * 60}
+pruefe("Gleich schnell: kürzerer Weg", server.werkzeuge.kuerzester_weg([W(13.2, 15), W(11.2, 15)])["distance"], 11200)
+pruefe("Etwas langsamer, aber kürzer", server.werkzeuge.kuerzester_weg([W(13, 15), W(11, 16)])["distance"], 11000)
+pruefe("Viel langsamer zählt nicht", server.werkzeuge.kuerzester_weg([W(50, 30), W(40, 60)])["distance"], 50000)
 pruefe("Umrechner öffnen", bool(server.werkzeuge.umrechnung_erkennen("Zeig mir den Umrechner")), True)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)

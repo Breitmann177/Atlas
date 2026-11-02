@@ -369,6 +369,13 @@ def _ort_daten(name: str) -> dict | None:
     return {"name": voll, "kurz": f"{haus}, {p['city']}" if haus and p.get("city") else titel or name, "lat": lat, "lon": lon}
 
 
+def kuerzester_weg(wege: list[dict]) -> dict:
+    """Der Dienst nahm bei gleicher Fahrzeit auch mal den längeren Weg (13,2 statt 11,2 km). Unter den fast gleich schnellen
+    (höchstens 2 Minuten oder 10 % länger) gilt deshalb der kürzeste."""
+    schnellste = min(w["duration"] for w in wege)
+    return min((w for w in wege if w["duration"] <= max(schnellste + 120, schnellste * 1.1)), key=lambda w: w["distance"])
+
+
 def route(start: str, ziel: str) -> dict:
     """Strecke mit dem Auto. km und minuten fehlen, wenn ein Dienst nicht antwortet; der Google-Link funktioniert trotzdem."""
     a, b = _ort_daten(start), _ort_daten(ziel)
@@ -379,8 +386,9 @@ def route(start: str, ziel: str) -> dict:
     if not a or not b:
         return ergebnis
     try:
-        r = requests.get(f"https://router.project-osrm.org/route/v1/driving/{a['lon']},{a['lat']};{b['lon']},{b['lat']}",
-                         params={"overview": "simplified", "geometries": "geojson"}, headers=HEADERS, timeout=10).json()["routes"][0]
+        wege = requests.get(f"https://router.project-osrm.org/route/v1/driving/{a['lon']},{a['lat']};{b['lon']},{b['lat']}",
+                            params={"overview": "simplified", "geometries": "geojson", "alternatives": "true"}, headers=HEADERS, timeout=10).json()["routes"]
+        r = kuerzester_weg(wege)
     except (requests.RequestException, ValueError, KeyError, IndexError):
         return ergebnis
     # Für die Karte als [Breite, Länge]
