@@ -30,7 +30,7 @@
   header { height:64px; flex-shrink:0; display:flex; align-items:center; padding:0 22px 0 108px; }
   .logo { font-family:var(--mono); letter-spacing:.45em; font-size:14px; font-weight:600; }
 
-  /* Ring-Logo (früher Auge, die id bleibt): groß in der Mitte, nach der ersten Nachricht klein oben links */
+  /* Auge: groß in der Mitte, nach der ersten Nachricht klein oben links */
   #auge { position:fixed; z-index:20; cursor:pointer; top:84px; left:50%; width:min(380px,80vw); height:auto;
           transform:translateX(-50%);
           transition:top .8s ease, left .8s ease, width .8s ease, transform .8s ease; }
@@ -1320,7 +1320,7 @@
     kiAnzeigen(); ladeStatus();
   }));
 
-  // ---------- Münze und Würfel im Logo ----------
+  // ---------- Münze und Würfel im Auge ----------
   const WURF_DAUER = 2900, WURF_ZEIGEN = 3000;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
   const wurfAnzeige = document.getElementById("wurfanzeige");
   let wurfUhr = [];
@@ -1336,7 +1336,7 @@
   }
 
   // ---------- Timer ----------
-  // Zählt im Browser herunter. Solange er läuft, wird der Ring zur Uhr (siehe Ring-Logo), darunter steht die Restzeit.
+  // Zählt im Browser herunter. Solange er läuft, wird die Pupille zur Uhr (siehe Auge), darunter steht die Restzeit.
   const timerAnzeige = document.getElementById("timeranzeige");
   let timerUhr = null;
   function timerStarten(sekunden) {
@@ -1710,44 +1710,33 @@
   }
   document.querySelectorAll(".kachel[data-design]").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
 
-  // ---------- Ring-Logo (ersetzt das Auge) ----------
-  // Konzentrische Ringe mit Lücken wie im Logo. Jeder Zustand setzt Zielwerte, die Ringe gleiten weich dorthin:
-  //   ruhe     – drehen sich sehr langsam, atmen leicht
-  //   hoert    – ziehen sich zusammen und werden heller
-  //   denkt    – drehen sich schneller, die Bögen werden länger und kürzer
-  //   sucht    – laufen schnell umeinander
-  //   spricht  – die Bögen wachsen und schrumpfen im Rhythmus der Stimme
-  //   froh     – kurz heller und etwas größer
-  //   timer    – der zweite Ring wird zur Restzeit, die inneren treten zurück
-  //   wurf     – die inneren Ringe machen Platz für Münze oder Würfel
+  // ---------- Halftone-Auge ----------
   (function () {
     const canvas = document.getElementById("auge");
     const c = canvas.getContext("2d");
-    const W = 380, H = 210, cx = W / 2, cy = H / 2;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);  // sonst sind die feinen Linien unscharf
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    c.scale(dpr, dpr);
+    const W = 380, H = 210, R = 6;
+    canvas.width = W; canvas.height = H;
+    const quelle = document.createElement("canvas");
+    quelle.width = W; quelle.height = H;
+    const q = quelle.getContext("2d", { willReadFrequently: true });
 
-    let farbe = "#d4d4d4", grund = "#050505";
+    let farbe = "#d4d4d4";
     window.augeFarbe = () => {
-      const st = getComputedStyle(document.documentElement);
-      farbe = st.getPropertyValue("--punkt").trim() || farbe;
-      grund = st.getPropertyValue("--bg").trim() || grund;
+      farbe = getComputedStyle(document.documentElement).getPropertyValue("--punkt").trim() || farbe;
     };
-    window.augeFarbe();
 
-    // Wie im Logo: Radius, Linienbreite, Helligkeit, Bögen als [Anfang, Länge] in Umdrehungen, Drehrichtung und Tempo
-    const RINGE = [
-      { r: 98, b: 2, a: .7, boegen: [[0, 1]], dreh: 0 },
-      { r: 88, b: 2.6, a: .95, boegen: [[.015, .22], [.265, .22], [.515, .22], [.765, .22]], dreh: .25 },
-      { r: 67, b: 2, a: .6, boegen: [[.04, .13], [.55, .15]], dreh: -1.1 },
-      { r: 57, b: 2, a: .55, boegen: [[.1, .3], [.47, .2], [.74, .17]], dreh: .75 },
-      { r: 37, b: 1.6, a: .35, boegen: [[0, .09], [.125, .09], [.25, .09], [.375, .09], [.5, .09], [.625, .09], [.75, .09], [.875, .09]], dreh: -.55 },
-      { r: 28, b: 1.4, a: .28, boegen: [[.02, .43], [.52, .43]], dreh: 1.4 },
-    ];
-    const phase = RINGE.map((_, i) => i * 0.7);
-    const wert = { tempo: .15, hell: .85, groesse: 1, welle: 0, innen: 1, uhr: 0 };
-    let letzt = performance.now();
+    // Freundliches Auge mit Stimmungen. Jede Stimmung setzt Zielwerte, das Auge gleitet weich dorthin:
+    //   ruhe     – offen, schaut ab und zu kurz umher, lächelt manchmal
+    //   hoert    – Live-Modus hört zu: weit offen, große Pupille
+    //   denkt    – schaut nach oben zur Seite, leicht zusammengekniffen
+    //   sucht    – schaut schnell umher
+    //   spricht  – lächelt und wippt im Rhythmus
+    //   froh     – kurz nach einer Antwort: lächelt ("^"-Auge)
+    const ziel = { x: 0, y: 0 }, pos = { x: 0, y: 0 };
+    let blinzelStart = 0, naechstes = performance.now() + 2500;
+    let offen = 1, freude = 0, pupilleR = 24, naechsterUmblick = 0, naechstesLaecheln = performance.now() + 9000;
+    let uhr = 0;  // 0 = normale Pupille, 1 = Uhr (Timer läuft)
+    const UMHER = [[-1, -.3], [1, -.2], [.7, .6], [-.7, .5], [0, -.7], [1, .1], [-1, .2]];
 
     function stimmung(t) {
       if (window.hermesWurf) return "wurf";
@@ -1760,86 +1749,146 @@
       return "ruhe";
     }
 
-    function bogen(r, von, bis, breite, alpha) {
-      c.globalAlpha = Math.max(0, Math.min(1, alpha));
-      c.lineWidth = breite;
-      c.beginPath(); c.arc(cx, cy, r, von - Math.PI / 2, bis - Math.PI / 2); c.stroke();
-    }
-
-    // Münze oder Würfel in der Mitte: dreht sich immer langsamer und landet auf dem Ergebnis.
+    // Münze oder Würfel statt Pupille: bleibt an Ort und Stelle, dreht sich immer langsamer und landet auf dem Ergebnis.
     // Beim Drehen sieht man beide Seiten der Münze im Wechsel, zuletzt die, auf der sie landet.
-    function wurfZeichnen(t) {
+    // Die dunkle Scheibe dahinter verdeckt die Pupille, auch wenn die Münze beim Drehen fast unsichtbar schmal ist.
+    function wurfZeichnen(t, cx, cy) {
       const w = window.hermesWurf, p = Math.min(1, (t - w.start) / w.dauer), brems = 1 - Math.pow(1 - p, 3);
-      c.save();
-      c.globalAlpha = 1;
-      c.translate(cx, cy);
+      q.fillStyle = "#050505"; q.beginPath(); q.arc(cx, cy, 66, 0, Math.PI * 2); q.fill();
+      q.save();
+      q.translate(cx, cy);
       if (w.art === "muenze") {
         const winkel = (1 - Math.pow(1 - p, 2)) * Math.PI * 9, drehung = Math.cos(winkel);
-        c.scale(1, Math.max(0.06, Math.abs(drehung)));
-        c.fillStyle = farbe; c.beginPath(); c.arc(0, 0, 42, 0, Math.PI * 2); c.fill();
+        q.scale(1, Math.max(0.06, Math.abs(drehung)));
+        q.fillStyle = "#f2f2f2"; q.beginPath(); q.arc(0, 0, 56, 0, Math.PI * 2); q.fill();
         const seite = drehung < 0 ? w.ergebnis : w.ergebnis === "Kopf" ? "Zahl" : "Kopf";
-        c.fillStyle = grund;
+        q.fillStyle = "#000";
         if (seite === "Kopf") {
-          c.beginPath(); c.arc(0, -10, 14, 0, Math.PI * 2); c.fill();
-          c.beginPath(); c.ellipse(0, 21, 23, 16, 0, 0, Math.PI * 2); c.fill();
+          q.beginPath(); q.arc(0, -13, 19, 0, Math.PI * 2); q.fill();
+          q.beginPath(); q.ellipse(0, 28, 31, 22, 0, 0, Math.PI * 2); q.fill();
         } else {
-          c.font = "bold 62px Arial,sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
-          c.fillText("1", 0, 3);
+          q.font = "bold 84px Arial,sans-serif"; q.textAlign = "center"; q.textBaseline = "middle";
+          q.fillText("1", 0, 4);
         }
       } else {
-        c.rotate(brems * Math.PI * 10);
-        c.fillStyle = farbe; c.beginPath(); c.roundRect(-34, -34, 68, 68, 10); c.fill();
-        const a = 17, punkte = { 1: [[0, 0]], 2: [[-a, -a], [a, a]], 3: [[-a, -a], [0, 0], [a, a]],
+        q.rotate(brems * Math.PI * 10);
+        q.fillStyle = "#f2f2f2"; q.beginPath(); q.roundRect(-45, -45, 90, 90, 12); q.fill();
+        const a = 23, punkte = { 1: [[0, 0]], 2: [[-a, -a], [a, a]], 3: [[-a, -a], [0, 0], [a, a]],
           4: [[-a, -a], [a, -a], [-a, a], [a, a]], 5: [[-a, -a], [a, -a], [0, 0], [-a, a], [a, a]],
           6: [[-a, -a], [a, -a], [-a, 0], [a, 0], [-a, a], [a, a]] };
-        c.fillStyle = grund;
-        (punkte[p >= 1 ? w.ergebnis : 1 + Math.floor(brems * 40) % 6] || []).forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.fill(); });
+        q.fillStyle = "#000";
+        (punkte[p >= 1 ? w.ergebnis : 1 + Math.floor(brems * 40) % 6] || []).forEach(([x, y]) => { q.beginPath(); q.arc(x, y, 9, 0, Math.PI * 2); q.fill(); });
       }
-      c.restore();
+      q.restore();
     }
 
     function zeichne(t) {
-      const dt = Math.min(0.05, (t - letzt) / 1000);
-      letzt = t;
-      const s = stimmung(t);
-      const ziel = { tempo: .15, hell: .85, groesse: 1 + Math.sin(t / 2200) * 0.012, welle: 0, innen: 1, uhr: 0 };
-      if (s === "hoert") Object.assign(ziel, { tempo: .25, hell: 1.1, groesse: .93 });
-      else if (s === "denkt") Object.assign(ziel, { tempo: 1.2, hell: .95, groesse: .98, welle: .3 });
-      else if (s === "sucht") Object.assign(ziel, { tempo: 2.4, hell: .95, welle: .15 });
-      else if (s === "spricht") Object.assign(ziel, { tempo: .5, hell: 1, welle: 1 });
-      else if (s === "froh") Object.assign(ziel, { hell: 1.15, groesse: 1.04 });
-      else if (s === "timer") Object.assign(ziel, { tempo: .1, innen: .3, uhr: 1 });
-      else if (s === "wurf") Object.assign(ziel, { tempo: .1, innen: 0 });
-      for (const k in wert) wert[k] += (ziel[k] - wert[k]) * 0.08;
+      if (t > naechstes) { blinzelStart = t; naechstes = t + 2500 + Math.random() * 3500; }
+      const b = t - blinzelStart;
+      const lid = b < 160 && !window.hermesWurf ? 1 - 0.95 * Math.sin((b / 160) * Math.PI) : 1;  // beim Wurf nicht blinzeln, sonst ist die Münze kurz weg
 
-      // Im kleinen Logo oben links wären die Linien sonst kaum noch zu sehen
-      const massstab = canvas.clientWidth / W || 1;
-      c.clearRect(0, 0, W, H);
-      c.strokeStyle = farbe;
-      c.lineCap = "round";
-      RINGE.forEach((ring, i) => {
-        phase[i] += ring.dreh * wert.tempo * dt;
-        // Stimme: ein unregelmäßiger Pegel, pro Ring etwas versetzt
-        const stimme = wert.welle * (0.5 + 0.5 * Math.sin(t / 95 + i * 1.3)) * (0.6 + 0.4 * Math.sin(t / 233 + i));
-        const r = ring.r * wert.groesse * (1 + stimme * 0.03 * Math.sin(t / 80 + i * 1.7));
-        const breite = Math.max(ring.b, 1.3 / massstab);
-        const alpha = ring.a * wert.hell * (i >= 2 ? wert.innen : 1);
-        if (i === 1 && wert.uhr > 0.02) {
-          // Timer: Der Ring zeigt die Restzeit, von oben im Uhrzeigersinn
-          const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
-          bogen(r, 0, Math.PI * 2, breite, alpha * 0.25);
-          if (rest > 0) bogen(r, 0, rest * Math.PI * 2 * wert.uhr, breite * 1.4, alpha);
-          return;
+      const s = stimmung(t);
+      let zOffen = 1, zFreude = 0, zPupille = 24;
+      if (s === "sucht") {
+        zOffen = 0.85; zPupille = 20;
+        if (t > naechsterUmblick) {
+          const z = UMHER[Math.floor(Math.random() * UMHER.length)];
+          ziel.x = z[0] * 46; ziel.y = z[1] * 20; naechsterUmblick = t + 450 + Math.random() * 450;
         }
-        ring.boegen.forEach(([anfang, laenge], j) => {
-          const dehnung = laenge >= 1 ? 1 : 1 + stimme * 0.35 * Math.sin(t / 120 + i + j * 2.1);
-          const l = Math.min(laenge * dehnung, laenge >= 1 ? 1 : 0.98 / ring.boegen.length);
-          const von = (anfang * Math.PI * 2) + phase[i];
-          bogen(r, von, von + l * Math.PI * 2, breite, alpha);
-        });
-      });
-      c.globalAlpha = 1;
-      if (window.hermesWurf) wurfZeichnen(t);
+      } else if (s === "denkt") {
+        zOffen = 0.8; zPupille = 22 + Math.sin(t / 300) * 2; ziel.x = 26; ziel.y = -16;
+      } else if (s === "hoert") {
+        zOffen = 1.12; zPupille = 29; ziel.x = 0; ziel.y = 0;
+      } else if (s === "spricht") {
+        zOffen = 0.95; zFreude = 0.35 + Math.abs(Math.sin(t / 180)) * 0.25; zPupille = 26;
+        ziel.x = 0; ziel.y = Math.sin(t / 180) * 3;
+      } else if (s === "wurf") {
+        zOffen = 1.15; ziel.x = 0; ziel.y = 0;
+      } else if (s === "timer") {
+        zOffen = 1.1; ziel.x = 0; ziel.y = 0;
+      } else if (s === "froh") {
+        zFreude = 0.85; zPupille = 26; ziel.x = 0; ziel.y = 0;
+      } else {
+        // Ruhe: ab und zu ein kurzer Blick zur Seite und ein kleines Lächeln, damit es lebendig wirkt
+        if (t > naechsterUmblick) {
+          const r = Math.random();
+          ziel.x = r < 0.5 ? 0 : (Math.random() - 0.5) * 50; ziel.y = r < 0.5 ? 0 : (Math.random() - 0.5) * 16;
+          naechsterUmblick = t + 1800 + Math.random() * 2500;
+        }
+        if (t > naechstesLaecheln) naechstesLaecheln = t + 9000 + Math.random() * 8000;
+        if (naechstesLaecheln - t > 7600 && naechstesLaecheln - t < 9000) zFreude = 0.6;
+      }
+      offen += (zOffen - offen) * 0.15;
+      freude += (zFreude - freude) * 0.15;
+      pupilleR += (zPupille - pupilleR) * 0.15;
+      uhr += ((window.hermesTimer ? 1 : 0) - uhr) * 0.12;
+      pos.x += (ziel.x - pos.x) * 0.2;
+      pos.y += (ziel.y - pos.y) * 0.2;
+
+      const cx = W / 2, cy = H / 2;
+      const ry = Math.max(3, 74 * lid * offen);
+      q.filter = "none";
+      q.fillStyle = "#000"; q.fillRect(0, 0, W, H);
+      q.filter = "blur(3px)";
+      q.save();
+      q.beginPath();
+      q.ellipse(cx, cy, 128, ry, 0, 0, Math.PI * 2);
+      const g = q.createRadialGradient(cx, cy, 10, cx, cy, 140);
+      g.addColorStop(0, "#e2e2e2"); g.addColorStop(1, "#8a8a8a");
+      q.fillStyle = g; q.fill(); q.clip();
+      const ix = cx + pos.x, iy = cy + pos.y;
+      const ig = q.createRadialGradient(ix, iy, pupilleR * 0.6, ix, iy, 52);
+      ig.addColorStop(0, "#000"); ig.addColorStop(0.5, "#262626"); ig.addColorStop(1, "#5c5c5c");
+      q.fillStyle = ig; q.beginPath(); q.arc(ix, iy, 52, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#000"; q.beginPath(); q.arc(ix, iy, pupilleR, 0, Math.PI * 2); q.fill();
+      q.fillStyle = "#fff";
+      q.beginPath(); q.arc(ix - 17, iy - 17, 9, 0, Math.PI * 2); q.fill();
+      q.beginPath(); q.arc(ix + 14, iy + 13, 4, 0, Math.PI * 2); q.fill();
+      // Timer: Die Pupille wird zur Uhr. Der helle Kuchen ist die Restzeit und schrumpft im Uhrzeigersinn.
+      if (uhr > 0.02) {
+        const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
+        q.globalAlpha = uhr;
+        q.fillStyle = "#0c0c0c"; q.beginPath(); q.arc(cx, cy, 60, 0, Math.PI * 2); q.fill();
+        if (rest > 0) {
+          q.fillStyle = "#d8d8d8"; q.beginPath(); q.moveTo(cx, cy);
+          q.arc(cx, cy, 52, -Math.PI / 2, -Math.PI / 2 + rest * Math.PI * 2); q.closePath(); q.fill();
+        }
+        q.fillStyle = "#fff";
+        for (let i = 0; i < 12; i++) {  // Stundenstriche als Punkte
+          const w = (i / 12) * Math.PI * 2 - Math.PI / 2;
+          q.beginPath(); q.arc(cx + Math.cos(w) * 57, cy + Math.sin(w) * 57, i % 3 ? 2 : 3.5, 0, Math.PI * 2); q.fill();
+        }
+        q.fillStyle = "#000"; q.beginPath(); q.arc(cx, cy, 6, 0, Math.PI * 2); q.fill();
+        q.globalAlpha = 1;
+      }
+      if (window.hermesWurf) wurfZeichnen(t, cx, cy);
+      q.restore();
+      // Lächeln: das Unterlid schiebt sich als Bogen von unten ins Auge -> freundliche "^"-Form.
+      // Ohne Clip gezeichnet, damit es auch den weichen Rand des Auges abdeckt.
+      if (freude > 0.02) {
+        const oben = cy + ry - freude * ry * 1.05;
+        q.fillStyle = "#000";
+        q.beginPath();
+        q.ellipse(cx, oben + 120, 142, 120, 0, 0, Math.PI * 2);
+        q.fill();
+      }
+      q.filter = "none";
+
+      const daten = q.getImageData(0, 0, W, H).data;
+      c.clearRect(0, 0, W, H);
+      c.fillStyle = farbe;
+      let reihe = 0;
+      for (let y = R / 2; y < H; y += R * 0.87, reihe++) {
+        const versatz = reihe % 2 ? R / 2 : 0;
+        for (let x = R / 2 + versatz; x < W; x += R) {
+          const i = (Math.floor(y) * W + Math.floor(x)) * 4;
+          const hell = daten[i] / 255;
+          if (hell < 0.05) continue;
+          c.beginPath();
+          c.arc(x, y, (R / 2) * Math.pow(hell, 0.8), 0, Math.PI * 2);
+          c.fill();
+        }
+      }
       requestAnimationFrame(zeichne);
     }
     requestAnimationFrame(zeichne);
