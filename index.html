@@ -618,7 +618,7 @@
   body.wurf #auge, body.klein.wurf #auge { position:fixed; z-index:20; top:90px; left:50%; width:min(320px,70vw); transform:translateX(-50%); }
   body.wurf::before { display:block; background:var(--bg); opacity:.92; }
   @media (max-width:480px) { #hero #auge { width:150px; } }
-  #wurfanzeige { color:var(--fg); top:282px; font-size:22px; font-weight:600; letter-spacing:0; }
+  #wurfanzeige { color:var(--fg); top:300px; font-size:22px; font-weight:600; letter-spacing:0; }
 </style>
 
 </head>
@@ -1258,7 +1258,7 @@
           if (!zeile.trim()) continue;
           const ev = JSON.parse(zeile);
           if (ev.typ === "start") aktuellerChat = ev.chat_id;
-          else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { /* kein Internet-Suchen: kein Kasten */ }
+          else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { window.hermesSkill = ev.text; window.hermesDenkt = false; }  // kein Internet-Suchen: kein Kasten, die Augen zeigen das Werkzeug
           else if (ev.typ === "status" && ev.detail !== undefined) {
             schritte++; window.hermesSucht = true;
             statusText(ev.text === "liest" ? "Liest Seiten" : "Sucht im Internet");
@@ -1280,6 +1280,7 @@
             statusText("Denkt nach");
           } else if (ev.typ === "token") {
             window.hermesDenkt = false; window.hermesSucht = false;
+            if (window.hermesSkill) setTimeout(() => { window.hermesSkill = null; }, 900);  // Symbol kurz stehen lassen
             roh += ev.text;
             if (aktiveKette) aktiveKette.rein(ev.text);
             else { inhalt.classList.remove("typing"); zeige(); }
@@ -1312,6 +1313,7 @@
       if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
     }
     window.hermesDenkt = false; window.hermesSucht = false;
+    if (window.hermesSkill) setTimeout(() => { window.hermesSkill = null; }, 900);
     beschaeftigt = false;
     sendeStatus();
     eingabe.focus();
@@ -1618,7 +1620,7 @@
   }));
 
   // ---------- Münze und Würfel im Auge ----------
-  const WURF_DAUER = 1900, WURF_ZEIGEN = 2200;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
+  const WURF_DAUER = 2100, WURF_ZEIGEN = 1800;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
   const wurfAnzeige = document.getElementById("wurfanzeige");
   let wurfUhr = [];
   function wurfStarten(art, ergebnis) {
@@ -2017,20 +2019,19 @@
   document.querySelectorAll(".kachel[data-design]").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
 
   // ---------- Roboter-Augen ----------
-  // Zwei runde Augen als "Gesicht" von Atlas (in der App und später vorne auf der Box). Jede Stimmung setzt Zielwerte,
-  // die Augen gleiten schnell und weich dorthin:
-  //   ruhe    – blinzelt ab und zu, schaut kurz umher, freut sich manchmal
-  //   hoert   – Augen groß und wach, leichtes Pulsieren
-  //   denkt   – schauen nach oben zur Seite, etwas schmaler, ein Auge kleiner (nachdenklich)
-  //   sucht   – schauen schnell hin und her
-  //   spricht – wippen im Rhythmus, leicht fröhlich
-  //   froh    – kurz nach einer Antwort: "^ ^"
-  //   timer   – die Augen verschmelzen zu einer Uhr, deren Restzeit im Uhrzeigersinn abläuft
-  //   wurf    – die Augen verschmelzen zur Münze oder zum Würfel, der geworfen wird, danach teilen sie sich wieder
+  // Zwei schlichte Augen als "Gesicht" von Atlas (in der App und später vorne auf der Box). Stimmungen:
+  //   ruhe    – blinzelt ab und zu, schaut kurz umher, freut sich manchmal ("^ ^")
+  //   hoert   – Augen groß und wach        denkt  – schauen nach oben zur Seite, etwas schmaler
+  //   sucht   – schauen schnell umher       spricht – wippen leicht
+  //   froh    – kurz nach einer Antwort "^ ^"
+  // Für Werkzeuge verschmelzen die Augen sichtbar zu einer Form und teilen sich danach wieder:
+  //   wurf    – Kugel -> Münze/Würfel, wird hochgeworfen, dreht sich und landet
+  //   timer   – Uhr, deren Restzeit im Uhrzeigersinn abläuft
+  //   wetter  – Sonne, die sich langsam dreht      rechnet – Gleichheitszeichen, das pulsiert
   (function () {
     const canvas = document.getElementById("auge");
     const c = canvas.getContext("2d");
-    const W = 320, H = 180, SKALA = 2;
+    const W = 320, H = 200, SKALA = 2;
     canvas.width = W * SKALA; canvas.height = H * SKALA;
     c.scale(SKALA, SKALA);
 
@@ -2046,23 +2047,28 @@
     platzieren();
     new MutationObserver(platzieren).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
-    let farbe = "#f2f1ec", leuchten = true;
+    // Gedämpftes Weiß mit leichtem Schein (nicht grell); im hellen Design dunkle Augen ohne Schein
+    let farbe = "#d9d7cf", schein = "rgba(255,255,255,.16)";
     window.augeFarbe = () => {
-      farbe = getComputedStyle(document.documentElement).getPropertyValue("--fg").trim() || farbe;
-      leuchten = document.documentElement.dataset.theme !== "hell";
+      const hell = document.documentElement.dataset.theme === "hell";
+      farbe = hell ? "#2b2a26" : "#d9d7cf"; schein = hell ? "transparent" : "rgba(255,255,255,.16)";
     };
     window.augeFarbe();
     const grund = () => getComputedStyle(document.body).backgroundColor;
 
     const ziel = { x: 0, y: 0 }, pos = { x: 0, y: 0 };
     let blinzelStart = -1000, naechstes = performance.now() + 2500;
-    let offen = 1, breite = 1, freude = 0, schief = 0, fusion = 0, naechsterUmblick = 0, naechsteFreude = performance.now() + 12000;
+    let offen = 1, breite = 1, freude = 0, schief = 0, naechsterUmblick = 0, naechsteFreude = performance.now() + 12000;
     const UMHER = [[-1, -.3], [1, -.2], [.7, .5], [-.7, .4], [0, -.6], [1, .1], [-1, .2]];
-    const VERSCHMELZEN = 220;  // ms, bis aus zwei Augen eins geworden ist
+    const REIN = 380, RAUS = 320;  // ms: so lange dauert das Verschmelzen und das Teilen
+    let fusionZiel = 0, fusionWechsel = -1e9, fusionVon = 0, form = "kreis";
     const mix = (a, b, f) => a + (b - a) * f;
+    const weich = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;  // langsam - schnell - langsam
 
     function stimmung(t) {
       if (window.hermesWurf) return "wurf";
+      if (window.hermesSkill === "wetter") return "wetter";
+      if (window.hermesSkill === "rechnet") return "rechnet";
       if (window.hermesSucht) return "sucht";
       if (window.hermesSpricht) return "spricht";
       if (window.hermesDenkt) return "denkt";
@@ -2072,129 +2078,147 @@
       return "ruhe";
     }
 
-    function form(x, y, w, h, r) {
-      c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, Math.min(r, w / 2, h / 2));
-    }
+    function rr(x, y, w, h, r) { c.beginPath(); c.roundRect(x - w / 2, y - h / 2, w, h, Math.max(0, Math.min(r, w / 2, h / 2))); }
 
-    function bogen(cx, cy, w, h) {  // "^"
-      const f = (freude - 0.5) * 2;
-      c.lineWidth = w * 0.26; c.lineCap = "round"; c.strokeStyle = farbe;
+    function bogen(cx, cy, w) {  // "^"
+      const f = Math.min(1, (freude - 0.5) * 2);
+      c.lineWidth = w * 0.24; c.lineCap = "round"; c.strokeStyle = farbe;
       c.beginPath();
-      c.moveTo(cx - w * 0.42, cy + h * 0.12 * f + 6);
-      c.quadraticCurveTo(cx, cy - h * 0.42 * f, cx + w * 0.42, cy + h * 0.12 * f + 6);
+      c.moveTo(cx - w * 0.4, cy + 10 * f + 4);
+      c.quadraticCurveTo(cx, cy - 30 * f, cx + w * 0.4, cy + 10 * f + 4);
       c.stroke();
     }
 
-    function uhr(cx, cy) {
-      const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
-      c.lineWidth = 5; c.strokeStyle = farbe;
-      c.beginPath(); c.arc(cx, cy, 52, 0, Math.PI * 2); c.stroke();
-      if (rest > 0) {
-        c.fillStyle = farbe; c.beginPath(); c.moveTo(cx, cy);
-        c.arc(cx, cy, 42, -Math.PI / 2, -Math.PI / 2 + rest * Math.PI * 2); c.closePath(); c.fill();
-      }
-    }
-
     function wurfZeichnen(t, cx, cy) {
-      const w = window.hermesWurf, dauer = w.dauer - VERSCHMELZEN;
-      const p = Math.min(1, Math.max(0, (t - w.start - VERSCHMELZEN) / dauer)), brems = 1 - Math.pow(1 - p, 3);
-      c.save(); c.translate(cx, cy);
+      const w = window.hermesWurf, flug = w.dauer - REIN;
+      const p = Math.min(1, Math.max(0, (t - w.start - REIN) / flug));
+      const brems = 1 - Math.pow(1 - p, 3);
+      const hoehe = -Math.sin(Math.min(1, p / 0.8) * Math.PI) * 42;          // hoch und wieder runter
+      const landung = p > 0.8 ? Math.sin(((p - 0.8) / 0.2) * Math.PI) * -6 : 0; // kleiner Hüpfer beim Aufkommen
+      c.save(); c.translate(cx, cy + hoehe + landung);
       if (w.art === "muenze") {
-        const winkel = (1 - Math.pow(1 - p, 2)) * Math.PI * 9, drehung = Math.cos(winkel);
+        const drehung = Math.cos(brems * Math.PI * 9);
         c.scale(1, Math.max(0.06, Math.abs(drehung)));
-        c.fillStyle = farbe; c.beginPath(); c.arc(0, 0, 52, 0, Math.PI * 2); c.fill();
+        c.fillStyle = farbe; c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.fill();
         if (p > 0) {
           const seite = drehung < 0 ? w.ergebnis : w.ergebnis === "Kopf" ? "Zahl" : "Kopf";
-          c.shadowBlur = 0; c.fillStyle = grund();
+          c.shadowColor = "transparent"; c.fillStyle = grund();
           if (seite === "Kopf") {
-            c.beginPath(); c.arc(0, -12, 17, 0, Math.PI * 2); c.fill();
-            c.beginPath(); c.ellipse(0, 26, 28, 20, 0, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.arc(0, -11, 15, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.ellipse(0, 23, 25, 17, 0, 0, Math.PI * 2); c.fill();
           } else {
-            c.font = "bold 76px Inter Variable, Arial, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+            c.font = "600 66px Inter Variable, Arial, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
             c.fillText("1", 0, 4);
           }
         }
       } else {
-        c.rotate(brems * Math.PI * 8);
-        c.fillStyle = farbe; c.beginPath(); c.roundRect(-45, -45, 90, 90, 16); c.fill();
+        c.rotate(brems * Math.PI * 6);
+        c.fillStyle = farbe; c.beginPath(); c.roundRect(-40, -40, 80, 80, 16); c.fill();
         if (p > 0) {
-          const a = 23, punkte = { 1: [[0, 0]], 2: [[-a, -a], [a, a]], 3: [[-a, -a], [0, 0], [a, a]],
+          const a = 20, punkte = { 1: [[0, 0]], 2: [[-a, -a], [a, a]], 3: [[-a, -a], [0, 0], [a, a]],
             4: [[-a, -a], [a, -a], [-a, a], [a, a]], 5: [[-a, -a], [a, -a], [0, 0], [-a, a], [a, a]],
             6: [[-a, -a], [a, -a], [-a, 0], [a, 0], [-a, a], [a, a]] };
-          c.shadowBlur = 0; c.fillStyle = grund();
-          (punkte[p >= 1 ? w.ergebnis : 1 + Math.floor(brems * 30) % 6] || []).forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.fill(); });
+          c.shadowColor = "transparent"; c.fillStyle = grund();
+          (punkte[p >= 1 ? w.ergebnis : 1 + Math.floor(brems * 24) % 6] || []).forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 8, 0, Math.PI * 2); c.fill(); });
         }
+      }
+      c.restore();
+    }
+
+    function symbol(art, t, cx, cy, auf) {  // auf: 0..1, das Symbol "ploppt" aus der Kugel heraus
+      const sk = 0.7 + 0.3 * auf;
+      c.save(); c.translate(cx, cy); c.scale(sk, sk); c.globalAlpha = auf;
+      c.fillStyle = farbe; c.strokeStyle = farbe; c.lineCap = "round";
+      if (art === "timer") {
+        const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
+        c.lineWidth = 5; c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.stroke();
+        if (rest > 0) { c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 36, -Math.PI / 2, -Math.PI / 2 + rest * Math.PI * 2); c.closePath(); c.fill(); }
+      } else if (art === "wetter") {
+        c.beginPath(); c.arc(0, 0, 26, 0, Math.PI * 2); c.fill();
+        c.rotate(t / 2400); c.lineWidth = 7;
+        for (let i = 0; i < 8; i++) { const w = i * Math.PI / 4; c.beginPath(); c.moveTo(Math.cos(w) * 38, Math.sin(w) * 38); c.lineTo(Math.cos(w) * 50, Math.sin(w) * 50); c.stroke(); }
+      } else if (art === "rechnet") {
+        const puls = 1 + Math.sin(t / 160) * 0.06;
+        c.scale(puls, 1);
+        rr(0, -15, 86, 18, 9); c.fill(); rr(0, 15, 86, 18, 9); c.fill();
       }
       c.restore();
     }
 
     function zeichne(t) {
       const s = stimmung(t);
-      if (t > naechstes && fusion < 0.05) {
+      const fusionNoetig = s === "wurf" || s === "timer" || s === "wetter" || s === "rechnet";
+      const fNow = () => fusionZiel ? Math.min(1, fusionVon + (t - fusionWechsel) / REIN) : Math.max(0, fusionVon - (t - fusionWechsel) / RAUS);
+      if ((fusionNoetig ? 1 : 0) !== fusionZiel) { fusionVon = fNow(); fusionZiel = fusionNoetig ? 1 : 0; fusionWechsel = t; }
+      if (fusionNoetig) form = s;
+      const roh = fNow(), f = weich(roh);
+
+      if (t > naechstes && f < 0.02) {
         blinzelStart = t; naechstes = t + 2600 + Math.random() * 3600;
         if (Math.random() < 0.15) naechstes = t + 220;  // manchmal doppelt blinzeln
       }
       const b = t - blinzelStart;
       const lid = b < 130 ? 1 - 0.92 * Math.sin((b / 130) * Math.PI) : 1;
 
-      let zOffen = 1, zBreite = 1, zFreude = 0, zSchief = 0, zFusion = 0;
+      let zOffen = 1, zBreite = 1, zFreude = 0, zSchief = 0;
       if (s === "sucht") {
         zOffen = 0.9;
         if (t > naechsterUmblick) {
           const z = UMHER[Math.floor(Math.random() * UMHER.length)];
-          ziel.x = z[0] * 34; ziel.y = z[1] * 14; naechsterUmblick = t + 300 + Math.random() * 300;
+          ziel.x = z[0] * 30; ziel.y = z[1] * 12; naechsterUmblick = t + 300 + Math.random() * 300;
         }
       } else if (s === "denkt") {
-        zOffen = 0.72; zSchief = 0.18; ziel.x = 22; ziel.y = -16 + Math.sin(t / 360) * 2;
+        zOffen = 0.72; zSchief = 0.18; ziel.x = 20; ziel.y = -14 + Math.sin(t / 360) * 2;
       } else if (s === "hoert") {
-        zOffen = 1.12 + Math.sin(t / 220) * 0.04; zBreite = 1.06; ziel.x = 0; ziel.y = 0;
+        zOffen = 1.1 + Math.sin(t / 220) * 0.04; zBreite = 1.05; ziel.x = 0; ziel.y = 0;
       } else if (s === "spricht") {
-        zOffen = 0.9; zFreude = 0.3; ziel.x = 0; ziel.y = Math.sin(t / 150) * 4;
+        zOffen = 0.92; ziel.x = 0; ziel.y = Math.sin(t / 150) * 3;
       } else if (s === "froh") {
         zFreude = 1; ziel.x = 0; ziel.y = -2;
-      } else if (s === "timer" || s === "wurf") {
-        zFusion = 1; ziel.x = 0; ziel.y = 0;
+      } else if (fusionNoetig) {
+        ziel.x = 0; ziel.y = 0;
       } else {
         if (t > naechsterUmblick) {
           const r = Math.random();
-          ziel.x = r < 0.55 ? 0 : (Math.random() - 0.5) * 44; ziel.y = r < 0.55 ? 0 : (Math.random() - 0.5) * 14;
+          ziel.x = r < 0.55 ? 0 : (Math.random() - 0.5) * 40; ziel.y = r < 0.55 ? 0 : (Math.random() - 0.5) * 12;
           naechsterUmblick = t + 1600 + Math.random() * 2400;
         }
         if (t > naechsteFreude) naechsteFreude = t + 12000 + Math.random() * 10000;
         if (naechsteFreude - t > 10800 && naechsteFreude - t < 12000) zFreude = 1;
       }
-      const k = 0.26;  // wie schnell die Augen ihrem Ziel folgen (höher = flinker)
-      offen += (zOffen - offen) * k;
-      breite += (zBreite - breite) * k;
-      freude += (zFreude - freude) * k;
-      schief += (zSchief - schief) * k * 0.7;
-      fusion += (zFusion - fusion) * 0.3;
-      if (Math.abs(zFusion - fusion) < 0.01) fusion = zFusion;
-      pos.x += (ziel.x - pos.x) * 0.32;
-      pos.y += (ziel.y - pos.y) * 0.32;
+      const k = 0.26;  // wie flink die Augen ihrem Ziel folgen
+      offen += (zOffen - offen) * k; breite += (zBreite - breite) * k;
+      freude += (zFreude - freude) * k; schief += (zSchief - schief) * k * 0.7;
+      pos.x += (ziel.x - pos.x) * 0.32; pos.y += (ziel.y - pos.y) * 0.32;
 
       c.clearRect(0, 0, W, H);
-      c.shadowColor = leuchten ? "rgba(255,255,255,.55)" : "transparent";
-      c.shadowBlur = leuchten ? 22 : 0;
+      c.shadowColor = schein; c.shadowBlur = 10;
+      c.fillStyle = farbe;
       const cx = W / 2, cy = H / 2;
-      const f = fusion, ef = 1 - Math.pow(1 - f, 2);  // weich auslaufend
-      const muenze = s === "wurf" && window.hermesWurf.art === "muenze";
-      // Ziel-Form beim Verschmelzen: Kreis (Münze, Uhr) oder abgerundetes Quadrat (Würfel)
-      const zw = s === "wurf" && !muenze ? 90 : 104, zr = s === "wurf" && !muenze ? 16 : 52;
+      const EW = 58, EH = 78, ABST = 52;  // Augenbreite, -höhe, halber Abstand
+      // Zielform der Kugel: Würfel eckiger, sonst rund
+      const wuerfel = form === "wurf" && window.hermesWurf && window.hermesWurf.art !== "muenze";
+      const D = wuerfel ? 80 : form === "wurf" ? 92 : 84, DR = wuerfel ? 16 : D / 2;
 
-      if (f >= 0.999 && s === "wurf") wurfZeichnen(t, cx, cy);
-      else if (f >= 0.999 && s === "timer") uhr(cx, cy);
-      else if (freude > 0.5 && f < 0.05) {
-        bogen(cx - 62 + pos.x, cy + pos.y, 70 * breite, 92);
-        bogen(cx + 62 + pos.x, cy + pos.y, 70 * breite, 92);
+      if (f >= 1 && s === "wurf") wurfZeichnen(t, cx, cy);
+      else if (f >= 1 && fusionNoetig) {
+        // Kugel "ploppt" zum Symbol: kurz die Kugel, dann das Symbol
+        const auf = Math.min(1, (t - fusionWechsel - REIN) / 160);
+        if (auf < 1) { c.globalAlpha = 1 - auf; c.beginPath(); c.arc(cx, cy, D / 2, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
+        symbol(s, t, cx, cy, Math.max(0, auf));
+      } else if (freude > 0.5 && f < 0.02) {
+        bogen(cx - ABST + pos.x, cy + pos.y, EW * breite);
+        bogen(cx + ABST + pos.x, cy + pos.y, EW * breite);
       } else {
-        const w = mix(70 * breite, zw, ef);
-        const h0 = Math.max(6, 92 * offen * lid);
-        const r = mix(Math.min(70, h0) * 0.42, zr, ef);
-        const abstand = 62 * (1 - ef), px = pos.x * (1 - ef), py = pos.y * (1 - ef);
-        c.fillStyle = farbe;
-        form(cx - abstand + px, cy + py, w, mix(h0 * (1 - schief), zw, ef), r); c.fill();
-        form(cx + abstand + px, cy + py, w, mix(h0 * (1 + schief * 0.4), zw, ef), r); c.fill();
+        // Verschmelzen: Die Augen gleiten zur Mitte, überlappen und werden zu einer Kugel.
+        // Kurz vor dem Ende ein kleiner Wackler (größer, dann zurück), damit man das "Zusammenploppen" sieht.
+        const knall = f > 0.85 ? 1 + Math.sin(((f - 0.85) / 0.15) * Math.PI) * 0.08 : 1;
+        const w = mix(EW * breite, D, f) * knall;
+        const h0 = Math.max(6, EH * offen * lid);
+        const r = mix(Math.min(EW, h0) * 0.42, DR, f);
+        const abst = ABST * (1 - f), px = pos.x * (1 - f), py = pos.y * (1 - f);
+        rr(cx - abst + px, cy + py, w, mix(h0 * (1 - schief), D, f) * knall, r); c.fill();
+        rr(cx + abst + px, cy + py, w, mix(h0 * (1 + schief * 0.4), D, f) * knall, r); c.fill();
       }
       requestAnimationFrame(zeichne);
     }
