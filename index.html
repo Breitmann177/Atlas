@@ -448,6 +448,7 @@
       <nav id="einstMenue" aria-label="Einstellungen">
         <button type="button" data-oeffnet="erinnerungen"><span class="symbol" aria-hidden="true">🧠</span>Erinnerungen<span class="pfeil" aria-hidden="true">›</span></button>
         <button type="button" data-oeffnet="design"><span class="symbol" aria-hidden="true">🎨</span>Design<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="ki"><span class="symbol" aria-hidden="true">🤖</span>KI<span class="pfeil" aria-hidden="true">›</span></button>
         <button type="button" data-oeffnet="stimme"><span class="symbol" aria-hidden="true">🔊</span>Stimme<span class="pfeil" aria-hidden="true">›</span></button>
         <button type="button" data-oeffnet="wake"><span class="symbol" aria-hidden="true">🎙️</span>Wake-Word<span class="pfeil" aria-hidden="true">›</span></button>
         <button type="button" data-oeffnet="daten"><span class="symbol" aria-hidden="true">🗂️</span>Daten<span class="pfeil" aria-hidden="true">›</span></button>
@@ -476,6 +477,16 @@
           <button type="button" class="stimme" data-stimme="george" id="stimmeGeorge" hidden>GEORGE<small>ElevenLabs, sehr natürlich</small></button>
           <button type="button" class="stimme" data-stimme="alfred">ALFRED<small>männlich, ruhig</small></button>
           <button type="button" class="stimme" data-stimme="frau">SERAPHINA<small>weiblich, angenehm</small></button>
+        </div>
+      </section>
+
+      <section data-bereich="ki" hidden>
+        <h3 class="abschnitt">KI</h3>
+        <p class="hinweis" id="kiHinweis">Lokal läuft alles auf dem Laptop, nichts verlässt ihn. Claude ist klüger und schneller, kostet aber pro Frage etwas Geld, und Nachricht, Verlauf, Erinnerungen und Suchergebnisse gehen an Anthropic.</p>
+        <p class="hinweis" id="kiOhneSchluessel" hidden>Für Claude fehlt der API-Schlüssel: in die Datei .env die Zeile ANTHROPIC_API_KEY=... eintragen und Hermes neu starten.</p>
+        <div class="stimmen">
+          <button type="button" class="stimme" data-ki="lokal">LOKAL<small>Ollama auf dem Laptop</small></button>
+          <button type="button" class="stimme" data-ki="claude" id="kiClaude" hidden>CLAUDE<small>online, mit API-Schlüssel</small></button>
         </div>
       </section>
 
@@ -935,7 +946,7 @@
       const res = await fetch("/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, chat_id: aktuellerChat, modus, bilder: meineBilder, live: liveAn,
+        body: JSON.stringify({ text, chat_id: aktuellerChat, modus, ki: kiAktiv(), bilder: meineBilder, live: liveAn,
           dokumente: meinePdfs.map((p) => ({ name: p.name, text: p.text })) }),
         signal: abbruch.signal,
       });
@@ -1294,6 +1305,21 @@
   }));
   stimmeAnzeigen();
 
+  // KI-Wahl (Einstellungen): lokal oder Claude. Claude gibt es nur, wenn der Server einen Schlüssel hat.
+  let kiWahl = "lokal", claudeDa = false;
+  try { kiWahl = localStorage.getItem("hermes-ki") === "claude" ? "claude" : "lokal"; } catch (e) {}
+  const kiAktiv = () => (kiWahl === "claude" && claudeDa ? "claude" : "lokal");
+  function kiAnzeigen() {
+    document.getElementById("kiClaude").hidden = !claudeDa;
+    document.getElementById("kiOhneSchluessel").hidden = claudeDa;
+    document.querySelectorAll("[data-ki]").forEach((b) => b.classList.toggle("aktiv", b.dataset.ki === kiAktiv()));
+  }
+  document.querySelectorAll("[data-ki]").forEach((b) => b.addEventListener("click", () => {
+    kiWahl = b.dataset.ki;
+    try { localStorage.setItem("hermes-ki", kiWahl); } catch (e) {}
+    kiAnzeigen(); ladeStatus();
+  }));
+
   // ---------- Münze und Würfel im Logo ----------
   const WURF_DAUER = 2900, WURF_ZEIGEN = 3000;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
   const wurfAnzeige = document.getElementById("wurfanzeige");
@@ -1542,8 +1568,13 @@
       const s = await (await fetch("/status")).json();
       modiInfo = s.modi; modusHinweis();
       statuspunkt.className = s.ollama ? "an" : "aus";
-      statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
-      document.getElementById("gpuwarnung").hidden = s.grafikkarte;
+      claudeDa = !!s.claude; kiAnzeigen();
+      if (kiAktiv() === "claude") {
+        statuspunkt.className = "an"; statustext.textContent = "LAPTOP · CLAUDE";
+      } else {
+        statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
+      }
+      document.getElementById("gpuwarnung").hidden = s.grafikkarte || kiAktiv() === "claude";
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
       statuspunkt.className = "aus";

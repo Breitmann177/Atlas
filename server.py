@@ -289,9 +289,8 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
     if frage.strip().endswith("?") or not SELBSTAUSSAGE.search(frage):
         return []
     try:
-        r = requests.post(
-            OLLAMA_URL + "/api/chat",
-            json={
+        inhalt = ki_json_anfrage(
+            {
                 "model": modell, "stream": False, "think": False, "keep_alive": HALTEN,
                 "options": {"num_ctx": NUM_CTX, "temperature": 0},
                 "format": {
@@ -314,7 +313,7 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
             },
             timeout=90,
         )
-        fakten = json.loads(r.json()["message"]["content"]).get("fakten", [])
+        fakten = json.loads(inhalt).get("fakten", [])
     except Exception:
         return []
     vorhanden = [e["text"].lower() for e in alle_erinnerungen()]
@@ -427,6 +426,131 @@ STANDARD_STIMME = "alfred"
 # George = ruhiger britischer Erzähler, spricht mit dem Multilingual-Modell auch Deutsch.
 ELEVENLABS_KEY = os.environ.get("ELEVENLABS_API_KEY", "").strip()
 ELEVENLABS_STIMME = os.environ.get("ELEVENLABS_STIMME", "JBFqnCBsd6RMkjVDRZzb")
+
+# ---------- KI-Anbieter: lokal (Ollama) oder Claude über einen API-Schlüssel ----------
+# Schlüssel NUR in .env: ANTHROPIC_API_KEY=... Dann erscheint "Claude" in den Einstellungen unter KI.
+# Ohne Schlüssel oder bei Wahl "lokal" läuft alles wie bisher über Ollama.
+# Mit Claude gehen die Nachricht, der Verlauf, die Erinnerungen und Suchergebnisse an Anthropic; es kostet pro Frage Geld.
+CLAUDE_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+CLAUDE_MODELL = os.environ.get("CLAUDE_MODELL", "claude-sonnet-5-5").strip()
+_ki = threading.local()  # die Wahl gilt pro Anfrage (siehe chat_stream), nicht für den ganzen Server
+_claude_client = None
+
+
+class KiFehler(Exception):
+    """Fehler beim Online-Anbieter, Text ist schon für den Nutzer formuliert."""
+
+
+def claude_aktiv() -> bool:
+    return bool(CLAUDE_KEY) and getattr(_ki, "wahl", "lokal") == "claude"
+
+
+def claude():
+    global _claude_client
+    if _claude_client is None:
+        import anthropic  # erst hier: Hermes läuft auch ohne das Paket, solange niemand Claude wählt
+        _claude_client = anthropic.Anthropic(api_key=CLAUDE_KEY, max_retries=2)
+    return _claude_client
+
+
+def _bildtyp(b64: str) -> str:
+    """Erkennt das Bildformat am Anfang der base64-Daten; Claude will es wissen, Ollama nicht."""
+    for anfang, typ in (("iVBOR", "image/png"), ("/9j/", "image/jpeg"), ("R0lG", "image/gif"), ("UklG", "image/webp")):
+        if b64.startswith(anfang):
+            return typ
+    return "image/jpeg"
+
+
+def claude_nachrichten(messages: list[dict]) -> tuple[str, list[dict]]:
+    """Ollama-Nachrichten -> (system, messages) für Claude. Claude will den Systemtext extra,
+    Bilder als eigene Blöcke, und das Gespräch muss mit dem Nutzer beginnen."""
+    system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+    liste = []
+    for m in messages:
+        if m["role"] not in ("user", "assistant"):
+            continue
+        inhalt = m["content"] or "..."
+        if m.get("images"):
+            inhalt = [{"type": "image", "source": {"type": "base64", "media_type": _bildtyp(b), "data": b}}
+                      for b in m["images"]] + [{"type": "text", "text": inhalt}]
+        if liste and liste[-1]["role"] == m["role"]:  # zwei gleiche Rollen hintereinander: zusammenlegen
+            alt = liste[-1]["content"]
+            if isinstance(alt, str) and isinstance(inhalt, str):
+                liste[-1]["content"] = alt + "\n\n" + inhalt
+            else:
+                bloecke = lambda x: x if isinstance(x, list) else [{"type": "text", "text": x}]
+                liste[-1]["content"] = bloecke(alt) + bloecke(inhalt)
+        else:
+            liste.append({"role": m["role"], "content": inhalt})
+    while liste and liste[0]["role"] != "user":
+        liste.pop(0)
+    return system, liste
+
+
+def _streng(schema):
+    """Claude verlangt bei JSON-Vorgaben additionalProperties=false an jedem Objekt."""
+    if isinstance(schema, dict):
+        schema = {k: _streng(v) for k, v in schema.items()}
+        if schema.get("type") == "object":
+            schema["additionalProperties"] = False
+    return schema
+
+
+def _claude_fehler(e: Exception) -> KiFehler:
+    import anthropic
+    if isinstance(e, anthropic.AuthenticationError):
+        return KiFehler("Claude lehnt den API-Schlüssel ab. Bitte ANTHROPIC_API_KEY in .env prüfen.")
+    if isinstance(e, anthropic.PermissionDeniedError):
+        return KiFehler("Claude: kein Zugriff (Guthaben oder Freigabe des Kontos prüfen).")
+    if isinstance(e, anthropic.RateLimitError):
+        return KiFehler("Claude: zu viele Anfragen gerade, bitte kurz warten.")
+    if isinstance(e, anthropic.APIConnectionError):
+        return KiFehler("Claude ist nicht erreichbar. Gibt es Internet?")
+    if isinstance(e, anthropic.APIStatusError):
+        return KiFehler(f"Claude-Fehler {e.status_code}: {str(e.message)[:200]}")
+    return KiFehler(f"Claude-Fehler: {type(e).__name__}")
+
+
+def ki_json_anfrage(body: dict, timeout) -> str:
+    """Kurze JSON-Antwort (Analyse, Werkzeugwahl, Erinnerungen). body ist im Ollama-Format;
+    mit Claude wird es übersetzt. Gibt den JSON-Text zurück, Fehler gehen an den Aufrufer."""
+    if not claude_aktiv():
+        return requests.post(OLLAMA_URL + "/api/chat", json=body, timeout=timeout).json()["message"]["content"]
+    system, nachrichten = claude_nachrichten(body["messages"])
+    try:
+        r = claude().with_options(timeout=timeout).messages.create(
+            model=CLAUDE_MODELL, max_tokens=2000, system=system, messages=nachrichten,
+            # effort low: Diese Schritte sind einfach und sollen schnell gehen
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": _streng(body["format"])}},
+        )
+    except Exception as e:
+        raise _claude_fehler(e) from e
+    return next((b.text for b in r.content if b.type == "text"), "{}")
+
+
+def claude_stream(messages, modus):
+    """Wie modell_stream, nur mit Claude. Gründlich = mehr Nachdenken (effort), schnell = wenig."""
+    system, nachrichten = claude_nachrichten(messages)
+    yield "denkt", ""
+    try:
+        with claude().messages.stream(
+            model=CLAUDE_MODELL, max_tokens=8000, system=system, messages=nachrichten,
+            output_config={"effort": "medium" if modus.get("think") else "low"},
+        ) as stream:
+            etwas = False
+            for text in stream.text_stream:
+                text = EMOJI.sub("", text)
+                if text:
+                    etwas = True
+                    yield "token", text
+            if stream.get_final_message().stop_reason == "refusal" and not etwas:
+                yield "token", "Dazu kann ich leider nichts sagen."
+    except KiFehler:
+        raise
+    except Exception as e:
+        if type(e).__module__.startswith("anthropic"):
+            raise _claude_fehler(e) from e
+        raise
 
 
 def _elevenlabs_sprechen(text: str) -> bytes:
@@ -660,7 +784,7 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "grafikkarte": grafikkarte_aktiv(),
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "grafikkarte": grafikkarte_aktiv(),
             "ersatzstimme": time.time() < _online_pause_bis}
 
 
@@ -679,6 +803,7 @@ class Frage(BaseModel):
     modus: str = "auto"  # auto, schnell oder gruendlich
     dokumente: list[Dokument] = []  # aus /pdf-lesen: gelesener Text angehängter PDFs
     bilder: list[str] = []  # base64 (mit oder ohne "data:image/...;base64,"-Anfang)
+    ki: str = "lokal"  # "lokal" (Ollama) oder "claude" (nur mit ANTHROPIC_API_KEY in .env)
     live: bool = False  # Live-Sprachmodus: Antwort wird vorgelesen, also kurz und ohne Markdown
 
 
@@ -998,9 +1123,8 @@ def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict], dok_namen: li
     wissen = "\n".join("- " + e["text"] for e in alle_erinnerungen()) or "(nichts)"
     doks = ", ".join(dok_namen) or "(keine)"
     try:
-        r = requests.post(
-            OLLAMA_URL + "/api/chat",
-            json={
+        inhalt = ki_json_anfrage(
+            {
                 "model": modell, "stream": False, "think": False, "keep_alive": HALTEN,
                 "options": {"num_ctx": NUM_CTX, "temperature": 0},
                 "format": {
@@ -1043,7 +1167,7 @@ def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict], dok_namen: li
             },
             timeout=60,
         )
-        j = json.loads(r.json()["message"]["content"])
+        j = json.loads(inhalt)
         werkzeug, eingabe = j.get("werkzeug"), (j.get("eingabe") or "").strip()[:200]
         if werkzeug not in WERKZEUGE or (werkzeug in ("suche", "rechnen") and not eingabe):
             return "keins", ""
@@ -1139,6 +1263,9 @@ MAX_ANTWORT = 1500
 
 
 def modell_stream(messages, modus):
+    if claude_aktiv():
+        yield from claude_stream(messages, modus)
+        return
     body = {"model": modus["name"], "messages": messages, "stream": True, "think": modus["think"],
             "keep_alive": HALTEN, "options": {"num_ctx": NUM_CTX, "temperature": 0.3, "num_predict": MAX_DENKEN + MAX_ANTWORT}}
     denken = 0
@@ -1265,9 +1392,8 @@ MODELL_START_SEKUNDEN = 120
 def _modell_json(system: str, nutzer: str, feld: str) -> str:
     """Kurze JSON-Antwort vom Modell; leer bei jedem Fehler."""
     try:
-        r = requests.post(
-            OLLAMA_URL + "/api/chat",
-            json={
+        inhalt = ki_json_anfrage(
+            {
                 "model": HILFSMODELL, "stream": False, "think": False, "keep_alive": HALTEN,
                 "options": {"num_ctx": NUM_CTX, "temperature": 0},
                 "format": {"type": "object", "properties": {feld: {"type": "string"}}, "required": [feld]},
@@ -1275,7 +1401,7 @@ def _modell_json(system: str, nutzer: str, feld: str) -> str:
             },
             timeout=MODELL_START_SEKUNDEN,
         )
-        return (json.loads(r.json()["message"]["content"]).get(feld) or "").strip()
+        return (json.loads(inhalt).get(feld) or "").strip()
     except Exception:
         return ""
 
@@ -1310,9 +1436,8 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     # Ohne Quellenliste: Sie lenkte die Einordnung nur ab
     kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
     try:
-        r = requests.post(
-            OLLAMA_URL + "/api/chat",
-            json={
+        inhalt = ki_json_anfrage(
+            {
                 "model": HILFSMODELL, "stream": False, "think": False, "keep_alive": HALTEN,
                 "options": {"num_ctx": NUM_CTX, "temperature": 0},
                 "format": {"type": "object", "properties": {"art": {"type": "string", "enum": ANALYSE_ARTEN},
@@ -1323,7 +1448,7 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
             },
             timeout=MODELL_START_SEKUNDEN,  # nach einem Neustart muss das Modell erst laden: Sonst fiele die Analyse aus
         )
-        j = json.loads(r.json()["message"]["content"])
+        j = json.loads(inhalt)
         art, anfrage = j.get("art", ""), re.sub(r"\s+", " ", j.get("suchanfrage") or "").strip(" ?!.,")[:200]
     except Exception:
         return "", ""
@@ -1699,6 +1824,23 @@ def ollama_erreichbar() -> bool:
 
 
 def chat_stream(frage: Frage):
+    """Setzt vor jedem Schritt die KI-Wahl dieser Anfrage, dann läuft _chat_stream wie gewohnt."""
+    gen, wahl = _chat_stream(frage), (frage.ki if frage.ki in ("lokal", "claude") else "lokal")
+    try:
+        while True:
+            _ki.wahl = wahl
+            try:
+                e = next(gen)
+            except StopIteration:
+                return
+            finally:
+                _ki.wahl = "lokal"
+            yield e
+    finally:
+        gen.close()
+
+
+def _chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
     if bilder:
@@ -1774,7 +1916,7 @@ def chat_stream(frage: Frage):
         yield ev(typ="fertig")
         return
 
-    if not ollama_erreichbar():
+    if not claude_aktiv() and not ollama_erreichbar():
         yield ev(typ="fehler", text=OLLAMA_AUS_TEXT)
         yield ev(typ="fertig")
         return
@@ -2020,6 +2162,9 @@ def chat_stream(frage: Frage):
                        or ([f"Der Nutzer wohnt in {wetter_ort}."] if wetter_ort and not wohnort() else []))
         if vorschlaege:
             yield ev(typ="vorschlag", fakten=vorschlaege)
+    except KiFehler as e:
+        print("KI-FEHLER:", e, flush=True)
+        yield ev(typ="fehler", text=str(e))
     except OllamaFehler as e:
         print("OLLAMA-FEHLER:", e, flush=True)  # auch im Server-Fenster sichtbar
         yield ev(typ="fehler", text=f"Ollama-Fehler: {e}")
