@@ -71,22 +71,33 @@ chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$APPS"
 if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-    green "Hermes als Dienst einrichten (startet nur, wenn du die App öffnest)"
+    green "Hermes als Dienst einrichten (startet erst beim ersten Aufruf, vom Laptop oder Handy)"
     UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     mkdir -p "$UNIT_DIR"
+    cat > "$UNIT_DIR/hermes.socket" <<EOF
+[Unit]
+Description=Hermes Box: startet Hermes beim ersten Aufruf (Laptop oder Handy)
+
+[Socket]
+ListenStream=127.0.0.1:8000
+
+[Install]
+WantedBy=sockets.target
+EOF
     cat > "$UNIT_DIR/hermes.service" <<EOF
 [Unit]
 Description=Hermes Box (lokaler KI-Assistent)
-After=network-online.target
+Requires=hermes.socket
+After=hermes.socket network-online.target
 
 [Service]
 WorkingDirectory=$DIR
-ExecStart=$DIR/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8000
+ExecStart=$DIR/.venv/bin/python -m uvicorn server:app --fd 3
 Restart=on-failure
 RestartSec=3
-
 EOF
     systemctl --user daemon-reload
+    systemctl --user enable --now hermes.socket
     EXEC="$DIR/hermes-app.sh"; TERM_APP=false
 else
     warn "Kein systemd: Hermes startet über ein Terminalfenster (./start.sh)."
