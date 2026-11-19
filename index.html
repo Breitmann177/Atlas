@@ -602,6 +602,13 @@
   .kachel[data-design="hell"] { background-color:#f8f7f3; color:#1b1a17; }
   .kachel[data-design="grau"] { background-color:#1f2023; color:#eeeef0; }
   .kachel.aktiv { border:2px solid var(--akzent); }
+
+  /* ---- Fixes: weißes Leuchten, Plus-Menü im leeren Chat nach unten, Plus dreht sich nicht ---- */
+  body:not(.klein)::after { background:radial-gradient(closest-side, rgba(255,255,255,.055), transparent); }
+  [data-theme="hell"] body:not(.klein)::after, body[data-x]::after { background:radial-gradient(closest-side, rgba(0,0,0,.035), transparent); }
+  body:not(.klein) #plusmenue { top:calc(100% + 8px); bottom:auto; transform-origin:top left; }
+  #plus[aria-expanded="true"] { transform:none; background:var(--karte); color:var(--fg); }
+  #plusmenue { box-shadow:0 16px 48px -12px rgba(0,0,0,.6); border-color:var(--rand); }
 </style>
 
 </head>
@@ -614,12 +621,12 @@
   <button type="button" id="menueKnopf" title="Chats und Einstellungen" aria-label="Menü">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
   </button>
-  <div class="logo"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg>Atlas</div>
+  <div class="logo">Atlas</div>
 </header>
 
 <main id="fenster">
   <div id="chat">
-    <div id="hero"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg><h1 id="gruss">Hallo</h1></div>
+    <div id="hero"><h1 id="gruss">Hallo</h1></div>
   </div>
 </main>
 
@@ -675,7 +682,7 @@
 <div id="schleier"></div>
 <aside id="seite">
   <div class="seitenkopf">
-    <span class="seitenlogo"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg>Atlas</span>
+    <span class="seitenlogo">Atlas</span>
     <div class="kopfknoepfe">
       <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
