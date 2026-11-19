@@ -336,15 +336,26 @@ _gpu_kaputt = False
 
 
 def _cuda_dlls():
-    """Die CUDA-Bibliotheken liegen als pip-Pakete in der venv; Windows muss sie dort finden."""
+    """Die CUDA-Bibliotheken liegen als pip-Pakete in der venv; das System muss sie dort finden.
+    Windows: Ordner nvidia/*/bin zum Suchpfad. Linux: nvidia/*/lib/*.so vorab laden, denn LD_LIBRARY_PATH
+    wirkt erst beim Programmstart; schon geladene Bibliotheken findet Linux danach über ihren Namen."""
+    import ctypes
     import glob
     import site
 
     for basis in site.getsitepackages():
-        for ordner in glob.glob(os.path.join(basis, "nvidia", "*", "bin")):
-            os.environ["PATH"] = ordner + os.pathsep + os.environ.get("PATH", "")
-            if hasattr(os, "add_dll_directory"):
+        if os.name == "nt":
+            for ordner in glob.glob(os.path.join(basis, "nvidia", "*", "bin")):
+                os.environ["PATH"] = ordner + os.pathsep + os.environ.get("PATH", "")
                 os.add_dll_directory(ordner)
+        else:
+            # zweimal: manche Bibliotheken brauchen andere, die alphabetisch später kommen
+            for _ in range(2):
+                for datei in sorted(glob.glob(os.path.join(basis, "nvidia", "*", "lib", "lib*.so*"))):
+                    try:
+                        ctypes.CDLL(datei, mode=ctypes.RTLD_GLOBAL)
+                    except OSError:
+                        pass
 
 
 def whisper(groesse: str = "medium"):
