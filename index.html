@@ -361,7 +361,57 @@
   .gefahr { padding:10px; font-size:11px; }
   .abmelden { margin-top:8px; border-color:var(--rand); color:var(--dim); }
   .abmelden:hover { background:var(--btn); color:var(--btnfg); border-color:var(--btn); }
+  /* ---- Seitenleiste im Claude-Stil: ruhig, Satzschreibung, Linien-Symbole ---- */
+  #seite { font-family:system-ui,"Segoe UI",sans-serif; padding:14px 10px 12px; gap:6px; border-right:1px solid var(--line);
+           box-shadow:none; width:min(300px,88vw); }
+  #seite::before { display:none; }
+  #seite svg { width:18px; height:18px; flex-shrink:0; }
+  .seitenkopf { padding:2px 4px 10px 10px; border-bottom:0; }
+  .seitenlogo { font-family:inherit; letter-spacing:0; font-size:17px; font-weight:600; }
+  .kopfknoepfe .leise, .kopfknoepfe .zahnrad, .kopfknoepfe #zu { width:32px; height:32px; border-radius:8px; opacity:1; color:var(--dim); }
+  .kopfknoepfe .leise:hover, .kopfknoepfe .zahnrad.aktiv { background:var(--karte); color:var(--fg); }
+  .kopfknoepfe .leise svg { width:18px; height:18px; }
+  .zahnrad:hover svg, .zahnrad.aktiv svg { transform:none; }
+  .bereich { gap:2px; }
+  .neuerchat { justify-content:flex-start; gap:10px; padding:8px 10px; border:0; border-radius:8px; background:none;
+               color:var(--fg); font-family:inherit; font-size:14px; letter-spacing:0; font-weight:500; }
+  .neuerchat:hover { background:var(--karte); color:var(--fg); transform:none; box-shadow:none; }
+  .neuerchat .plus { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--btn); color:var(--btnfg); }
+  .neuerchat .plus svg { width:14px; height:14px; stroke-width:2.2; }
+  .suchfeld { display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:8px; color:var(--dim); cursor:text; }
+  .suchfeld:hover, .suchfeld:focus-within { background:var(--karte); }
+  .suchfeld svg { margin:0 3px; }
+  .suche, .suche:focus { border:0; background:none; border-radius:0; padding:9px 0; font-size:14px; }
+  .suche::placeholder { color:var(--dim); }
+  .abschnitt, #ansicht-chats .abschnitt { font-family:inherit; letter-spacing:0; font-size:12px; font-weight:500; color:var(--dim);
+               margin:16px 10px 4px; }
+  .abschnitt::after { display:none; }
+  .listen { gap:1px; }
+  .listen li { animation:none; }
+  .titel { padding:7px 10px; border-radius:8px; border:0; font-size:14px; color:var(--fg); }
+  .titel::before, .titel.aktiv::before { display:none; }
+  .titel:hover { background:var(--karte); transform:none; }
+  .titel.aktiv { background:var(--karte); }
+  .listen li .leise { display:grid; place-items:center; width:28px; height:28px; padding:0; border-radius:6px; font-size:0; }
+  .listen li .leise svg { width:16px; height:16px; }
+  .listen li .leise:hover { background:var(--karte); }
+  .listen li.leer { padding:6px 10px; font-size:13px; }
+  .zurueck { display:flex; align-items:center; gap:6px; border:0; padding:7px 10px; border-radius:8px; font-family:inherit;
+             font-size:14px; letter-spacing:0; color:var(--dim); }
+  .zurueck:hover { background:var(--karte); color:var(--fg); }
+  #einstMenue { gap:1px; }
+  #einstMenue button { gap:12px; padding:8px 10px; border-radius:8px; font-size:14px; }
+  #einstMenue .symbol { display:grid; place-items:center; color:var(--dim); filter:none; }
+  #einstMenue button:hover .symbol { color:var(--fg); }
+  #einstMenue .pfeil { display:grid; color:var(--dim); }
+  #einstMenue .pfeil svg { width:16px; height:16px; }
+  .einst section { padding:4px 10px; }
+  .einst .abschnitt { margin:6px 0 8px; font-size:15px; font-weight:600; color:var(--fg); }
+  .gefahr { font-family:inherit; letter-spacing:0; font-size:14px; border-radius:8px; padding:9px 12px; text-align:left; }
+  .gefahr:hover { background:var(--karte); }
+  .fuss { font-family:inherit; letter-spacing:0; font-size:12px; border-top:1px solid var(--line); padding:10px 10px 0; }
 </style>
+
 </head>
 <body>
 <canvas id="auge" title="Menü"></canvas>
@@ -421,7 +471,7 @@
 <div id="schleier"></div>
 <aside id="seite">
   <div class="seitenkopf">
-    <span class="seitenlogo">HERMES</span>
+    <span class="seitenlogo">Hermes</span>
     <div class="kopfknoepfe">
       <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -435,34 +485,34 @@
 
   <!-- Ansicht 1: Chats -->
   <div class="bereich" id="ansicht-chats">
-    <button class="neuerchat" id="neuerChat"><span>+</span>NEUER CHAT</button>
-    <input class="suche" id="suche" placeholder="Chats durchsuchen ..." autocomplete="off">
-    <h3 class="abschnitt">CHATS</h3>
+    <button class="neuerchat" id="neuerChat"><span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></span>Neuer Chat</button>
+    <label class="suchfeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="suche" id="suche" placeholder="Chats durchsuchen" autocomplete="off"></label>
+    <h3 class="abschnitt">Chats</h3>
     <ul class="listen" id="chatListe"></ul>
   </div>
 
   <!-- Ansicht 2: Einstellungen (Zahnrad) -->
   <div class="bereich" id="ansicht-einstellungen" hidden>
-    <button class="zurueck" id="zurueck">← ZURÜCK</button>
+    <button class="zurueck" id="zurueck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Zurück</button>
     <div class="einst">
       <nav id="einstMenue" aria-label="Einstellungen">
-        <button type="button" data-oeffnet="erinnerungen"><span class="symbol" aria-hidden="true">🧠</span>Erinnerungen<span class="pfeil" aria-hidden="true">›</span></button>
-        <button type="button" data-oeffnet="design"><span class="symbol" aria-hidden="true">🎨</span>Design<span class="pfeil" aria-hidden="true">›</span></button>
-        <button type="button" data-oeffnet="ki"><span class="symbol" aria-hidden="true">🤖</span>KI<span class="pfeil" aria-hidden="true">›</span></button>
-        <button type="button" data-oeffnet="stimme"><span class="symbol" aria-hidden="true">🔊</span>Stimme<span class="pfeil" aria-hidden="true">›</span></button>
-        <button type="button" data-oeffnet="wake"><span class="symbol" aria-hidden="true">🎙️</span>Wake-Word<span class="pfeil" aria-hidden="true">›</span></button>
-        <button type="button" data-oeffnet="daten"><span class="symbol" aria-hidden="true">🗂️</span>Daten<span class="pfeil" aria-hidden="true">›</span></button>
+        <button type="button" data-oeffnet="erinnerungen"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2a2.5 2.5 0 0 1 2.5 2.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2a2.5 2.5 0 0 0-2.5 2.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2Z"/></svg></span>Erinnerungen<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button type="button" data-oeffnet="design"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor"/></svg></span>Design<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button type="button" data-oeffnet="ki"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="12" rx="3"/><path d="M12 7V4"/><circle cx="12" cy="3.5" r=".5"/><path d="M9.5 12v1.5M14.5 12v1.5"/><path d="M2.5 12v3M21.5 12v3"/></svg></span>KI<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button type="button" data-oeffnet="stimme"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></span>Stimme<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button type="button" data-oeffnet="wake"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3.5"/></svg></span>Wake-Word<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button type="button" data-oeffnet="daten"><span class="symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.66 3.58 3 8 3s8-1.34 8-3v-13"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg></span>Daten<span class="pfeil"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></span></button>
       </nav>
 
       <section data-bereich="erinnerungen" hidden>
-        <h3 class="abschnitt">ERINNERUNGEN</h3>
+        <h3 class="abschnitt">Erinnerungen</h3>
         <p class="hinweis">Das weiß Hermes über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
         <ul class="listen" id="liste"></ul>
         <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
       </section>
 
       <section data-bereich="design" hidden>
-        <h3 class="abschnitt">DESIGN</h3>
+        <h3 class="abschnitt">Design</h3>
         <div class="kacheln">
           <button class="kachel" data-design="dunkel">DUNKEL</button>
           <button class="kachel" data-design="grau">GRAU</button>
@@ -471,7 +521,7 @@
       </section>
 
       <section data-bereich="stimme" hidden>
-        <h3 class="abschnitt">STIMME</h3>
+        <h3 class="abschnitt">Stimme</h3>
         <p class="hinweis">Klick auf eine Stimme spielt eine Probe und übernimmt sie. Die Stimmen brauchen Internet (der Text geht dafür an Microsoft); ohne Internet springt eine lokale Stimme ein.</p>
         <div class="stimmen">
           <button type="button" class="stimme" data-stimme="george" id="stimmeGeorge" hidden>GEORGE<small>ElevenLabs, sehr natürlich</small></button>
@@ -491,7 +541,7 @@
       </section>
 
       <section data-bereich="wake" hidden>
-        <h3 class="abschnitt">WAKE-WORD</h3>
+        <h3 class="abschnitt">Wake-Word</h3>
         <p class="hinweis">Sagen Sie „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
         <div class="schalter-zeile" id="wakeZeile">
           <b id="wakeText">AUS</b>
@@ -500,9 +550,9 @@
       </section>
 
       <section data-bereich="daten" hidden>
-        <h3 class="abschnitt">DATEN</h3>
-        <button class="gefahr" id="alleLoeschen">ALLE CHATS LÖSCHEN</button>
-        <button class="gefahr abmelden" id="abmelden" hidden>ABMELDEN</button>
+        <h3 class="abschnitt">Daten</h3>
+        <button class="gefahr" id="alleLoeschen">Alle Chats löschen</button>
+        <button class="gefahr abmelden" id="abmelden" hidden>Abmelden</button>
       </section>
     </div>
   </div>
@@ -1570,15 +1620,15 @@
       statuspunkt.className = s.ollama ? "an" : "aus";
       claudeDa = !!s.claude; kiAnzeigen();
       if (kiAktiv() === "claude") {
-        statuspunkt.className = "an"; statustext.textContent = "LAPTOP · CLAUDE";
+        statuspunkt.className = "an"; statustext.textContent = "Laptop · Claude";
       } else {
-        statustext.textContent = "LAPTOP · " + (s.ollama ? "ONLINE" : "OLLAMA AUS");
+        statustext.textContent = "Laptop · " + (s.ollama ? "Online" : "Ollama aus");
       }
       document.getElementById("gpuwarnung").hidden = s.grafikkarte || kiAktiv() === "claude";
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
       statuspunkt.className = "aus";
-      statustext.textContent = "SERVER NICHT ERREICHBAR";
+      statustext.textContent = "Server nicht erreichbar";
     }
   }
 
@@ -1624,7 +1674,7 @@
       titel.addEventListener("click", () => oeffneChat(c.id));
       const weg = document.createElement("button");
       weg.className = "leise";
-      weg.textContent = "✕";
+      weg.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>'; weg.title = "Löschen";
       weg.addEventListener("click", async () => {
         if (!confirm("Diesen Chat löschen?")) return;
         await fetch("/chats/" + c.id, { method: "DELETE" });
@@ -1676,7 +1726,7 @@
       feld.addEventListener("change", () => schicke("PUT", "/erinnerungen/" + eintrag.id, feld.value.replace(/\s+/g, " ")));
       const weg = document.createElement("button");
       weg.className = "leise";
-      weg.textContent = "✕";
+      weg.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>'; weg.title = "Löschen";
       weg.addEventListener("click", () => schicke("DELETE", "/erinnerungen/" + eintrag.id));
       li.append(feld, weg);
       liste.appendChild(li);

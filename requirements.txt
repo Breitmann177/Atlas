@@ -4,6 +4,7 @@ requests
 ddgs
 trafilatura
 faster-whisper
+av<17  # ab PyAV 17 fehlt metadata_errors, faster-whisper 1.2.1 bricht dann ab
 python-multipart
 fpdf2
 pypdf

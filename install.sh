@@ -66,25 +66,52 @@ green "KI-Modelle laden (einmalig, zusammen etwa 8,5 GB)"
 ollama pull qwen3:8b
 ollama pull qwen3.5:4b
 
-# --- App-Menü-Eintrag (öffnet ein Terminal, schließen = Hermes beenden) ---------------------------
-green "Eintrag im App-Menü"
-chmod +x "$DIR/start.sh"
+# --- Hintergrund-Dienst (startet beim Anmelden) und App-Menü-Eintrag ohne Terminal ---------------
+chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$APPS"
+if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+    green "Hermes als Dienst einrichten (startet automatisch beim Anmelden)"
+    UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    mkdir -p "$UNIT_DIR"
+    cat > "$UNIT_DIR/hermes.service" <<EOF
+[Unit]
+Description=Hermes Box (lokaler KI-Assistent)
+After=network-online.target
+
+[Service]
+WorkingDirectory=$DIR
+ExecStart=$DIR/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload
+    systemctl --user enable hermes.service
+    systemctl --user restart hermes.service
+    EXEC="$DIR/hermes-app.sh"; TERM_APP=false
+else
+    warn "Kein systemd: Hermes startet über ein Terminalfenster (./start.sh)."
+    EXEC="$DIR/start.sh"; TERM_APP=true
+fi
+
+green "Eintrag im App-Menü"
 cat > "$APPS/hermes.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Hermes
 Comment=Lokaler KI-Assistent
-Exec="$DIR/start.sh"
+Exec="$EXEC"
 Path=$DIR
 Icon=$DIR/hermes.png
-Terminal=true
+Terminal=$TERM_APP
 Categories=Utility;
 Keywords=ki;assistent;jarvis;hermes;
 EOF
 update-desktop-database "$APPS" 2>/dev/null || true
 
-green "Fertig! Hermes startet jetzt (später: App-Menü → Hermes, oder ./start.sh)."
+green "Fertig! Hermes läuft im Hintergrund. Öffnen: App-Menü → Hermes (oder http://localhost:8000)."
 warn "Tipp: Ein Passwort kommt in die Datei .env (siehe README), sobald das Handy zugreifen soll."
-exec "$DIR/start.sh"
+exec "$EXEC"

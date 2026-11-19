@@ -42,7 +42,9 @@ cd hermes-box
 
 Das Skript installiert ein paar Systempakete, legt eine eigene Python-Umgebung an (über `uv`), installiert
 Ollama mit dem offiziellen Skript, lädt die KI-Modelle (einmalig etwa 8,5 GB) und trägt Hermes ins App-Menü ein.
-Später startet Hermes über das App-Menü oder `./start.sh`.
+Hermes läuft danach als Hintergrund-Dienst und startet beim Anmelden von selbst. Das App-Menü → Hermes öffnet
+nur noch den Browser, ohne Terminalfenster. Neu starten (z. B. nach Änderungen an `.env`):
+`systemctl --user restart hermes`, Ausgaben ansehen: `journalctl --user -u hermes -f`.
 
 **NVIDIA-Treiber:** Fedora bringt ohne Zusatz nur den freien Treiber mit, damit läuft die KI auf dem Prozessor.
 Den NVIDIA-Treiber gibt es über RPM Fusion:

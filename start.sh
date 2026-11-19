@@ -9,6 +9,11 @@ if [ ! -x ".venv/bin/python" ]; then
   exit 1
 fi
 
+# Als Dienst eingerichtet (install.sh)? Dann den Dienst nutzen statt eines zweiten Servers.
+if systemctl --user cat hermes.service >/dev/null 2>&1; then
+  exec "$(pwd)/hermes-app.sh"
+fi
+
 # Läuft Hermes schon? Dann nur den Browser öffnen.
 if curl -s -o /dev/null --max-time 2 http://127.0.0.1:8000/auth-status; then
   echo "Hermes läuft schon, öffne den Browser ..."
