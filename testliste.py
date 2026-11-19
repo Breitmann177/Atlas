@@ -136,6 +136,9 @@ BEZUG = [
     ("Wer ist Friedrich Merz?", "Der Bundeskanzler.", "Wie hoch ist der Eiffelturm?", ["eiffelturm"], ["merz"]),
     ("Wie weit ist es von Köln nach Bonn?", "Etwa 30 Kilometer.", "Wie mache ich Pizzateig?", ["pizza"], ["köln", "bonn"]),
 ]
+# Wikipedia: Suchwörter, Frage, erwarteter Artikel (None: lieber keiner als ein falscher)
+WIKI = [("Friedrich Merz Geburtsort", "Wo wurde Friedrich Merz geboren?", "Friedrich Merz"), ("Eiffelturm Baujahr", "Wann wurde der Eiffelturm gebaut?", "Eiffelturm"),
+        ("Zugspitze Höhe", "Wie hoch ist die Zugspitze?", "Zugspitze"), ("Pizzateig selbst machen", "Wie mache ich Pizzateig?", None)]
 GESPRAECHE = [
     (["ist es morgen kalt?", "freiburg"], ["Freiburg"]),
     (["Wie alt bin ich?", "19", "Wie alt bin ich?"], ["19"]),
@@ -228,6 +231,11 @@ W = lambda km, minuten: {"distance": km * 1000, "duration": minuten * 60}
 pruefe("Gleich schnell: kürzerer Weg", server.werkzeuge.kuerzester_weg([W(13.2, 15), W(11.2, 15)])["distance"], 11200)
 pruefe("Etwas langsamer, aber kürzer", server.werkzeuge.kuerzester_weg([W(13, 15), W(11, 16)])["distance"], 11000)
 pruefe("Viel langsamer zählt nicht", server.werkzeuge.kuerzester_weg([W(50, 30), W(40, 60)])["distance"], 50000)
+_ollama = server.OLLAMA_URL
+server.OLLAMA_URL = "http://127.0.0.1:9"  # dort läuft nichts
+pruefe("Ollama aus: sofortige Meldung", [json.loads(z)["typ"] for z in server.chat_stream(server.Frage(text="Wer ist Bundeskanzler?", chat_id=None, live=False))],
+       ["start", "fehler", "fertig"])
+server.OLLAMA_URL = _ollama
 pruefe("Umrechner öffnen", bool(server.werkzeuge.umrechnung_erkennen("Zeig mir den Umrechner")), True)
 pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
 pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
@@ -245,6 +253,11 @@ if "--voll" in sys.argv:
             ohne_werkzeug = ("hermes", "gespraech", "aufgabe")
             pruefe(f"Analyse: {text}", "ohne werkzeug" if art in ohne_werkzeug else art, "ohne werkzeug" if soll in ohne_werkzeug else soll)
     pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
+    print("Wikipedia:")
+    for anfrage, text, soll in WIKI:
+        w = server.werkzeuge.wikipedia(anfrage, text)
+        print(f"  {text!r} -> {w and w['titel']!r}", flush=True)
+        pruefe(f"Wikipedia: {text}", w and w["titel"], soll)
     print("Bezug:")
     for vorher, antwort, neu, muss, nicht in BEZUG:
         verlauf = [{"role": "user", "content": vorher}, {"role": "assistant", "content": antwort}, {"role": "user", "content": neu}]

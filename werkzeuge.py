@@ -223,6 +223,54 @@ def wetter(ort: str) -> str:
     return "\n".join(zeilen)
 
 
+# ---------- Wikipedia direkt: ganzer Artikelanfang statt Schnipsel aus der Websuche ----------
+WIKIPEDIA_API = "https://de.wikipedia.org/w/api.php"
+# Wikipedia verlangt eine Kennung mit Kontakt. Ohne Link kam nach wenigen Anfragen Fehler 429
+WIKIPEDIA_KOPF = {"User-Agent": "HermesBox/1.0 (https://github.com/Breitmann177/hermes-box) python-requests"}
+
+
+def _wiki_titel(suchwort: str) -> list[str]:
+    for versuch in range(3):  # Die Suche meldet oft kurz "too busy", dann klappt es beim nächsten Mal
+        d = requests.get(WIKIPEDIA_API, headers=WIKIPEDIA_KOPF, timeout=6,
+                         params={"action": "query", "format": "json", "list": "search", "srsearch": suchwort, "srlimit": 3}).json()
+        if "query" in d:
+            return [t["title"] for t in d["query"]["search"]]
+        time.sleep(0.5 + versuch)
+    return [suchwort.title() if suchwort.islower() else suchwort]  # Suche ausgefallen: Vielleicht heißt der Artikel genau so
+
+
+def wikipedia(anfrage: str, frage: str = "") -> dict | None:
+    """Der passende Artikel als {'titel', 'url', 'text'}, sonst None. Ein Artikel zählt nur, wenn sein Titel wirklich zur Frage
+    gehört: Die Suche liefert sonst auch zu "Friedrich Merz" zuerst Verwandte oder ganz andere Themen."""
+    fragewoerter = re.findall(r"[\wäöüß-]{2,}", (frage or anfrage).lower())
+
+    def passt(titel: str) -> bool:
+        # Jedes Titelwort muss in der Frage selbst stehen, gebeugt ist erlaubt ("Erster" zu "Ersten"). Die Suchanfrage zählt nicht:
+        # Ihre Hilfswörter brachten sonst Artikel wie "Erfinder" oder "Goethe-Jahr"
+        for wort in re.findall(r"[\wäöüß-]{2,}", re.sub(r"\(.*?\)", "", titel).lower()):
+            stamm = wort[:-2] if len(wort) > 5 else wort
+            if not any(f.startswith(stamm) and len(f) <= len(wort) + 3 for f in fragewoerter):
+                return False
+        return True
+
+    woerter = re.findall(r"[\wÄÖÜäöüß-]{4,}", anfrage)
+    try:
+        titel = next((t for suchwort in [anfrage, *sorted(woerter, key=len, reverse=True)[:2]] for t in _wiki_titel(suchwort) if passt(t)), None)
+        if not titel:
+            return None
+        seiten = requests.get(WIKIPEDIA_API, headers=WIKIPEDIA_KOPF, timeout=6, params={
+            "action": "query", "format": "json", "prop": "extracts|info", "titles": titel, "explaintext": 1, "inprop": "url", "redirects": 1,
+        }).json()["query"]["pages"]
+    except (requests.RequestException, ValueError, KeyError):
+        return None
+    seite = next(iter(seiten.values()))
+    text = (seite.get("extract") or "").strip()
+    # Begriffsklärungen ("Merkur steht für: ...") helfen nicht weiter
+    if len(text) < 200 or "steht für:" in text[:200] or "bezeichnet:" in text[:200]:
+        return None
+    return {"titel": seite["title"], "url": seite.get("fullurl") or f"https://de.wikipedia.org/wiki/{seite['title']}", "text": text[:4000]}
+
+
 # ---------- Umrechnen: Einheiten rechnet der Code, Kurse kommen täglich von der EZB (frankfurter.dev, ohne Konto) ----------
 EINHEITEN = {
     "Länge": {"Kilometer": 1000, "Meter": 1, "Zentimeter": 0.01, "Millimeter": 0.001, "Meilen": 1609.344, "Yard": 0.9144, "Fuß": 0.3048, "Zoll": 0.0254},

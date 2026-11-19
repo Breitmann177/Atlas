@@ -1687,6 +1687,17 @@ def treffer_passen(treffer: list[dict], frage: str) -> bool:
     return sum(w in text for w in woerter) / len(woerter) >= 0.6
 
 
+OLLAMA_AUS_TEXT = "Ollama ist nicht erreichbar. Läuft Ollama? (Startmenü oder 'ollama serve')"
+
+
+def ollama_erreichbar() -> bool:
+    """Kurzer Blick, ob Ollama läuft. Ohne ihn suchte Hermes erst 15 s im Internet und meldete den Fehler danach."""
+    try:
+        return requests.get(OLLAMA_URL + "/api/version", timeout=2).ok
+    except requests.RequestException:
+        return False
+
+
 def chat_stream(frage: Frage):
     modus = MODELLE.get(frage.modus, MODELLE["schnell"])
     bilder = bilder_bereinigen(frage.bilder)
@@ -1763,6 +1774,10 @@ def chat_stream(frage: Frage):
         yield ev(typ="fertig")
         return
 
+    if not ollama_erreichbar():
+        yield ev(typ="fehler", text=OLLAMA_AUS_TEXT)
+        yield ev(typ="fertig")
+        return
     messages = [{"role": "system", "content": system_prompt()}] + kuerzen(verlauf)
     # "Hermes, ..." am Satzanfang ist die Anrede, kein Thema: Das Modell hielt es sonst für den Paketdienst
     messages[-1] = {**messages[-1], "content": ANREDE.sub("", messages[-1]["content"]) or messages[-1]["content"]}
@@ -1896,6 +1911,10 @@ def chat_stream(frage: Frage):
         elif werkzeug == "suche":
             anfrage = eingabe
             yield ev(typ="status", text="sucht", detail=anfrage)
+            # Für feste Fakten zuerst Wikipedia. Bei zeitnahen Fragen nicht: Dort zählt die neueste Meldung
+            wiki = None if werkzeuge.ZEITNAH.search(gemeint) else werkzeuge.wikipedia(anfrage, gemeint)
+            if wiki:
+                quellen[wiki["url"]] = f"{wiki['titel']} – Wikipedia"
             try:
                 treffer = werkzeuge.suche(anfrage)
                 # Nicht gleich aufgeben: Passen die Treffer kaum zur Frage, wird mit der vollständigen Frage nachgesucht.
@@ -1905,12 +1924,18 @@ def chat_stream(frage: Frage):
                     treffer = [t for t in werkzeuge.suche(gemeint[:200]) if t["url"] not in gesehen] + treffer
             except Exception:
                 treffer = []
-            yield ev(typ="ergebnis", name="web_suche", ok=bool(treffer))
+            yield ev(typ="ergebnis", name="web_suche", ok=bool(treffer) or bool(wiki))
+            if wiki:
+                yield ev(typ="status", text="liest", detail=wiki["url"])
+                yield ev(typ="ergebnis", name="seite_lesen", ok=True)
             for t in treffer:
                 quellen[t["url"]] = t["titel"] or t["url"]
             teile = ["[%d] %s (%s)%s\n%s" % (i + 1, t["titel"], t["url"],
                                              f", vom {t['datum']}" if t.get("datum") else "", t["text"])
                      for i, t in enumerate(treffer)]
+            if wiki:
+                teile.insert(0, f"Wikipedia-Artikel „{wiki['titel']}“ ({wiki['url']}), für feste Fakten die erste Wahl:\n{wiki['text']}")
+                treffer = [t for t in treffer if werkzeuge._domain(t["url"]) != werkzeuge._domain(wiki["url"])]
             # die drei besten Seiten gleichzeitig lesen (nacheinander dauert es dreimal so lange)
             # Höchstens 5 s warten: eine langsame Seite soll nicht die ganze Antwort aufhalten
             pool = ThreadPoolExecutor(3)
@@ -1921,7 +1946,7 @@ def chat_stream(frage: Frage):
             laeufe = [(t["url"], pool.submit(werkzeuge.seite_lesen, t["url"], 2500)) for t in zu_lesen]
             gelesen = 0
             for url, lauf in laeufe:
-                if gelesen >= 3:
+                if gelesen >= (2 if wiki else 3):  # sonst wird der Text für das Modell zu lang und langsam
                     break
                 yield ev(typ="status", text="liest", detail=url)
                 try:
@@ -1999,7 +2024,7 @@ def chat_stream(frage: Frage):
         print("OLLAMA-FEHLER:", e, flush=True)  # auch im Server-Fenster sichtbar
         yield ev(typ="fehler", text=f"Ollama-Fehler: {e}")
     except requests.ConnectionError:
-        yield ev(typ="fehler", text="Ollama ist nicht erreichbar. Läuft Ollama? (Startmenü oder 'ollama serve')")
+        yield ev(typ="fehler", text=OLLAMA_AUS_TEXT)
     except Exception as e:
         print("FEHLER:", repr(e), flush=True)
         yield ev(typ="fehler", text=f"Fehler: {type(e).__name__}")

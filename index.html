@@ -506,7 +506,7 @@
   let beschaeftigt = false;
   let abbruch = null;  // AbortController der laufenden Antwort (für den Stopp-Knopf)
   let chatsAlle = [];
-  const STANDARD = "Schreiben Sie Hermes etwas ...";
+  const STANDARD = matchMedia("(max-width: 480px)").matches ? "Nachricht an Hermes" : "Schreiben Sie Hermes etwas ...";  // lang passt aufs Handy nicht
 
   const chat = document.getElementById("chat");
   const fenster = document.getElementById("fenster");
@@ -1883,6 +1883,7 @@
   try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
   setzeDesign(gespeichert);
   setzeModus(modus);
+  eingabe.placeholder = STANDARD;
   let wakeGespeichert = false;
   try { wakeGespeichert = localStorage.getItem("hermes-wake") === "an"; } catch (e) {}
   wakeSetzen(wakeGespeichert);
