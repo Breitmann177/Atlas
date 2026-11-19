@@ -42,9 +42,9 @@ cd hermes-box
 
 Das Skript installiert ein paar Systempakete, legt eine eigene Python-Umgebung an (über `uv`), installiert
 Ollama mit dem offiziellen Skript, lädt die KI-Modelle (einmalig etwa 8,5 GB) und trägt Hermes ins App-Menü ein.
-Hermes läuft danach als Hintergrund-Dienst und startet beim Anmelden von selbst. Das App-Menü → Hermes öffnet
-nur noch den Browser, ohne Terminalfenster. Neu starten (z. B. nach Änderungen an `.env`):
-`systemctl --user restart hermes`, Ausgaben ansehen: `journalctl --user -u hermes -f`.
+Danach startest du Hermes über das App-Menü → Hermes. Es öffnet sich in einem eigenen Fenster (mit Chromium,
+sonst im normalen Browser). Fenster schließen = Hermes beenden. Ein Autostart ist nicht eingerichtet.
+Ausgaben ansehen: `journalctl --user -u hermes -f`.
 
 **NVIDIA-Treiber:** Fedora bringt ohne Zusatz nur den freien Treiber mit, damit läuft die KI auf dem Prozessor.
 Den NVIDIA-Treiber gibt es über RPM Fusion:
@@ -114,3 +114,11 @@ python testliste.py --voll   # mit echten Antworten (dauert länger, Ollama muss
 ## Geplant
 - Box mit Display und LED-Ring
 - Smart Mirror
+
+## Auf dem iPhone (über Tailscale)
+1. Auf dem Laptop einmalig: `tailscale serve --bg --https=443 http://127.0.0.1:8000`
+   (beim ersten Mal zeigt Tailscale einen Link, um „Serve“ im Konto freizuschalten).
+2. In `.env`: `HERMES_PASSWORT=...` und `HERMES_HOSTS=<laptop>.<tailnet>.ts.net`, dann Hermes neu starten.
+3. Auf dem iPhone die Tailscale-App installieren, mit demselben Konto anmelden, in Safari
+   `https://<laptop>.<tailnet>.ts.net` öffnen, Passwort eingeben, dann Teilen → „Zum Home-Bildschirm“.
+Hermes ist vom Handy nur erreichbar, solange es auf dem Laptop geöffnet ist. Über HTTPS funktioniert auch das Mikrofon.

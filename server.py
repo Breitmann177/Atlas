@@ -71,7 +71,7 @@ def eingeloggt(request: Request) -> bool:
 
 def pruefe(request: Request):
     """Läuft vor JEDER Route. Nur Startseite und Login sind offen."""
-    if request.url.path in ("/", "/login") or eingeloggt(request):
+    if request.url.path in ("/", "/login", "/hermes.png") or eingeloggt(request):
         return
     raise HTTPException(401, "Nicht angemeldet")
 
@@ -2314,6 +2314,12 @@ def erinnerung_loeschen(eid: int):
     with db() as c:
         c.execute("DELETE FROM erinnerungen WHERE id=?", (eid,))
     return {"ok": True}
+
+
+@app.get("/hermes.png")
+def symbol():
+    """App-Symbol, z. B. für "Zum Home-Bildschirm" auf dem iPhone. Öffentlich, damit es auch vor dem Login lädt."""
+    return FileResponse("hermes.png", media_type="image/png")
 
 
 @app.get("/")

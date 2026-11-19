@@ -71,7 +71,7 @@ chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$APPS"
 if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-    green "Hermes als Dienst einrichten (startet automatisch beim Anmelden)"
+    green "Hermes als Dienst einrichten (startet nur, wenn du die App öffnest)"
     UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     mkdir -p "$UNIT_DIR"
     cat > "$UNIT_DIR/hermes.service" <<EOF
@@ -85,12 +85,8 @@ ExecStart=$DIR/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 80
 Restart=on-failure
 RestartSec=3
 
-[Install]
-WantedBy=default.target
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable hermes.service
-    systemctl --user restart hermes.service
     EXEC="$DIR/hermes-app.sh"; TERM_APP=false
 else
     warn "Kein systemd: Hermes startet über ein Terminalfenster (./start.sh)."
@@ -109,9 +105,10 @@ Icon=$DIR/hermes.png
 Terminal=$TERM_APP
 Categories=Utility;
 Keywords=ki;assistent;jarvis;hermes;
+StartupWMClass=hermes
 EOF
 update-desktop-database "$APPS" 2>/dev/null || true
 
-green "Fertig! Hermes läuft im Hintergrund. Öffnen: App-Menü → Hermes (oder http://localhost:8000)."
+green "Fertig! Hermes startet jetzt. Später: App-Menü → Hermes. Fenster schließen = Hermes beenden."
 warn "Tipp: Ein Passwort kommt in die Datei .env (siehe README), sobald das Handy zugreifen soll."
 exec "$EXEC"
