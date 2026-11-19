@@ -25,6 +25,12 @@ Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und L
 - Ruhige Oberfläche mit Begrüßung nach Tageszeit, Vorschlägen und weichen Animationen
 - Passwortschutz und Zugriff vom Handy (z. B. über Tailscale)
 
+## Wie Atlas arbeitet
+Atlas ist ein Agent: Die KI bekommt Werkzeuge (Websuche, Wetter, Nachrichten, Rechner, Umrechner, Weltzeit, Route,
+Timer, Münze, Würfel, Erinnerungen, PDF) und entscheidet selbst, wann sie welches aufruft – wie Claude oder ChatGPT.
+Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funktioniert mit dem lokalen Modell
+(`qwen3.5:9b` über Ollama) und mit Claude (API-Schlüssel in `.env`). `python testliste.py --voll` prüft echte Gespräche.
+
 ## Voraussetzungen
 - Windows 10/11 oder Linux (getestet wird auf Fedora)
 - Empfohlen: NVIDIA-Grafikkarte mit 8 GB Speicher. Ohne läuft alles auf dem Prozessor, nur deutlich langsamer.

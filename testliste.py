@@ -1,10 +1,11 @@
 """Feste Testliste für Atlas. Fängt ab, dass etwas kaputtgeht, das vorher lief.
 
-    python testliste.py          schnell: nur die Wege der Fragen, ohne KI (Sekunden)
-    python testliste.py --voll   zusätzlich echte Antworten mit Ollama und Internet (einige Minuten)
+    python testliste.py          schnell: Werkzeuge und Bausteine, ohne KI (Sekunden)
+    python testliste.py --voll   zusätzlich echte Gespräche mit Ollama und Internet (einige Minuten)
 
 Nutzt eine eigene leere Datenbank: Deine Chats und Erinnerungen bleiben unberührt.
-Die Vollprüfung sucht nur nach Stichwörtern. Ein Treffer heißt: wahrscheinlich richtig, nicht sicher richtig.
+Die Vollprüfung schaut, ob das richtige Werkzeug benutzt wurde und ob Stichwörter in der Antwort stehen.
+Ein Treffer heißt: wahrscheinlich richtig, nicht sicher richtig.
 """
 import json
 import os
@@ -12,11 +13,14 @@ import sys
 import tempfile
 import time
 
-ordner = tempfile.mkdtemp(prefix="hermes-test-")
+ordner = tempfile.mkdtemp(prefix="atlas-test-")
 
 import server  # noqa: E402
 
 server.DB = os.path.join(ordner, "test.db")
+server.WURF_SEKUNDEN = 0
+server.STANDARD_ORT = ""
+os.environ.pop("ATLAS_NUTZER", None)
 fehler = []
 
 
@@ -26,263 +30,109 @@ def pruefe(name, ist, soll):
         print(f"  FEHLER: {name}\n     erwartet {soll!r}, bekam {ist!r}")
 
 
-def weg(text, verlauf=()):
-    """Wohin geht eine Frage, wenn das Modell nicht gefragt wird? Die Festen zuerst, zuletzt der Rückweg ohne Analyse."""
-    if server.timer_erkennen(text):
-        return "timer"
-    if server.MUENZE.search(text):
-        return "münze"
-    if server.WUERFEL.search(text):
-        return "würfel"
-    if server.VORSTELLUNG.search(text):
-        return "vorstellung"
-    if server.HERKUNFT.search(text):
-        return "herkunft"
-    if server.FAEHIGKEIT.search(text):
-        return "fähigkeiten"
-    if server.UHRZEIT_ORT.search(text):
-        return "weltzeit"
-    if server.UHRZEIT.search(text) or server.DATUM_FRAGE.search(text):
-        return "uhr"
-    if server.BRIEFING.search(text):
-        return "briefing"
-    if server.NACHRICHTEN.search(text):
-        return "nachrichten"
-    if server.ist_smalltalk(text) or server.plauderei(text):
-        return "smalltalk"
-    if server.WETTER.search(text):
-        return "wetter"
-    if server.ohne_router(text, []):
-        return "kein werkzeug"
-    if server.direkte_suche(text, []):
-        return "suche"
-    return "router"
+def ausfuehren(name, args):
+    """Führt ein Werkzeug aus wie im Chat: (Events, Ergebnis fürs Modell)."""
+    events, gen = [], server.werkzeug_ausfuehren(name, args, server.Lauf(1, False))
+    try:
+        while True:
+            events.append(json.loads(next(gen)))
+    except StopIteration as e:
+        return events, e.value
 
 
-WEGE = [
-    ("Hallo, wie geht's?", "smalltalk"), ("hallo wie gehts", "smalltalk"), ("Danke dir", "smalltalk"),
-    ("Poah, heute muss ich echt viel machen", "smalltalk"), ("Guten Morgen", "briefing"), ("Gib mir die Nachrichten", "nachrichten"),
-    ("Wie spät ist es?", "uhr"), ("wie viel uhr ist es gerade", "uhr"), ("Welcher Tag ist heute?", "uhr"),
-    ("Wie spät ist es in Tokio?", "weltzeit"), ("Wie wird das Wetter morgen in Köln?", "wetter"),
-    ("Wie viel Grad ist es gerade in Heilbronn?", "wetter"), ("Regnet es heute?", "wetter"),
-    ("wie viel grad hat die sonne", "suche"), ("Stell einen Timer auf 5 Minuten", "timer"), ("Timer stopp", "timer"),
-    ("Wirf eine Münze", "münze"), ("Kannst du eine Münze werfen?", "münze"), ("Kopf oder Zahl?", "münze"),
-    ("Was ist eine Münze?", "suche"), ("Würfel mal", "würfel"), ("Was ist ein Würfel?", "suche"),
-    ("Was kannst du so alles?", "fähigkeiten"), ("Was sind die Fähigkeiten von Atlas?", "fähigkeiten"),
-    ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("atlas wie funktioniert das Thema grenzwerte", "suche"),
-    ("atlas wir sind hier in einem bewerbungsgespräch sag mal was über dich was du kannst etc", "vorstellung"),
-    ("Wer bist du?", "vorstellung"), ("Stell dich mal kurz vor", "vorstellung"), ("Erzähl mir was über dich", "vorstellung"),
-    ("Atlas, wer hat dich gebaut?", "herkunft"), ("Von wem wurdest du entwickelt?", "herkunft"),
-    ("Hat Alex dich komplett selbst programmiert?", "herkunft"), ("Wer hat das iPhone erfunden?", "suche"),
-    ("Kannst du dich vorstellen?", "vorstellung"), ("Kannst du dir vorstellen, dass es regnet?", "wetter"),
-    ("Erzähl mir was über Rom", "router"), ("Mach einfach, was du kannst", "router"),
-    ("Atlas, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
-    ("Wer ist Atlas in der griechischen Mythologie?", "suche"), ("Wie hoch ist der Eiffelturm?", "suche"),
-    ("Was sind 18 Prozent von 2450?", "router"), ("Wie schreibe ich eine Schleife in Python?", "router"),
-    ("Schreib mir ein Gedicht über Katzen", "kein werkzeug"), ("Stimmt das?", "router"),
-]
-SPRUCH_ERLAUBT = {"Poah, heute muss ich echt viel machen": True, "Ich bin so müde": True,
-                  "Mein Opa ist gestorben, ich bin traurig": False, "Was muss ich für die Klausur lernen?": False}
-PDF_WUNSCH = {"Mach mir ein PDF über Istanbul": True, "Schreib mir aus dem PDF raus, wann meine Tests sind": False,
-              "Was steht im PDF?": False, "Kannst du das als PDF speichern?": True}
-STIL = {"Antworte ab jetzt kürzer": True, "Atlas, sei in Zukunft lockerer": True, "Sprich nicht mehr so förmlich": True,
-        "Ich möchte, dass du ab jetzt ausführlicher antwortest": True, "Schreib das kürzer": False,
-        "Schreib mir einen Text, der immer lustig ist": False, "Ab jetzt regnet es immer": False}
-KORREKTUREN = {"Nein, das stimmt nicht, der Eiffelturm ist 330 Meter hoch": True, "Das ist falsch": True,
-               "Nicht Scholz, sondern Merz": True, "Danke, das war hilfreich": False}
-ORTE = {"Wie wird das Wetter morgen in Bad Homburg?": "Bad Homburg", "Wetter in Frankfurt am Main": "Frankfurt am Main",
-        "wetter in köln": "Köln", "Regnet es in der Nacht?": ""}
-# Stichwort: Eins davon muss vorkommen. falsch: Das darf nicht vorkommen.
-ANTWORTEN = [
-    ("Wer ist aktuell Bundeskanzler?", ["Merz"], ["Scholz ist"]),
-    ("Wer ist Bundespräsident von Deutschland?", ["Steinmeier"], []),
-    ("Was ist die Hauptstadt von Australien?", ["Canberra"], []),
-    ("Wer hat die Fußball-WM 2022 gewonnen?", ["Argentinien"], []),
-    ("Wer hat die Fußball-WM 2098 gewonnen?", ["nicht", "keine"], ["hat die Fußball-WM 2098 gewonnen."]),
-    ("Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?", ["nicht", "keine"], []),
-    ("Was sind 18 Prozent von 2450?", ["441"], []),
-    ("Wie spät ist es in Tokio?", ["Tokio"], []),
-    ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
-    ("atlas wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
-    ("atlas wie heiße ich", ["nicht", "noch"], ["Ich heiße [", "testedich"]),
-    ("Wie lange muss ich Eier kochen?", ["Min"], []),
-    ("atlas wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Atlas"], ["Ich bin Alex", "studiere"]),
-]
-# Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.
-ANALYSE = {
-    "route": ["Wie lange fahre ich von Köln nach Bonn?", "Wie weit ist es von München nach Salzburg?", "atlas wie lange dauert der weg von freiburg bis heilbronn techcampus"],
-    "wetter": ["ist es morgen kalt?", "Brauche ich heute einen Schirm?", "Wird es am Wochenende warm?", "Soll ich eine Jacke mitnehmen?",
-               "Schneit es morgen in München?", "wie warm ist es gerade in Rom"],
-    "nutzer": ["atlas wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
-               "Weißt du, wie ich heiße?", "Wie heißt mein Hund?", "was weißt du über mich", "Habe ich einen Bruder?"],
-    "atlas": ["Was sind deine Stärken?", "Welches Modell benutzt du?", "Bist du schon in einer Box eingebaut?", "Was machst du in deiner Freizeit?"],
-    "gespraech": ["Stimmt das?", "Warum?", "du lügst doch", "Ok danke dir", "Das war aber eine schlechte Antwort"],
-    "aufgabe": ["Schreib mir ein Gedicht über Katzen", "Übersetze guten Morgen ins Englische", "Wie schreibe ich eine Schleife in Python?"],
-    "rechnen": ["Was sind 18 Prozent von 2450?", "Wie viel ist 12 mal 12?", "wurzel aus 144"],
-    "internet": ["Wer ist aktuell Bundeskanzler?", "atlas wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
-                 "Wer ist Atlas in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?", "Wie weit ist der Mond von der Erde entfernt?",
-                 "Wie lange dauert ein Flug nach Rom?", "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne", "Wie kalt ist flüssiger Stickstoff?", "Wie kalt war der kälteste Winter in Deutschland?",
-                 "Wie warm wird eine Herdplatte?",
-                 "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?",
-                 "Was kann ich gegen Kopfschmerzen tun?", "Was darf mein Chef von mir verlangen?"],
-}
-# Bezug: vorige Frage, Antwort, neue Frage, das muss in die Suche, das darf nicht hinein
-BEZUG = [
-    ("wie lange ist der weg von freiburg bis heilbronn techcampus?", "Der Abstand beträgt etwa 9,8 km (Quelle: x).\n\n---\n**Quellen**\n- [a](https://a.de)",
-     "wie lange dauert die fahrt mit dem auto?", ["freiburg", "heilbronn"], []),
-    ("Wie komme ich von Stuttgart nach Berlin?", "Mit dem Zug oder dem Auto.", "Und wie teuer ist der Zug?", ["stuttgart", "berlin"], []),
-    ("Wie hoch ist der Eiffelturm?", "330 Meter.", "Und wann wurde er gebaut?", ["eiffelturm"], []),
-    ("Was kostet das iPhone 16?", "Etwa 900 Euro.", "Wo kann ich das kaufen?", ["iphone"], []),
-    ("Wer ist Friedrich Merz?", "Der Bundeskanzler.", "Wie hoch ist der Eiffelturm?", ["eiffelturm"], ["merz"]),
-    ("Wie weit ist es von Köln nach Bonn?", "Etwa 30 Kilometer.", "Wie mache ich Pizzateig?", ["pizza"], ["köln", "bonn"]),
-]
-# Wikipedia: Suchwörter, Frage, erwarteter Artikel (None: lieber keiner als ein falscher)
-WIKI = [("Friedrich Merz Geburtsort", "Wo wurde Friedrich Merz geboren?", "Friedrich Merz"), ("Eiffelturm Baujahr", "Wann wurde der Eiffelturm gebaut?", "Eiffelturm"),
-        ("Zugspitze Höhe", "Wie hoch ist die Zugspitze?", "Zugspitze"), ("Pizzateig selbst machen", "Wie mache ich Pizzateig?", None)]
-GESPRAECHE = [
-    (["ist es morgen kalt?", "freiburg"], ["Freiburg"]),
-    (["Wie alt bin ich?", "19", "Wie alt bin ich?"], ["19"]),
-    (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], ["Brilon"]),
-    (["Wie wird das Wetter morgen in Köln?", "Und in Hamburg?"], ["Hamburg"]),
-    (["Wie hoch ist der Eiffelturm?", "Und wann wurde er gebaut?"], ["1887", "1889"]),
-]
+print("Werkzeuge:")
+pruefe("Rechner 18 % von 2450", ausfuehren("rechnen", {"ausdruck": "2450*0.18"})[1], "2450*0.18 = 441")
+pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
+ev, text = ausfuehren("timer", {"sekunden": 300})
+pruefe("Timer-Event", [e["typ"] for e in ev], ["timer"])
+pruefe("Timer-Text", text, "Timer läuft: 5 Minuten.")
+ev, text = ausfuehren("muenze_werfen", {})
+pruefe("Münze: Animation zuerst", ev[0]["typ"] == "wurf" and ev[0]["ergebnis"] in ("Kopf", "Zahl"), True)
+ev, _ = ausfuehren("wuerfeln", {})
+pruefe("Würfel 1-6", ev[0]["ergebnis"] in list("123456"), True)
+pruefe("Wetter ohne Ort und Wohnort fragt nach", "Frag den Nutzer" in ausfuehren("wetter", {})[1], True)
+pruefe("Unbekanntes Werkzeug", ausfuehren("gibtsnicht", {})[1].startswith("FEHLER"), True)
 
+print("Erinnerungen:")
+ev, text = ausfuehren("erinnerung_speichern", {"fakt": "Der Nutzer wohnt in Freiburg.", "art": "nutzer"})
+pruefe("Fakt wird nur angeboten", [e["typ"] for e in ev], ["vorschlag"])
+ev, text = ausfuehren("erinnerung_speichern", {"fakt": "Der Nutzer heißt Alex.", "art": "nutzer", "ausdruecklich": True})
+pruefe("'Merk dir' speichert direkt", [e["typ"] for e in ev], ["gemerkt"])
+pruefe("Doppelt wird nicht gespeichert", ausfuehren("erinnerung_speichern", {"fakt": "Der Nutzer heißt Alex.", "ausdruecklich": True})[1],
+       "War schon gespeichert.")
+pruefe("Vorübergehendes nicht", ausfuehren("erinnerung_speichern", {"fakt": "Der Nutzer lernt gerade Mathe.", "ausdruecklich": True})[0], [])
+pruefe("Passwort nicht", ausfuehren("erinnerung_speichern", {"fakt": "Das Passwort ist abc123", "ausdruecklich": True})[0], [])
+pruefe("Stil wird direkt gespeichert", [e["typ"] for e in ausfuehren("erinnerung_speichern", {"fakt": "Antworte kürzer.", "art": "stil"})[0]],
+       ["gemerkt"])
+pruefe("Nur angeboten heißt nicht gespeichert", server.wohnort(), "")
 
-def frag(text, cid=None):
-    a = ""
-    for z in server.chat_stream(server.Frage(text=text, chat_id=cid, live=False)):
-        e = json.loads(z)
-        if e["typ"] == "start":
-            cid = e["chat_id"]
-        elif e["typ"] == "token":
-            a += e["text"]
-        elif e["typ"] == "fehler":
-            a += " [FEHLER: " + e["text"] + "]"
-    return a.split("\n\n---")[0].strip(), cid
-
-
-print("Wege der Fragen:")
-for text, soll in WEGE:
-    pruefe(f"Weg: {text}", weg(text), soll)
-server.SPRUCH_CHANCE = 100
-for text, soll in SPRUCH_ERLAUBT.items():
-    pruefe(f"Spruch: {text}", server.humor_spruch(text) is not None, soll)
-for text, soll in PDF_WUNSCH.items():
-    pruefe(f"PDF: {text}", server.pdf_gewuenscht(text), soll)
-for text, soll in ORTE.items():
-    pruefe(f"Ort: {text}", server.ort_aus_text(text), soll)
-for text, soll in STIL.items():
-    pruefe(f"Stil: {text}", bool(server.STIL_WUNSCH.search(server.ANREDE.sub("", text))), soll)
-for text, soll in KORREKTUREN.items():
-    pruefe(f"Korrektur: {text}", bool(server.KORREKTUR.search(text)), soll)
-server.erinnerung_speichern("Korrektur: Der Hund von Alex heißt Bello.")
-pruefe("Gelernt passt", server.gelerntes_passt("Wie heißt der Hund von Alex?"), True)
-pruefe("Gelernt passt nicht", server.gelerntes_passt("Wie heißt der Hund von Obama?"), False)
-pruefe("Gelernt passt nicht zum Thema", server.gelerntes_passt("Wie hoch ist der Eiffelturm?"), False)
-for e in server.alle_erinnerungen():
-    with server.db() as c:
-        c.execute("DELETE FROM erinnerungen WHERE id=?", (e["id"],))
-NACH_ORT = [{"role": "user", "content": "ist es morgen kalt?"}, {"role": "assistant", "content": server.WETTER_ORT_FRAGE}, {"role": "user", "content": ""}]
-for text, soll in {"freiburg": "Freiburg", "in köln": "Köln", "bad homburg": "Bad Homburg", "Für Heilbronn bitte": "Heilbronn", "ich wohne in Ulm": "Ulm",
-                   "ach egal": "", "nein danke": "", "warum willst du das wissen?": ""}.items():
-    pruefe(f"Ort nachgereicht: {text}", server.ort_nachgereicht(text, NACH_ORT), soll)
-pruefe("Ort nur nach der Rückfrage", server.ort_nachgereicht("freiburg", [{"role": "assistant", "content": "Hallo"}, {"role": "assistant", "content": "Hallo"}, {"role": "user", "content": "freiburg"}]), "")
-for (hoechst, regen), soll in {(9.9, 0): ("kalt", "Ich würde Ihnen eine Jacke empfehlen."), (10.8, 13): ("kühl", "Ich würde Ihnen eine Jacke empfehlen."),
-                              (20, 10): ("mild", ""), (20, 70): ("mild", "Ich würde Ihnen einen Schirm empfehlen."),
-                              (8, 80): ("kalt", "Ich würde Ihnen eine Jacke und einen Schirm empfehlen."),
-                              (26, None): ("warm", ""), (31.7, 0): ("heiß", "Viel trinken und Sonnencreme nicht vergessen.")}.items():
-    pruefe(f"Wetter-Einordnung {hoechst} Grad, {regen} % Regen", server.werkzeuge.wetter_einordnung(hoechst, regen), soll)
-for text, soll in {"Erklär mir das genau": True, "Erzähl mir mehr darüber": True, "Lies mir das ganze Rezept vor": True, "Wie geht das Schritt für Schritt?": True,
-                   "Wer ist Friedrich Merz?": False, "Wie mache ich Pizzateig?": False, "Wann genau war das?": False}.items():
-    pruefe(f"Mehr gewünscht: {text}", bool(server.MEHR_GEWUENSCHT.search(text)), soll)
-pruefe("Sprechmodus: kurze Vorstellung", server.faehigkeiten("Wer bist du?", "Wer bist du?", [], True), server.VORSTELLUNG_GESPROCHEN)
-pruefe("Chat: lange Vorstellung", server.faehigkeiten("Wer bist du?", "Wer bist du?", [], False), server.VORSTELLUNG_TEXT)
-pruefe("Sprechmodus: kurze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], True), server.FAEHIGKEITEN_GESPROCHEN)
-pruefe("Chat: ganze Fähigkeiten", server.faehigkeiten("Was kannst du?", "Was kannst du?", [], False), server.FAEHIGKEITEN_LISTE)
-for text, soll in {"Wie viel sind 5 Meilen in km": "5 Meilen sind 8,05 Kilometer.", "100 kg in Pfund": "100 Kilogramm sind 220,46 Pfund (lb).",
-                   "32 Fahrenheit in Celsius": "32 Fahrenheit sind 0 Celsius.", "2,5 Stunden in Minuten": "2,5 Stunden sind 150 Minuten.",
-                   "Wie viele Minuten sind 3 Stunden?": "3 Stunden sind 180 Minuten.", "1 GB in MB": "1 Gigabyte sind 1.000 Megabyte."}.items():
-    pruefe(f"Umrechnen: {text}", (server.werkzeuge.umrechnung_erkennen(text) or {}).get("antwort"), soll)
-for text in ["Wie weit ist Köln von Bonn?", "Ich habe 5 km in 30 Minuten geschafft", "Was sind 18 Prozent von 2450?", "Wie viel kostet 1 Liter Diesel in Deutschland?",
-             "Wer hat 2014 in Rio gewonnen?", "Treffen wir uns um 5 in Berlin?"]:
-    pruefe(f"Kein Umrechnen: {text}", server.werkzeuge.umrechnung_erkennen(text), None)
-for text, soll in {"atlas wie lange dauert der weg von freiburg bis heilbronn techcampus": ("freiburg", "heilbronn techcampus"),
-                   "Wie lange fahre ich von Köln nach Bonn?": ("Köln", "Bonn"), "Wie weit ist es von München nach Salzburg?": ("München", "Salzburg"),
-                   "wie lange von stuttgart hauptbahnhof zum flughafen frankfurt": ("stuttgart hauptbahnhof", "flughafen frankfurt"),
-                   "Wie lange brauche ich mit dem Auto von Ulm nach Augsburg?": ("Ulm", "Augsburg"), "wie lange von ulm nach augsburg mit dem auto": ("ulm", "augsburg"),
-                   "kannst du mir sagen wie lange der weg von freiburg bis heilbronn dauert?": ("freiburg", "heilbronn"),
-                   "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom"),
-                   "atlas wie weit ist es von hier nach berlin? ich wohne in freiburg": ("freiburg", "berlin"), "Ich wohne in Ulm. Wie weit ist es nach Berlin?": ("Ulm", "Berlin"),
-                   "Wie weit ist es von zuhause nach München?": ("", "München"), "wie lange von hier bis stuttgart": ("", "stuttgart"),
-                   "Ich wohne in Ulm. Wie lange von Köln nach Bonn?": ("Köln", "Bonn"),
-                   "atlas ich bin gerade im techcampus heilbronn wie lange dauert es mit dem auto zum bildungscampus heilbronn?": ("techcampus heilbronn", "bildungscampus heilbronn"),
-                   "Ich stehe gerade am Hauptbahnhof Stuttgart, wie weit ist es zum Flughafen Stuttgart?": ("Hauptbahnhof Stuttgart", "Flughafen Stuttgart"),
-                   "Ich bin bei der Hochschule Heilbronn. Wie lange fahre ich nach Freiburg?": ("Hochschule Heilbronn", "Freiburg"),
-                   "wir sind gerade in köln wie lange dauert es bis nach bonn": ("köln", "bonn"), "Ich fahre von Köln nach Bonn, wie lange dauert das?": ("Köln", "Bonn"),
-                   "Ich will nach Berlin, wie lange fahre ich?": ("", "Berlin")}.items():
-    pruefe(f"Route: {text}", server.route_orte(text, []), soll)
-for text, von, nach in [("wie viel ist 50 Euro in Türkische lira", "euro", "türkische lira"), ("100 euro in türkischen lira", "euro", "türkischen lira"),
-                        ("20 Schweizer Franken in Euro", "schweizer franken", "euro"), ("5000 Yen nach Euro", "yen", "euro"), ("10 kanadische Dollar in Euro", "kanadische dollar", "euro")]:
-    m = server.werkzeuge.UMRECHNUNG.search(text)
-    pruefe(f"Währung erkannt: {text}", bool(m) and (m.group(2).lower(), m.group(3).lower()), (von, nach))
-pruefe("Dollar heißt US-Dollar", server.werkzeuge.NAMEN["dollar"], "USD")
-pruefe("Kanadische Dollar", server.werkzeuge.NAMEN["kanadische dollar"], "CAD")
-W = lambda km, minuten: {"distance": km * 1000, "duration": minuten * 60}
-pruefe("Gleich schnell: kürzerer Weg", server.werkzeuge.kuerzester_weg([W(13.2, 15), W(11.2, 15)])["distance"], 11200)
-pruefe("Etwas langsamer, aber kürzer", server.werkzeuge.kuerzester_weg([W(13, 15), W(11, 16)])["distance"], 11000)
-pruefe("Viel langsamer zählt nicht", server.werkzeuge.kuerzester_weg([W(50, 30), W(40, 60)])["distance"], 50000)
+print("Bausteine:")
+pruefe("Quellen fürs Modell entfernt", server.fuers_modell("Merz.\n\n---\n**Quellen**\n- [a](b)", None), "Merz.")
+pruefe("Werkzeug-Vermerk", server.fuers_modell("Kopf.", "muenze_werfen"), "[Ergebnis von Werkzeug: muenze_werfen]\nKopf.")
+system, nachrichten = server.claude_nachrichten([
+    {"role": "system", "content": "S"}, {"role": "user", "content": "Wirf eine Münze"},
+    {"role": "assistant", "content": "", "tool_calls": [{"id": "t1", "function": {"name": "muenze_werfen", "arguments": {}}}]},
+    {"role": "tool", "tool_name": "muenze_werfen", "tool_call_id": "t1", "content": "Kopf"}])
+pruefe("Claude: Werkzeug-Aufruf übersetzt", [b["type"] for b in nachrichten[1]["content"]], ["tool_use"])
+pruefe("Claude: Ergebnis übersetzt", nachrichten[2]["content"][0], {"type": "tool_result", "tool_use_id": "t1", "content": "Kopf"})
+pruefe("Werkzeug-Schemas gültig", all(t["function"]["parameters"]["type"] == "object" for t in server.WERKZEUGE), True)
 _ollama = server.OLLAMA_URL
 server.OLLAMA_URL = "http://127.0.0.1:9"  # dort läuft nichts
 pruefe("Ollama aus: sofortige Meldung", [json.loads(z)["typ"] for z in server.chat_stream(server.Frage(text="Wer ist Bundeskanzler?", chat_id=None, live=False))],
        ["start", "fehler", "fertig"])
 server.OLLAMA_URL = _ollama
-pruefe("Umrechner öffnen", bool(server.werkzeuge.umrechnung_erkennen("Zeig mir den Umrechner")), True)
-pruefe("Rechner 18 % von 2450", server.werkzeuge.rechnen("2450*0.18"), "441")
-pruefe("Rechner führt keinen Code aus", server.werkzeuge.rechnen("__import__('os')").startswith("FEHLER"), True)
-pruefe("Passwort wird nicht gemerkt", server.merken("Mein Passwort ist abc123, merk dir das", [])[1], None)
-server.SPRUCH_CHANCE = 0
+
+
+def frag(text, cid=None):
+    """Eine Frage wie im Browser. Gibt (Antwort, chat_id, benutzte Werkzeuge) zurück."""
+    antwort, werkzeuge = "", []
+    for z in server.chat_stream(server.Frage(text=text, chat_id=cid, live=False)):
+        e = json.loads(z)
+        if e["typ"] == "start":
+            cid = e["chat_id"]
+        elif e["typ"] == "token":
+            antwort += e["text"]
+        elif e["typ"] == "fehler":
+            antwort += "[FEHLER " + e["text"] + "]"
+        elif e["typ"] == "status" and e["text"] in ("sucht", "wetter", "rechnet"):
+            werkzeuge.append(e["text"])
+        elif e["typ"] in ("wurf", "timer", "umrechner", "route", "vorschlag", "gemerkt"):
+            werkzeuge.append(e["typ"])
+    return antwort, cid, werkzeuge
+
+
+# (Gespräch, Werkzeug bei der letzten Frage oder None für "keine Suche/kein Wetter", Stichwörter (eins reicht), verbotene)
+GESPRAECHE = [
+    (["Wer ist aktuell Bundeskanzler?"], "sucht", ["Merz"], ["Scholz ist"]),
+    (["Wer ist aktuell Bundeskanzler?", "Wo wurde er geboren?"], "sucht", ["Brilon"], []),
+    (["Wer hat die Fußball-WM 2098 gewonnen?"], "egal", ["noch nicht", "Zukunft", "kein"], ["Frankreich hat die", "wurde von Frankreich"]),
+    (["Was sind 18 Prozent von 2450?"], None, ["441"], []),
+    (["Wie wird das Wetter morgen in Köln?", "Und in Hamburg?"], "wetter", ["Hamburg"], []),
+    (["Wirf eine Münze", "nochmal"], "wurf", ["Kopf", "Zahl"], []),
+    (["Stell einen Timer auf 5 Minuten"], "timer", ["5 Minuten", "fünf Minuten"], []),
+    (["Rechne 100 Euro in Dollar um"], "umrechner", ["Dollar"], []),
+    (["atlas wie gehts dir"], None, ["gut", "danke"], ["Dokument"]),
+    (["atlas wie gehts dir", "welches dokument"], None, ["kein", "nicht"], ["Quellen"]),
+    (["Was kannst du?"], None, ["Wetter", "Internet"], []),
+    (["Wer hat dich gebaut?"], None, ["Alex"], ["Team"]),
+    (["Ich bin 19 Jahre alt"], "vorschlag", [""], []),
+    (["ich lerne gerade mathe"], None, ["Mathe", "Thema", "Aufgabe", "helfen"], []),
+    (["Erkläre kurz, was ein Grenzwert in der Mathematik ist."], None, ["Grenzwert"], []),
+]
 
 if "--voll" in sys.argv:
-    print("\nEchte Antworten (dauert einige Minuten):")
-    print("Analyse:")
-    for soll, saetze in ANALYSE.items():
-        for text in saetze:
-            art, anfrage = server.analysieren(text, [])
-            print(f"  {art:9} {text!r}" + (f" -> {anfrage!r}" if art == "internet" else ""), flush=True)
-            # atlas, gespraech und aufgabe nehmen denselben Weg: antworten ohne Werkzeug
-            ohne_werkzeug = ("atlas", "gespraech", "aufgabe")
-            pruefe(f"Analyse: {text}", "ohne werkzeug" if art in ohne_werkzeug else art, "ohne werkzeug" if soll in ohne_werkzeug else soll)
-    pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
-    print("Wikipedia:")
-    for anfrage, text, soll in WIKI:
-        w = server.werkzeuge.wikipedia(anfrage, text)
-        print(f"  {text!r} -> {w and w['titel']!r}", flush=True)
-        pruefe(f"Wikipedia: {text}", w and w["titel"], soll)
-    print("Bezug:")
-    for vorher, antwort, neu, muss, nicht in BEZUG:
-        verlauf = [{"role": "user", "content": vorher}, {"role": "assistant", "content": antwort}, {"role": "user", "content": neu}]
-        gemeint = server.frage_aufloesen(neu, verlauf) if server.ist_folgefrage(neu, verlauf) else neu
-        art, anfrage = server.analysieren(gemeint, verlauf)
-        print(f"  {art:9} {neu!r} -> {anfrage!r}", flush=True)
-        pruefe(f"Bezug: {neu}", art in ("internet", "route") and all(w in anfrage.lower() for w in muss) and not any(w in anfrage.lower() for w in nicht), True)
-    print("Antworten:")
-    for text, muss, darf_nicht in ANTWORTEN:
-        t = time.time()
-        a, _ = frag(text)
-        ok = any(w.lower() in a.lower() for w in muss) and not any(w.lower() in a.lower() for w in darf_nicht) and "[FEHLER" not in a
-        print(f"  {'ok    ' if ok else 'FEHLER'} [{time.time() - t:3.0f}s] {text}\n         {a[:150]!r}", flush=True)
+    print("\nEchte Gespräche (dauert einige Minuten):")
+    for fragen, werkzeug, muss, nicht in GESPRAECHE:
+        cid, t = None, time.time()
+        for f in fragen:
+            a, cid, benutzt = frag(f, cid)
+        ok_werkzeug = True if werkzeug == "egal" else (werkzeug in benutzt) if werkzeug else not any(w in benutzt for w in ("sucht", "wetter", "vorschlag"))
+        ok = ok_werkzeug and any(w.lower() in a.lower() for w in muss) and not any(w.lower() in a.lower() for w in nicht) \
+            and "[FEHLER" not in a
+        print(f"  {'ok    ' if ok else 'FEHLER'} [{time.time() - t:3.0f}s] {' -> '.join(fragen)}  {benutzt}\n         {a[:150]!r}", flush=True)
         if not ok:
             print(f"         ganz: {a!r}", flush=True)
-            fehler.append(f"Antwort: {text}")
-    for fragen, muss in GESPRAECHE:
-        cid = None
-        t = time.time()
-        for f in fragen:
-            a, cid = frag(f, cid)
-        ok = any(w.lower() in a.lower() for w in muss) and "[FEHLER" not in a
-        print(f"  {'ok    ' if ok else 'FEHLER'} [{time.time() - t:3.0f}s] {' -> '.join(fragen)}\n         {a[:150]!r}", flush=True)
-        if not ok:
-            fehler.append(f"Gespräch: {fragen[-1]}")
+            fehler.append(f"Gespräch: {' -> '.join(fragen)}")
 
 print(f"\n{'ALLES OK' if not fehler else str(len(fehler)) + ' FEHLER'}")
 for f in fehler:
