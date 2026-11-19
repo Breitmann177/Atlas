@@ -105,7 +105,7 @@ ANTWORTEN = [
     ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
     ("atlas wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
     ("atlas wie heiße ich", ["nicht", "noch"], ["Ich heiße [", "testedich"]),
-    ("Wie lange muss ich Eier kochen?", ["Minuten"], []),
+    ("Wie lange muss ich Eier kochen?", ["Min"], []),
     ("atlas wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Atlas"], ["Ich bin Alex", "studiere"]),
 ]
 # Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.

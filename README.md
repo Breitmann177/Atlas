@@ -12,7 +12,7 @@ Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und L
 > passe ihn selbst an.
 
 ## Funktionen
-- **Lokale KI über Ollama** (`qwen3:8b`, für Bilder `qwen3.5:4b`), Modus *Schnell* oder *Gründlich* (mit Nachdenken)
+- **Lokale KI über Ollama** (`qwen3.5:9b`, versteht auch Bilder), Modus *Schnell* oder *Gründlich* (mit Nachdenken)
 - **Optional Claude** über einen eigenen API-Schlüssel, umschaltbar in den Einstellungen unter *KI*
 - Jede Frage wird erst eingeordnet: Muss gesucht werden, ist es Wetter, eine Route, eine Rechnung oder Smalltalk?
 - **Websuche** (DuckDuckGo und Wikipedia) mit Quellenliste; die besten Seiten werden gelesen
@@ -41,7 +41,7 @@ cd hermes-box
 ```
 
 Das Skript installiert ein paar Systempakete, legt eine eigene Python-Umgebung an (über `uv`), installiert
-Ollama mit dem offiziellen Skript, lädt die KI-Modelle (einmalig etwa 8,5 GB) und trägt Atlas ins App-Menü ein.
+Ollama mit dem offiziellen Skript, lädt das KI-Modell (einmalig etwa 6,6 GB) und trägt Atlas ins App-Menü ein.
 Danach startest du Atlas über das App-Menü → Atlas. Es öffnet sich in einem eigenen Fenster (mit Chromium,
 sonst im normalen Browser). Fenster schließen = Atlas beenden. Atlas startet nicht beim Hochfahren,
 aber von selbst, sobald es aufgerufen wird (z. B. vom Handy über Tailscale).
@@ -65,8 +65,7 @@ Danach ein paar Minuten warten (der Treiber wird gebaut), neu starten und `./ins
    ```
    py -3.12 -m venv .venv
    .venv\Scripts\pip install -r requirements.txt
-   ollama pull qwen3:8b
-   ollama pull qwen3.5:4b
+   ollama pull qwen3.5:9b
    ```
 3. `start.bat` doppelklicken. Der Browser öffnet `http://localhost:8000` von selbst.
 </details>

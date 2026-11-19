@@ -60,9 +60,8 @@ if ! curl -s -o /dev/null --max-time 2 http://127.0.0.1:11434/api/version; then
     (ollama serve >/dev/null 2>&1 &)
     sleep 5
 fi
-green "KI-Modelle laden (einmalig, zusammen etwa 8,5 GB)"
-ollama pull qwen3:8b
-ollama pull qwen3.5:4b
+green "KI-Modell laden (einmalig, etwa 6,6 GB)"
+ollama pull qwen3.5:9b
 
 # --- Hintergrund-Dienst (startet beim Anmelden) und App-Menü-Eintrag ohne Terminal ---------------
 chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"

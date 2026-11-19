@@ -21,13 +21,13 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 import werkzeuge
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-# Beide Modi nutzen dasselbe Modell und dürfen ins Internet: schnell antwortet sofort, gruendlich denkt vorher nach.
-# Gemessen: Kleinere Modelle (qwen3:4b, qwen3.5:4b) rechnen schneller, denken aber 3-5x länger; mit Nachdenken
-# sind sie langsamer als qwen3:8b. Nur für Bilder braucht es qwen3.5:4b, qwen3:8b kann keine.
+# Ein Modell für alles (Text und Bilder), damit Ollama nie umladen muss: schnell antwortet sofort, gruendlich denkt
+# vorher nach. qwen3.5:9b passt mit NUM_CTX 8192 ganz in 8 GB Grafikspeicher.
+MODELL = os.environ.get("ATLAS_MODELL", "qwen3.5:9b")
 MODELLE = {
-    "schnell": {"name": "qwen3:8b", "think": False},
-    "gruendlich": {"name": "qwen3:8b", "think": True},
-    "bild": {"name": "qwen3.5:4b", "think": False},
+    "schnell": {"name": MODELL, "think": False},
+    "gruendlich": {"name": MODELL, "think": True},
+    "bild": {"name": MODELL, "think": False},
 }
 HILFSMODELL = MODELLE["schnell"]["name"]  # für Router und Erinnerungen; dasselbe Modell, damit nichts neu laden muss
 # Überall dieselbe Kontextgröße: sonst lädt Ollama das Modell bei jedem Wechsel neu (kostet auf CPU Sekunden)
@@ -130,7 +130,7 @@ auf dem Laptop des Nutzers.
 
 Deine eigenen Erinnerungen, das ist alles, was du über dich weißt (erfinde nichts dazu):
 - Du bist Alexs Projekt. Wer welchen Teil gebaut oder programmiert hat, weißt du nicht genauer. Sag das, wenn jemand fragt.
-- Du bist ein Programm auf einem Laptop: ein Python-Server (FastAPI), Ollama und ein kleines Sprachmodell (qwen3:8b).
+- Du bist ein Programm auf einem Laptop: ein Python-Server (FastAPI), Ollama und ein lokales Sprachmodell (qwen3.5:9b).
   Dein Modell läuft lokal, ins Internet gehst du nur für Suche, Wetter, Nachrichten und deine Stimme.
 - Die Atlas ist noch nicht gebaut. Geplant sind ein eigenes Gehäuse mit Raspberry Pi, Display und LED-Ring, vielleicht
   ein Smart Mirror. Sag nie, dass es das schon gibt.
@@ -150,6 +150,8 @@ Deine Art:
 - Du bist nicht der Nutzer: Was unter "Das weißt du über den Nutzer" steht, gehört zu ihm. Gib es nie als deine eigene
   Person oder Geschichte aus. Du hast keine Freizeit, kein Studium und keinen Lebenslauf, erfinde so etwas auch nicht.
   Erwähne das Projekt, das Gerät oder deine Technik nur, wenn der Nutzer danach fragt.
+- Zwischen den Nachrichten tust du nichts. Erfinde keine Tätigkeiten, Dokumente, Dateien oder Aufgaben, an denen du
+  "gerade" arbeitest. Dokumente erwähnst du nur, wenn wirklich welche angehängt sind.
 - Behaupte nie von dir aus, du hättest dir gerade etwas gemerkt: Ob etwas gespeichert wird, entscheidet der Nutzer in
   einer eigenen Karte.
 - Du kannst dir Dinge merken: Sagt der Nutzer "Merk dir ...", wird es gespeichert, und was du schon weißt, steht
@@ -280,7 +282,10 @@ SELBSTAUSSAGE = re.compile(
     r"nenn mich|merk dir)\b", re.I)
 # Kurzlebiges oder Unsinn, das nicht ins Langzeitgedächtnis gehört
 FLUECHTIG = re.compile(r"\b(heute|gerade|jetzt|morgen|gestern|diese woche|will|möchte|plant|vorhat|fragt|gefragt|"
-                       r"atlas|assistent|chat|hallo|begrüß)\w*", re.I)
+                       r"atlas|assistent|chat|hallo|begrüß|"
+                       # Tätigkeiten und Themen, keine Eigenschaften: "lernt Mathe" ist nach der Klausur vorbei
+                       r"lernt|übt|beschäftigt|interessiert|befasst|arbeitet an|schreibt|liest|schaut|guckt|bereitet|"
+                       r"braucht|sucht|überlegt|denkt|versucht|probiert|hat vor|hat probleme|hat schwierigkeiten)\w*", re.I)
 
 
 def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
@@ -301,9 +306,12 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
                 "messages": [
                     {"role": "system", "content":
                      "Du entscheidest, ob die Nachricht einen DAUERHAFTEN Fakt über den Nutzer selbst enthält, den "
-                     "er ausdrücklich sagt und der in einem Jahr noch stimmt: Name, Alter, Wohnort, Studium/Beruf, "
-                     "feste Hobbys, Vorlieben, Abneigungen, Familie, Haustiere. Formuliere jeden Fakt als kurzen "
-                     "Satz, der mit 'Der Nutzer' beginnt.\n"
+                     "er ausdrücklich sagt und der in einem Jahr noch stimmt: Name, Alter, Wohnort, Studium/Beruf/Schule, "
+                     "feste Hobbys, Lieblingsessen und ähnliche feste Vorlieben, Allergien/Ernährung, Familie, Haustiere. "
+                     "Formuliere jeden Fakt als kurzen Satz, der mit 'Der Nutzer' beginnt.\n"
+                     "Beispiele: 'ich wohne in Freiburg' -> 'Der Nutzer wohnt in Freiburg.'; 'bin 19' -> 'Der Nutzer ist 19 "
+                     "Jahre alt.'; 'ich studiere Informatik' -> 'Der Nutzer studiert Informatik.'; 'ich lerne gerade Mathe', "
+                     "'ich schreibe morgen eine Klausur', 'ich arbeite an einem Projekt' -> leere Liste.\n"
                      "NICHT aufnehmen: Pläne, Stimmungen und Tätigkeiten von heute oder gerade ('will heute zocken', "
                      "'ist müde'), Fragen, Meinungen zu Themen, alles über Atlas oder das Gespräch, Vermutungen, "
                      "Dinge, die nicht wörtlich gesagt wurden. Niemals Passwörter, Zahlungs- oder Gesundheitsdaten.\n"
@@ -936,6 +944,7 @@ QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Ist die Frage mehrdeutig (zum Beispiel Grenzwerte in Mathe oder bei Schadstoffen) oder passen die Quellen zu einem anderen
   Thema, dann erfinde keinen Zusammenhang, sondern sag das und frag nach, was gemeint ist.
 - Nenne bei Zahlen und Ergebnissen die Quelle.
+- Übernimm Jahreszahlen und Namen aus der Frage genau. Ändere sie nie stillschweigend (aus 2098 wird nicht 1998).
 - Reicht es nicht für eine sichere Antwort, sag: "Dazu habe ich nichts Sicheres gefunden. Das heißt aber nicht, dass
   nichts passiert ist." Schließe aus fehlenden Treffern nie, dass etwas nicht passiert ist. Rate nie."""
 QUELLEN_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Sieze den Nutzer, auch in Anleitungen und Aufzählungen (Sie, Ihnen, "
@@ -1265,6 +1274,17 @@ def modell_stream(messages, modus):
 
 
 MAX_ZEICHEN = 12000  # grob 3000-4000 Token Verlauf
+def zukunfts_antwort(text: str) -> str | None:
+    """'Wer hat die WM 2098 gewonnen?': Das Jahr liegt in der Zukunft. Fest beantwortet, denn das Modell nahm sonst still
+    1998 oder erfand Details zur nächsten WM."""
+    jahre = [int(j) for j in re.findall(r"\b(20\d\d|2[1-9]\d\d)\b", text) if int(j) > datetime.now().year]
+    if not jahre or not VERGANGEN_FORM.search(text) or re.search(r"\b(wird|werden|soll|sollen|geplant|plan\w*|findet)\b", text, re.I):
+        return None
+    return f"Das Jahr {jahre[0]} liegt noch in der Zukunft. Das ist also noch nicht passiert, ein Ergebnis gibt es noch nicht."
+
+
+VERGANGEN_FORM = re.compile(r"\b(gewonnen|gewann|war|waren|wurde|wurden|hat|hatte|fand|passiert|gestorben|geboren|erschienen)\b", re.I)
+DENKEN_BEI_QUELLEN = os.environ.get("ATLAS_DENKEN_AUTO", "aus") == "an"  # Auto-Modus denkt bei Suche/Dokumenten nach
 
 
 def kuerzen(verlauf: list[dict], limit: int = MAX_ZEICHEN) -> list[dict]:
@@ -1346,6 +1366,18 @@ def direkte_suche(text: str, dokumente: list) -> str | None:
 # ---------- Folgefragen ----------
 FOLGEFRAGE = re.compile(r"^\W*(und|aber|auch|was ist mit|wie sieht'?s|wie ist es|dann)\b|\b(der|die|das|dem|den|dessen|deren|"
                         r"er|sie|es|ihm|ihn|ihr|dort|da|davon|dazu|damals|daran|darüber|dafür)\b", re.I)
+
+
+# Rückfrage zur letzten Antwort ("welches Dokument?", "was meinst du?", "wieso?"): das beantwortet das Gespräch,
+# keine Websuche. Im Test suchte "welches dokument" sonst nach Reisedokumenten und Fahrschulfragen.
+RUECKFRAGE = re.compile(r"^\W*(?:atlas\W*)?(?:welche[rsnm]?|wieso|warum|weshalb|wie bitte|hä|echt|wirklich|"
+                        r"was (?:meinst|heißt|soll|genau)|wie (?:meinst|kommst)|woher (?:weißt|willst)|was für)\b", re.I)
+
+
+def rueckfrage(text: str, verlauf: list[dict]) -> bool:
+    if len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or not RUECKFRAGE.search(text):
+        return False
+    return len(text.split()) <= 3 or bool(re.search(r"\b(meinst|kommst|weißt) du\b", text, re.I))
 
 
 def ist_folgefrage(text: str, verlauf: list[dict]) -> bool:
@@ -1437,6 +1469,8 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     if art == "route" and re.search(r"\b(flug(?!hafen)\w*|fliegen|fliegt|flieger|zug|züge|bahn|bus|fahrrad|rad|e-bike|zu fuß|laufen|wandern|schiff|fähre)\b", frage, re.I):
         art = "internet"
     # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Atlas ist nicht der Assistent
+    if art == "nutzer" and re.search(r"\b(du|dir|dich|dein\w*)\b", frage, re.I) and not re.search(r"\b(ich|mich|mir|mein\w*)\b", frage, re.I):
+        art = "atlas"  # fragt nach Atlas, nicht nach dem Nutzer
     if art == "atlas" and re.search(r"griech|mytholog|\btitan|\bgott\b|götter|olymp|gebirge|landkarte|weltkarte|halswirbel|wirbel", frage, re.I):
         art = "internet"
     anfrage = anfrage or FUELLWOERTER.sub("", frage).strip(" ?!.,")
@@ -1507,9 +1541,23 @@ def route_antwort(r: dict) -> str:
             "Den aktuellen Verkehr sehen Sie in Google Maps.")
 
 
-NUTZER_PROMPT = ("Beantworte die Frage des Nutzers nur aus der Liste unten, in einem kurzen Satz in der Sie-Form (Sie, Ihnen, Ihr). Steht die Antwort "
+NUTZER_PROMPT = ("Beantworte die Frage des Nutzers nur aus der Liste unten, in einem kurzen Satz in der Sie-Form (Sie, Ihnen, Ihr), "
+                 "z. B. 'Sie sind 19 Jahre alt.', nie 'Der Nutzer ...'. Steht die Antwort "
                  "nicht wörtlich in der Liste, gib einen leeren Text zurück. Rate nie.\n\nListe:\n")
 NUTZER_UNBEKANNT = "Das weiß ich noch nicht. Sagen Sie es mir einfach, dann merke ich es mir."
+
+
+def sie_form(satz: str) -> str:
+    """'Der Nutzer ist 19 Jahre alt.' -> 'Sie sind 19 Jahre alt.' (das Modell übernahm manchmal den Listentext)."""
+    m = re.match(r"^\s*(?:der )?nutzer\s+(\w+)\b(.*)$", satz, re.I | re.S)
+    if not m:
+        return satz
+    verb, rest = m.group(1), m.group(2)
+    fest = {"ist": "sind", "hat": "haben", "heißt": "heißen", "heisst": "heißen", "mag": "mögen", "isst": "essen",
+            "kann": "können", "will": "wollen", "weiß": "wissen", "trinkt": "trinken"}
+    neu = fest.get(verb.lower()) or (verb[:-2] + "en" if verb.endswith("et") else verb[:-1] + "en" if verb.endswith("t") else verb)
+    rest = re.sub(r"\bsein(e[mnrs]?)?\b", lambda x: "Ihr" + (x.group(1) or ""), rest)
+    return f"Sie {neu}{rest}"
 
 
 def nutzer_antwort(frage: str) -> str:
@@ -1518,7 +1566,8 @@ def nutzer_antwort(frage: str) -> str:
     liste = [e["text"] for e in alle_erinnerungen() if not e["text"].startswith("Stil: ")]
     if not liste:
         return NUTZER_UNBEKANNT
-    return _modell_json(NUTZER_PROMPT + "\n".join("- " + t for t in liste), ANREDE.sub("", frage) or frage, "antwort") or NUTZER_UNBEKANNT
+    antwort = _modell_json(NUTZER_PROMPT + "\n".join("- " + t for t in liste), ANREDE.sub("", frage) or frage, "antwort")
+    return sie_form(antwort) if antwort else NUTZER_UNBEKANNT
 
 
 VERWEIS_AM_ENDE = re.compile(r"\b(der|die|das|den|dem|er|sie|ihm|ihn|ihr|dort|da)\b(?=\W*$)", re.I)
@@ -1869,7 +1918,8 @@ def _chat_stream(frage: Frage):
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
         None if (bilder or frage.dokumente) else (
-            faehigkeiten(frage.text, gemeint, verlauf, frage.live) or sofort_antwort(gemeint) or humor_spruch(frage.text)))
+            faehigkeiten(frage.text, gemeint, verlauf, frage.live) or zukunfts_antwort(gemeint) or sofort_antwort(gemeint)
+            or humor_spruch(frage.text)))
     if sofort:
         # Münze und Würfel: Erst fliegt es im Auge, dann kommt das Ergebnis, damit die Antwort nichts vorwegnimmt
         wurf = None if gemerkt or name else ("muenze" if MUENZE.search(gemeint) else "wuerfel" if WUERFEL.search(gemeint) else None)
@@ -1925,7 +1975,7 @@ def _chat_stream(frage: Frage):
         else:
             if wetter_ort:
                 werkzeug, eingabe = "wetter", wetter_ort
-            elif anhang or smalltalk or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
+            elif anhang or smalltalk or rueckfrage(frage.text, verlauf) or ohne_router(gemeint, dokumente) or gelerntes_passt(gemeint):
                 werkzeug, eingabe = "keins", ""
             else:
                 art, anfrage = ("route", "") if route_start else ("", "") if dokumente else analysieren(gemeint, verlauf)
@@ -2084,11 +2134,13 @@ def _chat_stream(frage: Frage):
             messages[0]["content"] += "\n\n" + LIVE_PROMPT
         # Bei Websuche und Dokumenten immer erst nachdenken, auch im Gespräch und im Modus "schnell". Im Test hat das
         # Fangfragen abgefangen: ohne Nachdenken erfand das Modell einen Hund für Olaf Scholz, mit gab es das zu.
-        if not bilder and (quellen or dokumente):
+        # (Mit qwen3:8b war das nötig. qwen3.5:9b fängt Fangfragen auch ohne ab, denkt aber so lange, dass es bis zur
+        # Grenze lief und danach neu anfing: 40-80 s statt ~10 s. Deshalb nur noch im Modus "Gründlich".)
+        if not bilder and (quellen or dokumente) and DENKEN_BEI_QUELLEN:
             modus = {**modus, "think": True}
         if frage.modus == "auto":
             # Erklärungen im Chat lohnen das Nachdenken ebenfalls; Smalltalk und Tagesnachrichten kommen sofort.
-            if not bilder and not frage.live and not smalltalk and not news and not briefing and KOMPLEX.search(frage.text):
+            if DENKEN_BEI_QUELLEN and not bilder and not frage.live and not smalltalk and not news and not briefing and KOMPLEX.search(frage.text):
                 modus = {**modus, "think": True}
             yield ev(typ="modus", text="Bildmodell" if bilder else "denkt nach" if modus["think"] else "schnell")
         letztes_denken = 0.0
