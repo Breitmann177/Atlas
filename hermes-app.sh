@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# App-Start unter Linux: startet den Hermes-Dienst und öffnet Hermes in einem eigenen Fenster.
-# Fenster zu = Hermes beendet (gibt Grafikkarte und Speicher wieder frei). Kein Autostart.
+# App-Start unter Linux: startet den Atlas-Dienst und öffnet Atlas in einem eigenen Fenster.
+# Fenster zu = Atlas beendet (gibt Grafikkarte und Speicher wieder frei). Kein Autostart.
 cd "$(dirname "$0")" || exit 1
 URL=http://localhost:8000
 
@@ -27,7 +27,7 @@ if [ -n "$BROWSER" ]; then
              --class=hermes --no-first-run --no-default-browser-check >/dev/null 2>&1
   if [ -n "$DIENST" ]; then systemctl --user stop hermes.service; else kill "$SERVER_PID" 2>/dev/null; fi
 else
-  # Kein Chromium-Browser: normaler Browser-Tab, Hermes läuft weiter bis zur Abmeldung.
+  # Kein Chromium-Browser: normaler Browser-Tab, Atlas läuft weiter bis zur Abmeldung.
   xdg-open "$URL"
   [ -n "$SERVER_PID" ] && wait "$SERVER_PID"
 fi

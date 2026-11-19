@@ -58,7 +58,7 @@ COOKIE = "hermes_sitzung"
 fehlversuche: dict[str, list[float]] = {}  # IP -> Zeitpunkte falscher Passwörter
 
 if not PASSWORT:
-    print("WARNUNG: Kein HERMES_PASSWORT in .env gesetzt, Hermes ist ohne Login erreichbar.", flush=True)
+    print("WARNUNG: Kein HERMES_PASSWORT in .env gesetzt, Atlas ist ohne Login erreichbar.", flush=True)
 elif len(PASSWORT) < 8:
     print("WARNUNG: Das Passwort in .env ist sehr kurz.", flush=True)
 
@@ -86,7 +86,7 @@ async def _beim_start(_app):
 app = FastAPI(dependencies=[Depends(pruefe)], docs_url=None, redoc_url=None, openapi_url=None, lifespan=_beim_start)
 
 # Nur diese Host-Namen werden bedient. Schützt vor "DNS-Rebinding": eine fremde Webseite, deren Name auf
-# 127.0.0.1 zeigt, könnte sonst im Browser dein lokales Hermes ansprechen. Für Tailscale den Namen/die IP
+# 127.0.0.1 zeigt, könnte sonst im Browser dein lokales Atlas ansprechen. Für Tailscale den Namen/die IP
 # des Laptops in .env bei HERMES_HOSTS ergänzen (mit Komma getrennt).
 ERLAUBTE_HOSTS = ["localhost", "127.0.0.1"] + [
     h.strip() for h in os.environ.get("HERMES_HOSTS", "").split(",") if h.strip()
@@ -125,14 +125,14 @@ class SicherheitsHeader:
 
 app.add_middleware(SicherheitsHeader)
 
-BASIS_PROMPT = """Du bist Hermes, ein persönlicher KI-Assistent: kompetent, ehrlich und aufmerksam. Du läufst lokal
-auf dem Laptop des Nutzers in der "Hermes Box".
+BASIS_PROMPT = """Du bist Atlas, ein persönlicher KI-Assistent: kompetent, ehrlich und aufmerksam. Du läufst lokal
+auf dem Laptop des Nutzers.
 
 Deine eigenen Erinnerungen, das ist alles, was du über dich weißt (erfinde nichts dazu):
 - Du bist Alexs Projekt. Wer welchen Teil gebaut oder programmiert hat, weißt du nicht genauer. Sag das, wenn jemand fragt.
 - Du bist ein Programm auf einem Laptop: ein Python-Server (FastAPI), Ollama und ein kleines Sprachmodell (qwen3:8b).
   Dein Modell läuft lokal, ins Internet gehst du nur für Suche, Wetter, Nachrichten und deine Stimme.
-- Die Hermes Box ist noch nicht gebaut. Geplant sind ein eigenes Gehäuse mit Raspberry Pi, Display und LED-Ring, vielleicht
+- Die Atlas ist noch nicht gebaut. Geplant sind ein eigenes Gehäuse mit Raspberry Pi, Display und LED-Ring, vielleicht
   ein Smart Mirror. Sag nie, dass es das schon gibt.
 - Deine echten Stärken: Du schaust im Internet nach und nennst Quellen, man kann mit dir reden und dir ins Wort fallen,
   deine Daten bleiben auf dem Laptop. Andere Stärken wie Einfühlungsvermögen oder Flexibilität behauptest du nicht.
@@ -146,7 +146,7 @@ Deine Art:
   in gepflegter, aber ganz normaler Sprache, so wie ein Mensch natürlich redet. Keine Anrede wie "Sir",
   nichts Gestelztes, und du redest nie über deine Rolle oder deinen Stil ("als dein Assistent",
   "ich stehe bereit", "dein persönlicher ..." o.Ä.).
-- Du bist Hermes: Sprich von dir immer als "ich", nie über "Hermes" oder "das Projekt" wie über etwas Fremdes.
+- Du bist Atlas: Sprich von dir immer als "ich", nie über "Atlas" oder "das Projekt" wie über etwas Fremdes.
 - Du bist nicht der Nutzer: Was unter "Das weißt du über den Nutzer" steht, gehört zu ihm. Gib es nie als deine eigene
   Person oder Geschichte aus. Du hast keine Freizeit, kein Studium und keinen Lebenslauf, erfinde so etwas auch nicht.
   Erwähne das Projekt, das Gerät oder deine Technik nur, wenn der Nutzer danach fragt.
@@ -155,7 +155,7 @@ Deine Art:
 - Du kannst dir Dinge merken: Sagt der Nutzer "Merk dir ...", wird es gespeichert, und was du schon weißt, steht
   unten unter "Das weißt du über den Nutzer". Behaupte nie, du könntest dir nichts merken. Fehlt dir etwas dort,
   sag einfach, dass du es noch nicht weißt, und frag danach.
-- Fragt der Nutzer, wer du bist: "Ich bin Hermes." und in einem Satz, was du kannst (z.B. Fragen beantworten,
+- Fragt der Nutzer, wer du bist: "Ich bin Atlas." und in einem Satz, was du kannst (z.B. Fragen beantworten,
   im Internet nachsehen, Wetter, Rechnen, PDFs lesen). Mehr nicht.
 - Grüße nur, wenn der Nutzer dich grüßt. Sonst beginnt die Antwort direkt mit dem Inhalt.
 - Trockener Humor ist erlaubt, aber selten und nie auf Kosten der Antwort. Bei ernsten Themen kein Humor.
@@ -280,7 +280,7 @@ SELBSTAUSSAGE = re.compile(
     r"nenn mich|merk dir)\b", re.I)
 # Kurzlebiges oder Unsinn, das nicht ins Langzeitgedächtnis gehört
 FLUECHTIG = re.compile(r"\b(heute|gerade|jetzt|morgen|gestern|diese woche|will|möchte|plant|vorhat|fragt|gefragt|"
-                       r"hermes|assistent|chat|hallo|begrüß)\w*", re.I)
+                       r"atlas|assistent|chat|hallo|begrüß)\w*", re.I)
 
 
 def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
@@ -305,7 +305,7 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
                      "feste Hobbys, Vorlieben, Abneigungen, Familie, Haustiere. Formuliere jeden Fakt als kurzen "
                      "Satz, der mit 'Der Nutzer' beginnt.\n"
                      "NICHT aufnehmen: Pläne, Stimmungen und Tätigkeiten von heute oder gerade ('will heute zocken', "
-                     "'ist müde'), Fragen, Meinungen zu Themen, alles über Hermes oder das Gespräch, Vermutungen, "
+                     "'ist müde'), Fragen, Meinungen zu Themen, alles über Atlas oder das Gespräch, Vermutungen, "
                      "Dinge, die nicht wörtlich gesagt wurden. Niemals Passwörter, Zahlungs- oder Gesundheitsdaten.\n"
                      "Im Zweifel: leere Liste. Die meisten Nachrichten ergeben eine leere Liste."},
                     {"role": "user", "content": frage},
@@ -322,71 +322,41 @@ def fakten_vorschlagen(frage: str, modell: str) -> list[str]:
         if not (10 < len(f) < 160) or not f.lower().startswith("der nutzer") or FLUECHTIG.search(f):
             continue
         if any(f.lower().rstrip(".") in v or v.rstrip(".") in f.lower() for v in vorhanden):
-            continue  # weiß Hermes schon
+            continue  # weiß Atlas schon
         gut.append(f)
     return gut[:2]
 
 
 # ---------- Spracherkennung ----------
-# Auf der Grafikkarte braucht "medium" ~0,6 s pro Satz, auf der CPU ~5 s. Ist die Karte aus (Stromsparmodus) oder
-# der Speicher voll, geht es auf der CPU weiter; dort lauscht das kleinere "small" auf "Hey Hermes".
+# Läuft bewusst nur auf der CPU: Auf der Grafikkarte blieb Whisper "medium" dauerhaft liegen (gut 1 GB VRAM), und
+# dann passte das Sprachmodell in Ollama nicht mehr ganz in die 8 GB.
+# Gemessen (Core Ultra 9 386H, 16 Kerne, int8, Satz von 6,5 s, nach dem Aufwärmen):
+#   small:  4 Threads 1,14 s | 8 Threads 0,88 s | 12 Threads 0,87 s | 16 Threads 1,38 s
+#   medium: 4 Threads 3,22 s | 8 Threads 2,13 s | 12 Threads 2,59 s | 16 Threads 2,95 s
+# Mehr als 8 Threads bremst (Effizienzkerne). "small" lauscht auf "Hey Atlas", "medium" erkennt die eigentliche Frage.
+WHISPER_THREADS = min(8, os.cpu_count() or 8)
 _whisper: dict[str, object] = {}
 _whisper_sperre = threading.Lock()
-_gpu_kaputt = False
-
-
-def _cuda_dlls():
-    """Die CUDA-Bibliotheken liegen als pip-Pakete in der venv; das System muss sie dort finden.
-    Windows: Ordner nvidia/*/bin zum Suchpfad. Linux: nvidia/*/lib/*.so vorab laden, denn LD_LIBRARY_PATH
-    wirkt erst beim Programmstart; schon geladene Bibliotheken findet Linux danach über ihren Namen."""
-    import ctypes
-    import glob
-    import site
-
-    for basis in site.getsitepackages():
-        if os.name == "nt":
-            for ordner in glob.glob(os.path.join(basis, "nvidia", "*", "bin")):
-                os.environ["PATH"] = ordner + os.pathsep + os.environ.get("PATH", "")
-                os.add_dll_directory(ordner)
-        else:
-            # zweimal: manche Bibliotheken brauchen andere, die alphabetisch später kommen
-            for _ in range(2):
-                for datei in sorted(glob.glob(os.path.join(basis, "nvidia", "*", "lib", "lib*.so*"))):
-                    try:
-                        ctypes.CDLL(datei, mode=ctypes.RTLD_GLOBAL)
-                    except OSError:
-                        pass
 
 
 def whisper(groesse: str = "medium"):
-    """Gibt (modell, auf_grafikkarte) zurück. Aufrufer hält die Sperre."""
-    global _gpu_kaputt
+    """Whisper-Modell auf der CPU (einmal geladen, dann im Arbeitsspeicher). Aufrufer hält die Sperre."""
     from faster_whisper import WhisperModel
 
-    if not _gpu_kaputt:
-        try:
-            if "gpu" not in _whisper:
-                _cuda_dlls()
-                _whisper["gpu"] = WhisperModel("medium", device="cuda", compute_type="int8_float16")
-            return _whisper["gpu"], True
-        except Exception as e:
-            _gpu_kaputt = True
-            print("Spracherkennung läuft auf der CPU, Grafikkarte nicht nutzbar:", repr(e), flush=True)
     if groesse not in _whisper:
-        _whisper[groesse] = WhisperModel(groesse, device="cpu", compute_type="int8",
-                                         cpu_threads=max(4, (os.cpu_count() or 8) // 2))
-    return _whisper[groesse], False
+        _whisper[groesse] = WhisperModel(groesse, device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS)
+    return _whisper[groesse]
 
 
 def whisper_aufwaermen():
-    """Der allererste Lauf auf der Grafikkarte dauerte im Test 60 s. Das soll beim Start passieren, nicht bei dir."""
+    """Lädt beide Modelle beim Start im Hintergrund (je ein paar Sekunden), damit das erste Wort nicht darauf wartet."""
     def arbeit():
         import numpy as np
 
         try:
-            with _whisper_sperre:
-                modell, _ = whisper()
-                list(modell.transcribe(np.zeros(16000, dtype=np.float32), language="de")[0])
+            for groesse in ("small", "medium"):
+                with _whisper_sperre:
+                    list(whisper(groesse).transcribe(np.zeros(16000, dtype=np.float32), language="de")[0])
         except Exception as e:
             print("Spracherkennung konnte nicht vorgeladen werden:", repr(e), flush=True)
     threading.Thread(target=arbeit, daemon=True).start()
@@ -400,20 +370,9 @@ HALLUZINATION = re.compile(
 
 
 def transkribieren(pfad: str, groesse: str) -> str:
-    global _gpu_kaputt
     with _whisper_sperre:  # immer nur eine Erkennung gleichzeitig
-        modell, gpu = whisper(groesse)
-        try:
-            teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
-            saetze = [t.text.strip() for t in teile]  # erst hier rechnet Whisper wirklich
-        except Exception as e:
-            if not gpu:
-                raise
-            _gpu_kaputt = True  # z.B. Grafikspeicher voll: ab jetzt CPU
-            print("Spracherkennung wechselt auf die CPU:", repr(e), flush=True)
-            modell, _ = whisper(groesse)
-            teile, _ = modell.transcribe(pfad, language="de", vad_filter=True, hotwords="Hermes")
-            saetze = [t.text.strip() for t in teile]
+        teile, _ = whisper(groesse).transcribe(pfad, language="de", vad_filter=True, hotwords="Atlas")
+        saetze = [t.text.strip() for t in teile]  # erst hier rechnet Whisper wirklich
     saetze = [s for s in saetze if s and not HALLUZINATION.search(s)]
     return " ".join(saetze).strip()
 
@@ -459,7 +418,7 @@ def claude_aktiv() -> bool:
 def claude():
     global _claude_client
     if _claude_client is None:
-        import anthropic  # erst hier: Hermes läuft auch ohne das Paket, solange niemand Claude wählt
+        import anthropic  # erst hier: Atlas läuft auch ohne das Paket, solange niemand Claude wählt
         _claude_client = anthropic.Anthropic(api_key=CLAUDE_KEY, max_retries=2)
     return _claude_client
 
@@ -772,7 +731,7 @@ async def stt(datei: UploadFile = File(...), schnell: bool = Form(False)):
 
 # ---------- Status ----------
 def grafikkarte_aktiv() -> bool:
-    """False, wenn Hermes ohne Grafikkarte läuft: Karte aus (ASUS-Eco-Modus) oder Ollama hat sie beim Start nicht
+    """False, wenn Atlas ohne Grafikkarte läuft: Karte aus (ASUS-Eco-Modus) oder Ollama hat sie beim Start nicht
     gesehen. Dann ist alles vielfach langsamer, und das soll man sehen, bevor man jemandem etwas vorführt."""
     import subprocess
 
@@ -795,7 +754,7 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "grafikkarte": grafikkarte_aktiv(),
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "grafikkarte": grafikkarte_aktiv(), "nutzer": os.environ.get("ATLAS_NUTZER", "").strip(),
             "ersatzstimme": time.time() < _online_pause_bis}
 
 
@@ -886,21 +845,21 @@ SMALLTALK = re.compile(
     r"vielen dank|merci|ok(ay)?|alles klar|passt|super|cool|nice|top|gut|sehr gut|ja|nein|jo|nö|genau|"
     r"haha+|lol|tschüss|ciao|bis (später|dann|morgen|bald)|wie geht('?s| es dir)|was geht|"
     r"wer bist du|was kannst du|wie spät ist es|welcher tag ist (heute|es))"
-    r"( (hermes|bro|digga|mann|kumpel))*( (und )?(wie geht('?s| es dir)|was geht))?")
+    r"( (atlas|bro|digga|mann|kumpel))*( (und )?(wie geht('?s| es dir)|was geht))?")
 
 
 # Kleine Modelle überlesen Regeln im langen Systemprompt; ein kurzer Hinweis direkt an der Nachricht wirkt
-STIL_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Den Nutzer siezen (Sie, Ihnen), auch bei Aufforderungen (\"Machen Sie\", nie \"Mache\"), höflich und natürlich, wie ein Mensch redet. "
+STIL_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Den Nutzer siezen (Sie, Ihnen), auch bei Aufforderungen (\"Machen Sie\", nie \"Mache\"), höflich und natürlich, wie ein Mensch redet. "
                  "Fang direkt mit dem Inhalt an, ohne Begrüßung. Kein 'Sir', nichts über deine Rolle oder das Projekt. "
                  "Sprich von dir als 'ich'. Keine Emojis.]")
-SMALLTALK_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, den Nutzer siezen (Sie, Ihnen), aber "
+SMALLTALK_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Antworte in 1-2 kurzen, natürlichen Sätzen, den Nutzer siezen (Sie, Ihnen), aber "
                      "\"Sie\" nie als Anrede allein ('Guten Abend.', nie 'Guten Abend, Sie.'), höflich und entspannt wie ein Mensch. Grüße nur, wenn gegrüßt wurde. Kein 'Sir', nichts über "
                      "deine Rolle oder das Projekt, von dir nur als 'ich'. Geh auf die Nachricht ein. Keine Emojis. Beende die Antwort NICHT mit einer Frage "
                      "wie 'Wie kann ich Ihnen helfen?'.]")
 
 
 # ---------- Morgen-Briefing und Nachrichten ----------
-BRIEFING = re.compile(r"^\W*(hey |hallo |hi )?(hermes\W*)?(guten morgen|morgen|moin)(\W+hermes)?\W*$|"
+BRIEFING = re.compile(r"^\W*(hey |hallo |hi )?(atlas\W*)?(guten morgen|morgen|moin)(\W+atlas)?\W*$|"
                       r"\b(briefing|tagesüberblick|was gibt'?s neues|was ist (heute|gerade|so) (los|passiert))\b", re.I)
 NACHRICHTEN = re.compile(r"\b(nachrichten|news|schlagzeilen)\b", re.I)
 BRIEFING_PROMPT = """Gib jetzt ein kurzes Morgen-Briefing wie ein aufmerksamer Assistent, gesprochen und natürlich,
@@ -910,9 +869,9 @@ ohne Überschriften und ohne Listen, insgesamt etwa 6 bis 8 Sätze:
    Wetterdaten, sag in einem Satz, dass du dafür den Wohnort brauchst.
 3. Die drei bis vier wichtigsten Nachrichten, je ein Satz, verschiedene Themen. NUR aus den mitgegebenen
    Schlagzeilen, nichts dazuerfinden, nichts bewerten."""
-BRIEFING_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Gib jetzt das Morgen-Briefing wie in deinen "
+BRIEFING_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Gib jetzt das Morgen-Briefing wie in deinen "
                     "Anweisungen beschrieben: natürlich gesprochen, Fließtext, keine Listen, keine Emojis.]")
-NEWS_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Fasse die mitgegebenen Tagesschau-Schlagzeilen "
+NEWS_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Fasse die mitgegebenen Tagesschau-Schlagzeilen "
                 "zusammen, nichts erfinden, keine Emojis.]")
 NACHRICHTEN_PROMPT = """Fasse die wichtigsten Nachrichten zusammen: drei bis fünf verschiedene Themen, je ein bis
 zwei Sätze, NUR aus den mitgegebenen Schlagzeilen, nichts dazuerfinden. Nenne am Ende die Tagesschau als Quelle."""
@@ -924,7 +883,7 @@ VERGANGEN = re.compile(r"\b(gestern|vorgestern|letzte\w*|war)\b", re.I)
 KLEIDUNG = re.compile(r"\b(jacke|mantel|anziehen|sonnencreme)\b", re.I)
 KEIN_ORT_KLEIN = {"der", "die", "das", "den", "dem", "des", "einer", "einem", "einen", "meiner", "meinem", "unserer", "zukunft",
                   "ordnung", "deutschland", "ruhe", "letzter", "dieser", "diesem", "diesen", "kürze"}
-KEIN_ORT = {"Deutschland", "Grad", "Celsius", "Uhr", "Hermes"}
+KEIN_ORT = {"Deutschland", "Grad", "Celsius", "Uhr", "Atlas"}
 
 
 def ort_aus_text(text: str) -> str:
@@ -948,7 +907,7 @@ KEIN_ORT_WORT = re.compile(r"\b(egal|nein|nö|lass|vergiss|danke|nichts|keine?|w
 
 
 def ort_nachgereicht(text: str, verlauf: list[dict], frage: str = WETTER_ORT_FRAGE) -> str:
-    """Hermes hat nach dem Ort gefragt und der Nutzer antwortet: "Freiburg" ist dann ein Ort, kein neues Suchwort."""
+    """Atlas hat nach dem Ort gefragt und der Nutzer antwortet: "Freiburg" ist dann ein Ort, kein neues Suchwort."""
     if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or verlauf[-2]["content"] != frage
             or text.strip().endswith("?") or KEIN_ORT_WORT.search(text)):
         return ""
@@ -967,7 +926,7 @@ def wohnort() -> str:
     return ""
 
 
-ANREDE = re.compile(r"^\W*(?:(?:hey|hallo|hi|ok|okay)\s+)?hermes\b\W*", re.I)
+ANREDE = re.compile(r"^\W*(?:(?:hey|hallo|hi|ok|okay)\s+)?atlas\b\W*", re.I)
 # Damit die Websuche nicht zu erfundenen Antworten führt: das Modell muss die Quellen prüfen, nicht nur nacherzählen
 QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Nutze nur, was dort wirklich steht. Nichts aus dem Gedächtnis ergänzen, auch keine Namen, Zahlen oder Daten.
@@ -979,7 +938,7 @@ QUELLEN_REGELN = """Prüfe die Quellen, bevor du antwortest:
 - Nenne bei Zahlen und Ergebnissen die Quelle.
 - Reicht es nicht für eine sichere Antwort, sag: "Dazu habe ich nichts Sicheres gefunden. Das heißt aber nicht, dass
   nichts passiert ist." Schließe aus fehlenden Treffern nie, dass etwas nicht passiert ist. Rate nie."""
-QUELLEN_HINWEIS = ("\n\n[Hinweis an Hermes, nicht erwähnen: Sieze den Nutzer, auch in Anleitungen und Aufzählungen (Sie, Ihnen, "
+QUELLEN_HINWEIS = ("\n\n[Hinweis an Atlas, nicht erwähnen: Sieze den Nutzer, auch in Anleitungen und Aufzählungen (Sie, Ihnen, "
                    "\"Geben Sie das Mehl dazu\"), nie du oder dir. Antworte nur mit dem, was in den Suchergebnissen steht. "
                    "Steht es dort nicht eindeutig, sag das ehrlich, statt zu raten.]")
 
@@ -990,10 +949,10 @@ UHRZEIT_ORT = re.compile(r"\b(wie spät|wie viel uhr|wieviel uhr|uhrzeit)\b.*\b(
 UHRZEIT = re.compile(r"\b(wie spät|wie ?viel uhr)\b|\buhrzeit\b.*\?|^\W*uhrzeit\W*$", re.I)
 DATUM_FRAGE = re.compile(r"\b(welcher tag|welches datum|den wievielten|der wievielte|welchen tag)\b.*\b(heute|ist|haben|es)\b", re.I)
 WURF_SEKUNDEN = 3.0  # so lange wie die Animation im Browser (WURF_DAUER)
-NOCHMAL = re.compile(r"^\W*(hermes\W*)?(noch ?mal|noch ein(mal|e|en)?|wieder|nochmal werfen|nochmal würfeln|noch einer)"
+NOCHMAL = re.compile(r"^\W*(atlas\W*)?(noch ?mal|noch ein(mal|e|en)?|wieder|nochmal werfen|nochmal würfeln|noch einer)"
                      r"(\s+(bitte|werfen|würfeln|versuchen))*\W*$", re.I)
 MUENZE = re.compile(r"(?=.*\bm(?:ü|ue)nze\w*\b)(?=.*\b(?:wirf\w*|werf\w*|schnipp\w*|flip\w*)\b)|\bm(?:ü|ue)nzwurf\b|\bkopf oder zahl\b", re.I)
-WUERFEL = re.compile(r"^\W*(hermes\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfel doch|würfeln|wirf (einen|den|nen|ne) würfel)\b", re.I)
+WUERFEL = re.compile(r"^\W*(atlas\W*)?würfel\W*$|\b(würfle|würfel mal|würfel bitte|würfel doch|würfeln|wirf (einen|den|nen|ne) würfel)\b", re.I)
 ZUFALL = re.compile(r"\b(?:zufallszahl|zufällige zahl)\b(?:.*?(\d+)\D+(\d+))?", re.I)
 
 
@@ -1007,11 +966,11 @@ def letzter_wurf(text: str, verlauf: list[dict]) -> str | None:
     return None
 
 
-# Fragen nach den eigenen Fähigkeiten: feste, wahre Liste. Die Websuche fand sonst das fremde Produkt "Hermes Agent",
+# Fragen nach den eigenen Fähigkeiten: feste, wahre Liste. Die Websuche fand sonst fremde Produkte namens "Atlas",
 # und das Modell gab dessen Funktionen als seine eigenen aus.
-FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann hermes\b|"
-                        r"\b(deine|dein|von hermes|hermes)\s+(fähigkeit\w*|funktion(en)?|features?)\b|"
-                        r"\b(fähigkeit\w*|funktion(en)?|features?)\b.*\b(hast du|du hast|von dir|von hermes|kannst du)\b", re.I)
+FAEHIGKEIT = re.compile(r"\bwas kannst du\b|\bwas kann atlas\b|"
+                        r"\b(deine|dein|von atlas|atlas)\s+(fähigkeit\w*|funktion(en)?|features?)\b|"
+                        r"\b(fähigkeit\w*|funktion(en)?|features?)\b.*\b(hast du|du hast|von dir|von atlas|kannst du)\b", re.I)
 # "Sag was über dich": Das Modell gab sich sonst als den Nutzer aus und erfand einen Lebenslauf
 VORSTELLUNG = re.compile(r"\b(wer|was) bist du\b|\bstell\w* dich\b.*\bvor\b|\bdich\b.*\bvorstellen\b|"
                          r"\büber dich( selbst)? (sagen|erzählen|berichten)\b|"
@@ -1038,14 +997,14 @@ FAEHIGKEITEN_LISTE = """Das kann ich:
 - PDFs lesen und Fragen dazu beantworten, neue PDFs erstellen
 - Bilder beschreiben
 - Texte schreiben und übersetzen, Dinge erklären und im Chat beim Programmieren helfen
-- Mit Ihnen reden: per Knopf oder „Hey Hermes“, und Sie können mir ins Wort fallen
+- Mit Ihnen reden: per Knopf oder „Hey Atlas“, und Sie können mir ins Wort fallen
 - Mir Dinge über Sie merken, wenn Sie es möchten
 
 Nicht kann ich: Programme oder Dateien auf Ihrem Laptop steuern und mich zu einer bestimmten Uhrzeit von selbst melden."""
-VORSTELLUNG_TEXT = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ins Internet gehe ich nur für Suche, Wetter und Nachrichten und für meine Stimme.
+VORSTELLUNG_TEXT = """Ich bin Atlas, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ins Internet gehe ich nur für Suche, Wetter und Nachrichten und für meine Stimme.
 
 Ich beantworte Fragen und schaue dafür im Internet nach, mit Quellen. Außerdem kann ich rechnen, PDFs lesen, Bilder beschreiben, Timer stellen und mir Dinge merken, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
-VORSTELLUNG_GESPROCHEN = """Ich bin Hermes, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ich schaue im Internet nach, nenne das Wetter, rechne und merke mir Dinge, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
+VORSTELLUNG_GESPROCHEN = """Ich bin Atlas, ein KI-Assistent, mit dem man schreiben und sprechen kann. Mein Sprachmodell läuft lokal auf diesem Laptop. Ich schaue im Internet nach, nenne das Wetter, rechne und merke mir Dinge, wenn man das möchte. Fehler mache ich trotzdem, wichtige Dinge sollte man also nachprüfen."""
 FAEHIGKEITEN_GESPROCHEN = """Ich beantworte Fragen und schaue dafür im Internet nach. Ich nenne Wetter und Nachrichten, rechne, stelle Timer und werfe Münzen. PDFs lese ich, Bilder beschreibe ich, und Dinge über Sie merke ich mir, wenn Sie das möchten. Die ganze Liste steht im Chat, wenn Sie danach fragen."""
 
 
@@ -1122,8 +1081,8 @@ def dauer_text(s: int) -> str:
 
 def ist_smalltalk(text: str) -> bool:
     """Begrüßung, Dank, kurze Reaktion: dafür braucht es kein Werkzeug, also auch keinen Router (spart ~3 s)."""
-    t = re.sub(r"[^\w\s']", " ", text.lower().replace("hermes,", "hermes")).split()
-    t = " ".join(w for w in t if w != "hermes" or len(t) == 1)
+    t = re.sub(r"[^\w\s']", " ", text.lower().replace("atlas,", "atlas")).split()
+    t = " ".join(w for w in t if w != "atlas" or len(t) == 1)
     return len(t.split()) <= 8 and bool(SMALLTALK.fullmatch(t or "hallo"))
 
 
@@ -1165,12 +1124,12 @@ def werkzeug_waehlen(frage: str, modell: str, verlauf: list[dict], dok_namen: li
                      "Schreib KEINE Jahreszahl in die Suchanfrage, außer der Nutzer nennt selbst eine. Bei 'heute', "
                      "'gestern', 'morgen' nimm das echte Datum von oben.\n"
                      "werkzeug='keins' bei: Reaktionen auf das Gespräch ('du lügst', 'stimmt nicht', 'danke', 'ok', "
-                     "'warum?'), Kritik oder Nachfragen zu deiner letzten Antwort, Fragen zu Hermes oder dem "
-                     "Projekt, Smalltalk, Meinungen, Uhrzeit oder Datum (die kennt Hermes), Programmieren, "
+                     "'warum?'), Kritik oder Nachfragen zu deiner letzten Antwort, Fragen zu Atlas oder dem "
+                     "Projekt, Smalltalk, Meinungen, Uhrzeit oder Datum (die kennt Atlas), Programmieren, "
                      "Erklärungen zu bereits Gesagtem, reine Text-Aufgaben.\n"
-                     "Der Assistent heißt Hermes. Nachrichten, die sich an Hermes richten ('Hermes, wie geht es dir?', "
-                     "'Hallo Hermes'), sind Smalltalk: werkzeug='keins'. Nur wenn der Nutzer ausdrücklich nach dem "
-                     "griechischen Gott Hermes fragt, ist eine Suche nötig."},
+                     "Der Assistent heißt Atlas. Nachrichten, die sich an Atlas richten ('Atlas, wie geht es dir?', "
+                     "'Hallo Atlas'), sind Smalltalk: werkzeug='keins'. Nur wenn der Nutzer ausdrücklich nach dem "
+                     "Titan Atlas, dem Atlasgebirge oder einem Landkarten-Atlas fragt, ist eine Suche nötig."},
                     {"role": "user", "content": f"Wissen über den Nutzer:\n{wissen}\n\nDokumente im Chat: {doks}"
                      "\n\nBisheriges Gespräch:\n"
                      f"{kontext or '(leer)'}\n\nLetzte Nutzernachricht: {frage}"},
@@ -1219,17 +1178,17 @@ FLOSKEL_ANFAENGE = ("wie kann", "was kann", "kann ich", "darf ich", "falls du", 
                     "wenn du weitere", "wenn du fragen", "wenn sie", "ich stehe", "ich bin für", "ich bin gerne",
                     "ich bin jederzeit", "lass mich", "sag einfach", "sag gern", "sag bescheid", "ich helfe", "und falls",
                     "und wenn du", "alles, was du", "alles was du", "für alles", "wenn du was", "wenn du etwas",
-                    "ich bin hermes", "ich bin dein", "ich bin ihr", "sagen sie", "lassen sie", "das merke", "das merk", "merke ich",
+                    "ich bin atlas", "ich bin dein", "ich bin ihr", "sagen sie", "lassen sie", "das merke", "das merk", "merke ich",
                     "ich merke", "ich merk", "ich habe mir", "ich habe das", "das habe ich", "ist gemerkt", "ich speichere",
                     "danke für die info", "danke für die information", "rat:")
-# "Ich bin Hermes, dein persönlicher Assistent." -> "Ich bin Hermes." (der Nutzer will kein Gerede über die Rolle)
+# "Ich bin Atlas, dein persönlicher Assistent." -> "Ich bin Atlas." (der Nutzer will kein Gerede über die Rolle)
 ROLLE = re.compile(r",? *(dein|ihr|euer) (persönliche[rn]? |digitale[rn]? |treue[rn]? |eigene[rn]? )*(ki-)?"
                    r"(assistent|butler|helfer|begleiter|diener)\w*", re.I)
 
 
 def ohne_rolle(satz: str) -> str:
     satz = re.sub(r"^(\s*)Rat:\s*", r"\1", ROLLE.sub("", satz), flags=re.I)  # die Wetterdaten nennen ihn so, sagen soll er es nicht
-    return re.sub(r"\b(ich bin)(\W*)$", r"\1 Hermes\2", satz, flags=re.I)  # "Ich bin." -> "Ich bin Hermes."
+    return re.sub(r"\b(ich bin)(\W*)$", r"\1 Atlas\2", satz, flags=re.I)  # "Ich bin." -> "Ich bin Atlas."
 SATZENDE = re.compile(r"[.!?…](?=\s|$)|\n")
 
 
@@ -1343,21 +1302,21 @@ def briefing_daten(messages: list[dict], mit_wetter: bool):
     yield ev(typ="status", text="denkt nach")
 
 
-OHNE_ROUTER = re.compile(r"^\W*(hermes\W*)?(schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*)\b", re.I)
+OHNE_ROUTER = re.compile(r"^\W*(atlas\W*)?(schreib\w*|übersetz\w*|formulier\w*|korrigier\w*|programmier\w*)\b", re.I)
 MIN_SEITE = 300  # Zeichen; kürzer ist meist nur ein Cookie-Hinweis oder eine leere Seite
 # Auto-Modus: Bei solchen Fragen lohnt sich das Nachdenken
 KOMPLEX = re.compile(r"\b(erklär\w*|warum|wieso|weshalb|vergleich\w*|unterschied\w*|analysier\w*|begründ\w*|"
                      r"vor- und nachteile|beweis\w*|schritt für schritt|plan\w*|programmier\w*|code|fehler|berechne\w*)\b", re.I)
 # "Google mal ...", "Schau im Internet nach ...": dann wird immer gesucht, egal was das Modell meint
 SUCH_BEFEHL = re.compile(r"\b(googl\w*|such\w*|recherchier\w*|im internet|im netz|online nach|schau nach|guck nach)\b", re.I)
-FUELLWOERTER = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?((kannst|könntest) du( mir)?( mal| bitte)* )?"
+FUELLWOERTER = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(atlas\W*)?((kannst|könntest) du( mir)?( mal| bitte)* )?"
                           r"((googl\w*|such\w*|recherchier\w*|schau|guck)( mal| bitte| doch| im internet| im netz| nach| online)*\W*)?", re.I)
-FRAGEWORT = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(hermes\W*)?(wer|wen|wem|wessen|was|wann|wo|wohin|woher|wie|warum|wieso|weshalb|"
+FRAGEWORT = re.compile(r"^\W*(hey |hallo |hi |ok |okay )?(atlas\W*)?(wer|wen|wem|wessen|was|wann|wo|wohin|woher|wie|warum|wieso|weshalb|"
                        r"welche\w*|wieviel\w*|gibt es|gibt's|gab es|stimmt es|ist|sind|hat|haben|war|waren|wurde|wurden|wird|werden)\b", re.I)
 # Keine Sachfragen: Reaktionen aufs Gespräch und Programmieren (dafür taugt die Websuche nicht)
 REAKTION = re.compile(r"\b(stimmt das|ist das (so|richtig|wahr|sicher)|war das|was soll das)\b", re.I)
 PROGRAMMIEREN = re.compile(r"\b(python|javascript|java|html|css|code|programm\w*|funktion|variable|schleife|bug|fehlermeldung)\b", re.I)
-AN_HERMES = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
+AN_ATLAS = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
 RECHENFRAGE = re.compile(r"\d.*(%|\bprozent\b|\bmal\b|\bplus\b|\bminus\b|\bgeteilt\b|\bdurch\b|\bhoch\b|\bwurzel\b|\btage\b|"
                          r"\bwochen\b|[+*/=])|\b(wurzel|tage|wochen)\b.*\d|\brechne\b|\bberechne\b", re.I)
 
@@ -1376,7 +1335,7 @@ def direkte_suche(text: str, dokumente: list) -> str | None:
     Bundeskanzler."""
     frage = FUELLWOERTER.sub("", text)
     befehl = bool(SUCH_BEFEHL.search(text))
-    sachfrage = (not dokumente and bool(FRAGEWORT.search(text)) and len(frage.split()) >= 2 and not AN_HERMES.search(frage)
+    sachfrage = (not dokumente and bool(FRAGEWORT.search(text)) and len(frage.split()) >= 2 and not AN_ATLAS.search(frage)
                  and not REAKTION.search(text) and not PROGRAMMIEREN.search(text) and not RECHENFRAGE.search(text))
     if not befehl and not sachfrage:
         return None
@@ -1417,20 +1376,20 @@ def _modell_json(system: str, nutzer: str, feld: str) -> str:
         return ""
 
 
-ANALYSE_ARTEN = ["internet", "route", "wetter", "nutzer", "hermes", "gespraech", "aufgabe", "rechnen"]
-ANALYSE_PROMPT = """Du analysierst die letzte Nachricht an den Sprachassistenten Hermes. Sie kann aus Spracherkennung stammen und Tipp- oder Hörfehler enthalten. Überlege, was gemeint ist, und ordne sie ein.
+ANALYSE_ARTEN = ["internet", "route", "wetter", "nutzer", "atlas", "gespraech", "aufgabe", "rechnen"]
+ANALYSE_PROMPT = """Du analysierst die letzte Nachricht an den Sprachassistenten Atlas. Sie kann aus Spracherkennung stammen und Tipp- oder Hörfehler enthalten. Überlege, was gemeint ist, und ordne sie ein.
 
 art:
 - internet: Sachfrage über die Welt, die man nachschlagen kann: Personen, Ereignisse, Zahlen, Orte, Preise, Begriffe, Anleitungen, Gesundheit, Rechte. Auch wenn sie mit "ich" oder "mein" formuliert ist ("Wie mache ich Pizza?"). Im Zweifel internet.
 - route: Weg, Entfernung oder Fahrzeit auf der Straße zwischen Orten, mit dem Auto oder ohne genanntes Verkehrsmittel ("Wie lange von Köln nach Bonn?", "Wie weit ist es nach Paris?", "Wie lange dauert die Fahrt?"). Mit Zug, Bus, Flugzeug oder Fahrrad oder im Weltall: internet.
 - wetter: fragt nach dem Wetter an einem Ort auf der Erde, jetzt oder in den nächsten Tagen, auch ohne das Wort Wetter: kalt, warm, Regen, Schnee, Wind, Grad, oder ob man Jacke oder Schirm braucht ("Ist es morgen kalt?", "Brauche ich heute einen Schirm?"). Nur wenn die Antwort die aktuelle Vorhersage für einen Ort auf der Erde braucht. Alles andere ist internet: Temperaturen von Dingen und Himmelskörpern ("Wie heiß ist die Sonne?"), Erklärungen ("Warum ...", "Wie entsteht ..."), Kaufberatung und Wetter in der Vergangenheit.
 - nutzer: fragt nach Tatsachen über genau diesen Nutzer, die nur er oder sein Assistent wissen kann ("Wie heiße ich?", "Wie heißt mein Hund?", "Was weißt du über mich?").
-- hermes: fragt nach dem Assistenten selbst, seinen Stärken, seiner Technik, seinem Befinden. Der griechische Gott Hermes, der Paketdienst oder die Marke sind internet.
+- atlas: fragt nach dem Assistenten selbst, seinen Stärken, seiner Technik, seinem Befinden. Der Titan Atlas aus der Mythologie, das Atlasgebirge, ein Landkarten-Atlas, der Halswirbel oder Firmen namens Atlas sind internet.
 - gespraech: Reaktion auf die letzte Antwort, Kritik, Dank, Plauderei ("Stimmt das?", "Warum?", "du lügst"). Eine neue Sachfrage zum selben Thema ist internet.
 - aufgabe: Text schreiben, übersetzen, Code schreiben oder erklären, Gedicht, ohne dass Fakten nachgeschlagen werden müssen.
 - rechnen: konkrete Rechenaufgabe, deren Zahlen in der letzten Nachricht selbst stehen.
 
-suchanfrage: Immer ausfüllen. Formuliere die beste Google-Suche auf Deutsch, höchstens 8 Wörter, nur Stichwörter ohne Füllwörter und ohne die Anrede Hermes. Korrigiere Hör- und Tippfehler. Behalte alle Namen, Zahlen und Jahre aus der Frage genau bei. Bezieht sich die Nachricht auf das bisherige Gespräch, übernimm Namen, Orte und Jahre von dort, damit die Suche für sich allein verständlich ist. Bei einem neuen Thema nimm nichts aus dem Gespräch. Füge keine Jahreszahl hinzu und erfinde keine Tatsachen oder Antworten."""
+suchanfrage: Immer ausfüllen. Formuliere die beste Google-Suche auf Deutsch, höchstens 8 Wörter, nur Stichwörter ohne Füllwörter und ohne die Anrede Atlas. Korrigiere Hör- und Tippfehler. Behalte alle Namen, Zahlen und Jahre aus der Frage genau bei. Bezieht sich die Nachricht auf das bisherige Gespräch, übernimm Namen, Orte und Jahre von dort, damit die Suche für sich allein verständlich ist. Bei einem neuen Thema nimm nichts aus dem Gespräch. Füge keine Jahreszahl hinzu und erfinde keine Tatsachen oder Antworten."""
 # Das Modell allein traf hier nur 9 von 17 neuen Sätzen: Es hielt fast alles mit "kalt" oder "warm" für Wetter (Lava, Winterjacken).
 # Deshalb zählt seine Wahl nur, wenn die Frage auch nach jetzt oder bald klingt.
 WETTER_BALD = re.compile(r"\b(heute|morgen|übermorgen|gerade|jetzt|draußen|aktuell|momentan|nacht|abend|wochenende|wetter|"
@@ -1443,7 +1402,7 @@ AKTUELL = re.compile(r"\b(aktuell\w*|derzeit\w*|momentan\w*|gerade)\b", re.I)
 def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     """Der erste Schritt bei jeder offenen Frage: Was ist gemeint, muss das ins Internet, und wie sucht man es am besten?
     Gibt (art, suchanfrage) zurück, bei einem Fehler ("", ""). Dauert gut 2 s. Gemessen an 48 Nachrichten: 46 richtig."""
-    frage = ANREDE.sub("", text) or text  # "hermes wie heiße ich" hielt es sonst für eine Frage nach Hermes
+    frage = ANREDE.sub("", text) or text  # "atlas wie heiße ich" hielt es sonst für eine Frage nach Atlas
     # Ohne Quellenliste: Sie lenkte die Einordnung nur ab
     kontext = "\n".join(f"{m['role']}: {m['content'].split(chr(10) + '---' + chr(10))[0][:300]}" for m in verlauf[-3:-1])
     try:
@@ -1477,8 +1436,8 @@ def analysieren(text: str, verlauf: list[dict]) -> tuple[str, str]:
     # Gerechnet wird nur die Fahrt mit dem Auto. Flug, Zug und Fahrrad muss die Suche beantworten
     if art == "route" and re.search(r"\b(flug(?!hafen)\w*|fliegen|fliegt|flieger|zug|züge|bahn|bus|fahrrad|rad|e-bike|zu fuß|laufen|wandern|schiff|fähre)\b", frage, re.I):
         art = "internet"
-    # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Hermes ist nicht der Assistent
-    if art == "hermes" and re.search(r"griech|mytholog|\bgott\b|götter|olymp|\bpaket|sendung|tasche", frage, re.I):
+    # Der Name allein täuscht das Modell auch mit klarer Regel: Der Gott Atlas ist nicht der Assistent
+    if art == "atlas" and re.search(r"griech|mytholog|\btitan|\bgott\b|götter|olymp|gebirge|landkarte|weltkarte|halswirbel|wirbel", frage, re.I):
         art = "internet"
     anfrage = anfrage or FUELLWOERTER.sub("", frage).strip(" ?!.,")
     # Das Modell schrieb im Test "Bundeskanzler Deutschland 2023" und ließ Zahlen und "aktuell" weg: Das darf nicht die Suche verfälschen
@@ -1648,7 +1607,7 @@ def erinnerung_speichern(satz: str) -> bool:
 
 
 def antwort_auf_nachfrage(text: str, verlauf: list[dict]) -> str:
-    """'Wie alt bin ich?' - 'Das weiß ich noch nicht, sagen Sie es mir' - '19': Hermes hat versprochen, es zu merken.
+    """'Wie alt bin ich?' - 'Das weiß ich noch nicht, sagen Sie es mir' - '19': Atlas hat versprochen, es zu merken.
     Gibt den Fakt zurück, sonst leer."""
     if (len(verlauf) < 3 or verlauf[-2]["role"] != "assistant" or not verlauf[-2]["content"].startswith("Das weiß ich noch nicht")
             or text.strip().endswith("?") or SENSIBEL.search(text)):
@@ -1725,7 +1684,7 @@ NUR_WIDERSPRUCH = {"nein", "ne", "nö", "doch", "stimmt", "falsch", "so", "gar",
 
 
 def korrektur_vorschlagen(text: str, verlauf: list[dict]) -> list[str]:
-    """Berichtigt der Nutzer die letzte Antwort, fragt Hermes per Karte, ob er sich das merken soll. Speichert NICHTS."""
+    """Berichtigt der Nutzer die letzte Antwort, fragt Atlas per Karte, ob er sich das merken soll. Speichert NICHTS."""
     if (text.strip().endswith("?") or not KORREKTUR.search(text) or len(text.split()) < 4 or SENSIBEL.search(text)
             or len(verlauf) < 2 or verlauf[-2]["role"] != "assistant"):
         return []
@@ -1733,10 +1692,10 @@ def korrektur_vorschlagen(text: str, verlauf: list[dict]) -> list[str]:
     if not {w for w in re.findall(r"[a-zäöüß0-9-]+", text.lower()) if w not in FUELLWORT and w not in NUR_WIDERSPRUCH}:
         return []
     satz = _modell_json(
-        "Der Nutzer berichtigt eine Antwort von Hermes. Schreib die richtige Angabe als kurzen, für sich verständlichen "
+        "Der Nutzer berichtigt eine Antwort von Atlas. Schreib die richtige Angabe als kurzen, für sich verständlichen "
         "Aussagesatz, nur aus dem, was der Nutzer sagt. Nenne das Thema ausdrücklich, keine Wörter wie 'er', 'das' oder "
         "'es' ohne Bezug. Sagt er nur, dass etwas falsch ist, aber nicht, was stimmt, gib einen leeren Text zurück.",
-        f"Hermes: {verlauf[-2]['content'][:800]}\n\nNutzer: {text}", "fakt")
+        f"Atlas: {verlauf[-2]['content'][:800]}\n\nNutzer: {text}", "fakt")
     if not 10 < len(satz) < 200 or "nutzer" in satz.lower():
         return []
     return [] if satz.lower().rstrip(".") in (e["text"].lower().rstrip(".") for e in alle_erinnerungen()) else ["Korrektur: " + satz]
@@ -1827,7 +1786,7 @@ OLLAMA_AUS_TEXT = "Ollama ist nicht erreichbar. Läuft Ollama? (Startmenü oder 
 
 
 def ollama_erreichbar() -> bool:
-    """Kurzer Blick, ob Ollama läuft. Ohne ihn suchte Hermes erst 15 s im Internet und meldete den Fehler danach."""
+    """Kurzer Blick, ob Ollama läuft. Ohne ihn suchte Atlas erst 15 s im Internet und meldete den Fehler danach."""
     try:
         return requests.get(OLLAMA_URL + "/api/version", timeout=2).ok
     except requests.RequestException:
@@ -1906,7 +1865,7 @@ def _chat_stream(frage: Frage):
     if wetter_ort:
         gemeint = f"{verlauf[-3]['content'].rstrip(' ?.!')} in {wetter_ort}"
     route_start = ort_nachgereicht(frage.text, verlauf, ROUTE_START_FRAGE)
-    # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Hermes hier selbst
+    # Name als Antwort: Das Modell wiederholte im Test seine alte Antwort, also antwortet Atlas hier selbst
     name = "" if (gemerkt or bilder or frage.dokumente) else name_aus_antwort(frage.text, verlauf)
     sofort = gemerkt or (f"Freut mich, {name.removeprefix('Der Nutzer heißt ').rstrip('.')}." if name else None) or (
         None if (bilder or frage.dokumente) else (
@@ -1932,7 +1891,7 @@ def _chat_stream(frage: Frage):
         yield ev(typ="fertig")
         return
     messages = [{"role": "system", "content": system_prompt()}] + kuerzen(verlauf)
-    # "Hermes, ..." am Satzanfang ist die Anrede, kein Thema: Das Modell hielt es sonst für den Paketdienst
+    # "Atlas, ..." am Satzanfang ist die Anrede, kein Thema: Das Modell hielt es sonst für das Gebirge oder die Landkarte
     messages[-1] = {**messages[-1], "content": ANREDE.sub("", messages[-1]["content"]) or messages[-1]["content"]}
     if bilder:
         messages[-1] = {**messages[-1], "images": bilder}  # Bilder hängen an der letzten Nutzernachricht
@@ -1958,7 +1917,7 @@ def _chat_stream(frage: Frage):
         hinweis = (BRIEFING_HINWEIS if briefing else NEWS_HINWEIS if news else
                    SMALLTALK_HINWEIS if smalltalk else STIL_HINWEIS)
         if gemeint != frage.text:
-            hinweis += f"\n\n[Hinweis an Hermes, nicht erwähnen: Gemeint ist: {gemeint}]"
+            hinweis += f"\n\n[Hinweis an Atlas, nicht erwähnen: Gemeint ist: {gemeint}]"
         messages[-1] = {**messages[-1], "content": messages[-1]["content"] + hinweis}
         if briefing or news:
             yield from briefing_daten(messages, mit_wetter=briefing)
@@ -2005,7 +1964,7 @@ def _chat_stream(frage: Frage):
                         yield ev(typ="fertig")
                         return
                     art = "internet"  # kein Ziel erkannt: lieber normal suchen
-                if art in ("hermes", "gespraech", "aufgabe"):
+                if art in ("atlas", "gespraech", "aufgabe"):
                     werkzeug, eingabe = "keins", ""
                 elif art == "wetter" and WETTER_ZU_WEIT.search(gemeint):
                     yield ev(typ="token", text=WETTER_ZU_WEIT_TEXT)

@@ -7,9 +7,10 @@
 <link rel="apple-touch-icon" href="/hermes.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Hermes">
+<meta name="apple-mobile-web-app-title" content="Atlas">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<title>Hermes</title>
+<title>Atlas</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.20/index.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
@@ -188,7 +189,7 @@
   .senden:hover:not(:disabled) { transform:scale(1.07); }
   .senden:active:not(:disabled) { transform:scale(.94); }
   .senden:disabled { background:none; color:var(--dim); border-color:var(--rand); cursor:default; }
-  /* Während Hermes antwortet, wird der Pfeil zum Stopp-Knopf */
+  /* Während Atlas antwortet, wird der Pfeil zum Stopp-Knopf */
   .senden .ico-stopp { display:none; }
   .senden.stopp .ico-senden { display:none; }
   .senden.stopp .ico-stopp { display:block; }
@@ -416,6 +417,191 @@
   .gefahr { font-family:inherit; letter-spacing:0; font-size:14px; border-radius:8px; padding:9px 12px; text-align:left; }
   .gefahr:hover { background:var(--karte); }
   .fuss { font-family:inherit; letter-spacing:0; font-size:12px; border-top:1px solid var(--line); padding:10px 10px 0; }
+
+  /* ================= Neues Design: ruhig und clean (eine Schrift, keine Effekte) ================= */
+  :root { --bg:#1f1f1f; --fg:#ececec; --dim:#9b9b9b; --line:#2e2e2e; --karte:#2c2c2c; --rand:#3a3a3a; --feld:#2a2a2a;
+          --panel:#171717; --btn:#ececec; --btnfg:#171717; --raster:transparent;
+          --mono:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  [data-theme="hell"] { --bg:#ffffff; --fg:#1f1f1f; --dim:#6b6b6b; --line:#ececec; --karte:#f2f2f2; --rand:#e3e3e3; --feld:#f4f4f4;
+          --panel:#f9f9f9; --btn:#1f1f1f; --btnfg:#ffffff; }
+  [data-theme="grau"] { --bg:#2b2b2e; --fg:#ececed; --dim:#a2a3aa; --line:#38383c; --karte:#38383c; --rand:#45454a; --feld:#353538;
+          --panel:#232326; --btn:#ececed; --btnfg:#222; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  body::before { display:none; }
+  /* Kopf: kleines Symbol + Name, kein Gesperrtes mehr */
+  header { height:56px; padding:0 18px 0 64px; }
+  .logo { font-family:inherit; letter-spacing:0; font-size:17px; font-weight:600; }
+  #auge, body.klein #auge { top:10px; left:14px; width:40px; transform:none; }
+  #timeranzeige, body.klein #timeranzeige { top:12px; left:auto; right:18px; transform:none; width:auto; padding:6px 12px;
+          font-family:inherit; font-size:13px; letter-spacing:0; border:1px solid var(--rand); border-radius:999px; background:var(--feld); }
+  #wurfanzeige { font-family:inherit; letter-spacing:.05em; }
+  body.timer #hero h1 { visibility:visible; }
+  /* Start: Begrüßung statt großem Auge */
+  #hero, body.klein #hero { padding-top:0; }
+  #hero { margin-top:22vh; max-height:200px; }
+  #hero h1 { margin:0; font-size:28px; font-weight:500; letter-spacing:-.01em; color:var(--fg); }
+  body.wurf #hero h1 { visibility:hidden; }
+  /* Nachrichten */
+  #chat { gap:28px; padding-top:12px; }
+  .user .inhalt { background:var(--karte); border:0; border-radius:20px; padding:10px 16px; line-height:1.5; }
+  .bot .inhalt { padding-left:0; border-left:0; line-height:1.7; font-size:15.5px; }
+  .bot ul, .bot ol { padding-left:1.4em; }
+  .bot li { margin:.25em 0; }
+  .bot hr { border-top:1px solid var(--line); }
+  .bot pre, .bot code { border:0; }
+  .kopie { display:grid; place-items:center; width:30px; height:30px; padding:0; margin-top:4px; border-radius:8px; opacity:.7; }
+  .kopie svg { width:16px; height:16px; }
+  .kopie:hover { background:var(--karte); opacity:1; }
+  @media (hover:hover) { .msg .kopie { opacity:0; } .msg:hover .kopie { opacity:.7; } .msg .kopie:hover { opacity:1; } }
+  /* Recherche-Schritte, Karten: gleiche Schrift */
+  .recherche { border:1px solid var(--line); background:none; }
+  .recherche summary, .schritt b, .merkkarte b, .skillkopf, #vorschau .pdf b { font-family:inherit; letter-spacing:0; font-size:12.5px; }
+  .merkkarte { border-left:1px solid var(--rand); background:var(--karte); border-radius:14px; }
+  .skillkarte { background:var(--karte); border-color:var(--line); border-radius:16px; }
+  /* Eingabe: ein Rahmen, ruhig */
+  #form { padding:6px 18px 18px; }
+  .modus { margin:0 0 8px 14px; font-family:inherit; font-size:12px; letter-spacing:0; }
+  #modusname, #modushinweis { display:none; }
+  #livestatus, #gpuwarnung { margin-left:0; margin-right:10px; letter-spacing:0; }
+  .leiste { background:var(--feld); border:1px solid var(--rand); border-radius:26px; padding:6px; box-shadow:none; align-items:flex-end; }
+  .leiste:focus-within { border-color:var(--dim); box-shadow:none; }
+  .leiste textarea { padding:9px 4px; }
+  .rund { width:38px; height:38px; }
+  .rund svg { width:19px; height:19px; }
+  .mic:hover:not(:disabled), #plus:hover { background:var(--karte); border-color:transparent; }
+  .senden:disabled { background:var(--karte); color:var(--dim); border-color:transparent; }
+  .senden:hover:not(:disabled) { transform:none; opacity:.85; }
+  #plusmenue { background:var(--feld); border-color:var(--rand); border-radius:16px; }
+  #plusmenue button:hover { background:var(--karte); }
+  #plusmenue h4 { font-family:inherit; font-size:12px; letter-spacing:0; border-top-color:var(--line); }
+  .schalter-zeile b, .stimme, .kachel { font-family:inherit; letter-spacing:0; }
+  .stimme small { letter-spacing:0; }
+  .kachel { background-image:none; font-size:12px; }
+  .kachel[data-design="dunkel"] { background-color:#1f1f1f; color:#ececec; }
+  .kachel[data-design="hell"] { background-color:#ffffff; color:#1f1f1f; }
+  @media (max-width:480px) {
+    #hero { margin-top:16vh; } #hero h1 { font-size:24px; }
+    #form { padding:6px 10px calc(10px + env(safe-area-inset-bottom)); }
+  }
+
+  /* ================= Claude-Look: warme Farben, Eingabe als Karte, Begrüßung mittig ================= */
+  :root { --bg:#262624; --fg:#faf9f5; --dim:#a6a39b; --line:#3a3936; --karte:#30302e; --rand:#41403c; --feld:#30302e;
+          --panel:#1f1e1d; --btn:#faf9f5; --btnfg:#262624; }
+  [data-theme="hell"] { --bg:#faf9f5; --fg:#141413; --dim:#73726c; --line:#e8e6dc; --karte:#f0eee6; --rand:#dedcd1; --feld:#ffffff;
+          --panel:#f5f4ed; --btn:#141413; --btnfg:#faf9f5; }
+  [data-theme="grau"] { --bg:#262624; --fg:#faf9f5; --dim:#a6a39b; --line:#3a3936; --karte:#30302e; --rand:#41403c; --feld:#30302e;
+          --panel:#1f1e1d; --btn:#faf9f5; --btnfg:#262624; }
+  #auge { display:none; }
+  body.wurf #auge { display:block; }
+  header { padding:0 16px; gap:10px; }
+  #menueKnopf { display:grid; place-items:center; width:36px; height:36px; padding:0; border:0; border-radius:8px;
+                background:none; color:var(--dim); cursor:pointer; }
+  #menueKnopf:hover { background:var(--karte); color:var(--fg); }
+  #menueKnopf svg { width:20px; height:20px; }
+  .logo { font-size:16px; font-weight:500; color:var(--fg); }
+  /* Leerer Chat: Begrüßung und Eingabe zusammen in der Mitte */
+  body:not(.klein) main { flex:0 0 auto; margin-top:auto; overflow:visible; }
+  body:not(.klein) #form { margin-bottom:auto; padding-bottom:16vh; }
+  #hero, body:not(.klein) #hero { margin:0 0 26px; max-height:none; }
+  #hero h1 { font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif; font-weight:400;
+             font-size:38px; letter-spacing:-.01em; }
+  /* Eingabe als Karte: Text oben, Knöpfe unten */
+  #form { max-width:740px; }
+  .leiste { flex-wrap:wrap; align-items:center; gap:2px; border-radius:20px; padding:12px 10px 10px 12px;
+            background:var(--feld); border:1px solid var(--rand); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+  .leiste:focus-within { border-color:var(--rand); box-shadow:0 1px 2px rgba(0,0,0,.12); }
+  .leiste textarea { order:-1; flex:1 1 100%; min-height:52px; padding:2px 4px 8px; font-size:16px; }
+  #plus { margin-right:auto; }
+  .rund { width:34px; height:34px; border-radius:10px; }
+  .rund svg { width:18px; height:18px; }
+  .senden { border-radius:10px; }
+  .senden:disabled { background:transparent; color:var(--dim); }
+  .modus { display:flex; justify-content:flex-end; align-items:center; margin:8px 6px 0; min-height:22px; color:var(--dim); }
+  #modusKnopf { display:flex; align-items:center; gap:4px; padding:3px 8px; border:0; border-radius:8px; background:none;
+                color:var(--dim); font:inherit; font-size:13px; cursor:pointer; }
+  #modusKnopf:hover { background:var(--karte); color:var(--fg); }
+  #modusKnopf svg { width:14px; height:14px; }
+  #modusname { display:inline; color:inherit; }
+  #livestatus, #gpuwarnung { order:-1; margin-right:auto; }
+  #plusmenue { bottom:calc(100% + 8px); }
+  @media (max-width:480px) {
+    #hero h1 { font-size:30px; }
+    body:not(.klein) #form { padding-bottom:10vh; }
+  }
+
+  /* ---- Animationen: schimmernder Status, weich einblendender Text ---- */
+  .typing { animation:none; color:inherit; }
+  .schimmer { color:transparent; background:linear-gradient(90deg, var(--dim) 0%, var(--dim) 35%, var(--fg) 50%, var(--dim) 65%, var(--dim) 100%);
+              background-size:250% 100%; -webkit-background-clip:text; background-clip:text; animation:schimmer 1.8s linear infinite; }
+  @keyframes schimmer { from { background-position:100% 0; } to { background-position:-150% 0; } }
+  .neu { animation:einblenden .45s ease-out both; }
+  @keyframes einblenden { from { opacity:0; } to { opacity:1; } }
+  .msg { animation:hochkommen .3s ease-out both; }
+  @keyframes hochkommen { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .schritt b { color:var(--dim); font-weight:500; width:44px; }
+  .schritt i.puls::after { width:5px; height:5px; background:var(--dim); }
+  .recherche { border-radius:14px; padding:8px 14px; }
+  .recherche summary { font-size:13px; }
+  #hero h1 { animation:einblenden .6s ease-out both; }
+  @media (prefers-reduced-motion:reduce) { .schimmer, .neu, .msg, #hero h1 { animation:none; } .schimmer { color:var(--dim); } }
+
+  /* ================= Premium: tiefes Dunkel, Inter, Akzent, Tiefe ================= */
+  :root { --bg:#191918; --fg:#f2f1ec; --dim:#9a988f; --line:#2b2a28; --karte:#252523; --rand:rgba(255,255,255,.08);
+          --feld:#232322; --panel:#141413; --btn:#f2f1ec; --btnfg:#191918; --akzent:#e2a35a; --akzent-fg:#1d1408;
+          --schatten:0 1px 0 rgba(255,255,255,.04) inset, 0 10px 40px -12px rgba(0,0,0,.55); }
+  [data-theme="hell"] { --bg:#f8f7f3; --fg:#1b1a17; --dim:#77756d; --line:#e9e7df; --karte:#efede6; --rand:rgba(0,0,0,.09);
+          --feld:#ffffff; --panel:#f1efe8; --btn:#1b1a17; --btnfg:#ffffff; --akzent:#c7772c; --akzent-fg:#ffffff;
+          --schatten:0 1px 2px rgba(0,0,0,.05), 0 10px 32px -14px rgba(0,0,0,.18); }
+  [data-theme="grau"] { --bg:#1f2023; --fg:#eeeef0; --dim:#9b9ca4; --line:#2f3034; --karte:#2a2b2f; --rand:rgba(255,255,255,.08);
+          --feld:#28292d; --panel:#18191b; --btn:#eeeef0; --btnfg:#1f2023; --akzent:#8fb3ff; --akzent-fg:#0d1626; }
+  body, #seite, .leiste textarea, button, input { font-family:"Inter Variable",system-ui,-apple-system,"Segoe UI",sans-serif;
+         font-feature-settings:"cv11","ss01"; }
+  body { background:var(--bg); }
+  /* ganz leichter Lichtschein hinter der Begrüßung */
+  body:not(.klein)::after { content:""; position:fixed; left:50%; top:30%; width:900px; height:520px; transform:translate(-50%,-50%);
+         background:radial-gradient(closest-side, color-mix(in srgb, var(--akzent) 9%, transparent), transparent);
+         pointer-events:none; z-index:0; animation:einblenden 1.2s ease-out both; }
+  .zeichen { width:22px; height:22px; color:var(--akzent); flex-shrink:0; }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.01em; }
+  .logo .zeichen { width:20px; height:20px; }
+  #hero { display:flex; align-items:center; justify-content:center; gap:14px; }
+  #hero .zeichen { width:34px; height:34px; }
+  @keyframes drehen { to { transform:rotate(360deg); } }
+  #hero h1 { font-size:40px; letter-spacing:-.02em; }
+  /* Eingabe: schwebende Karte */
+  .leiste { background:var(--feld); border:1px solid var(--rand); box-shadow:var(--schatten); border-radius:22px;
+            transition:border-color .2s, box-shadow .2s; }
+  .leiste:focus-within { border-color:color-mix(in srgb, var(--fg) 18%, transparent); box-shadow:var(--schatten); }
+  .leiste textarea::placeholder { color:var(--dim); }
+  .senden:not(:disabled) { background:var(--akzent); color:var(--akzent-fg); }
+  .senden.stopp { background:var(--fg); color:var(--bg); }
+  /* Vorschläge */
+  #vorschlaege { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:10px; }
+  body.klein #vorschlaege { display:none; }
+  #vorschlaege button { display:flex; align-items:center; gap:7px; padding:7px 13px; border:1px solid var(--rand); border-radius:999px;
+                        background:transparent; color:var(--dim); font-size:13.5px; cursor:pointer; transition:background .15s, color .15s, border-color .15s; }
+  #vorschlaege button:hover { background:var(--karte); color:var(--fg); }
+  #vorschlaege svg { width:15px; height:15px; }
+  #form { position:relative; }
+  /* Nachrichten */
+  .user .inhalt { background:var(--karte); border-radius:18px; padding:10px 16px; }
+  .bot .inhalt { font-size:15.5px; line-height:1.72; }
+  .bot strong { font-weight:600; }
+  .bot a { color:inherit; text-decoration-color:color-mix(in srgb, var(--fg) 35%, transparent); }
+  .bot a:hover { text-decoration-color:var(--fg); }
+  .recherche { background:color-mix(in srgb, var(--karte) 55%, transparent); border:1px solid var(--rand); }
+  /* Seitenleiste */
+  #seite { background:var(--panel); border-right:1px solid var(--rand); }
+  .seitenlogo { display:flex; align-items:center; gap:8px; }
+  .neuerchat .plus { background:var(--akzent); color:var(--akzent-fg); }
+  .titel.aktiv, .titel:hover, .neuerchat:hover, .suchfeld:hover, .suchfeld:focus-within, #einstMenue button:hover { background:var(--karte); }
+  #schleier { background:rgba(0,0,0,.35); backdrop-filter:blur(2px); }
+  ::selection { background:color-mix(in srgb, var(--akzent) 35%, transparent); }
+  @media (max-width:480px) { #hero h1 { font-size:30px; } #hero .zeichen { width:28px; height:28px; } #vorschlaege { margin-top:14px; } }
+  .kachel[data-design="dunkel"] { background-color:#191918; color:#f2f1ec; }
+  .kachel[data-design="hell"] { background-color:#f8f7f3; color:#1b1a17; }
+  .kachel[data-design="grau"] { background-color:#1f2023; color:#eeeef0; }
+  .kachel.aktiv { border:2px solid var(--akzent); }
 </style>
 
 </head>
@@ -424,16 +610,20 @@
 <button type="button" id="timeranzeige" title="Timer stoppen" hidden></button>
 <div id="wurfanzeige" hidden></div>
 
-<header><div class="logo">HERMES</div></header>
+<header>
+  <button type="button" id="menueKnopf" title="Chats und Einstellungen" aria-label="Menü">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+  </button>
+  <div class="logo"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg>Atlas</div>
+</header>
 
 <main id="fenster">
   <div id="chat">
-    <div id="hero"><p>BEREIT</p></div>
+    <div id="hero"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg><h1 id="gruss">Hallo</h1></div>
   </div>
 </main>
 
 <form id="form" autocomplete="off">
-  <div class="modus" id="modus"><span id="modusname"></span><span id="modushinweis"></span><span id="livestatus" hidden><i></i>LIVE</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Hermes neu starten.">GRAFIKKARTE AUS · LANGSAM</span></div>
   <div id="vorschau" hidden></div>
   <input type="file" id="bilddatei" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" multiple hidden>
   <div class="leiste">
@@ -447,12 +637,12 @@
         </svg>
         <b>Bild oder PDF anhängen</b>
       </button>
-      <h4>MODUS</h4>
+      <h4>Modus</h4>
       <button type="button" data-m="auto"><span><b>Auto</b><small>wählt selbst</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
       <button type="button" data-m="schnell"><span><b>Schnell</b><small>antwortet direkt</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
       <button type="button" data-m="gruendlich"><span><b>Gründlich</b><small>denkt immer nach</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
     </div>
-    <textarea id="eingabe" rows="1" placeholder="Schreiben Sie Hermes etwas ..." autocomplete="off" autofocus></textarea>
+    <textarea id="eingabe" rows="1" placeholder="Nachricht an Atlas" autocomplete="off" autofocus></textarea>
     <button type="button" class="rund mic" id="mic" title="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
@@ -460,7 +650,7 @@
         <path d="M12 18v3"/>
       </svg>
     </button>
-    <button type="button" class="rund mic" id="live" title="Live-Gespräch (oder „Hey Hermes“ sagen)">
+    <button type="button" class="rund mic" id="live" title="Live-Gespräch (oder „Hey Atlas“ sagen)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 10v4"/><path d="M8 6v12"/><path d="M12 3v18"/><path d="M16 7v10"/><path d="M20 10v4"/>
       </svg>
@@ -472,12 +662,20 @@
       <svg class="ico-stopp" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
     </button>
   </div>
+  <div class="modus" id="modus"><button type="button" id="modusKnopf" title="Modus wählen"><span id="modusname"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Atlas neu starten.">Grafikkarte aus · langsam</span></div>
+  <div id="vorschlaege">
+    <button type="button" data-text="Wie wird das Wetter heute?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Wetter</button>
+    <button type="button" data-text="Was gibt es Neues in den Nachrichten?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Nachrichten</button>
+    <button type="button" data-text="Stell einen Timer auf 10 Minuten."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/></svg>Timer</button>
+    <button type="button" data-text="Rechne 100 Euro in Dollar um."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/></svg>Umrechnen</button>
+  </div>
+
 </form>
 
 <div id="schleier"></div>
 <aside id="seite">
   <div class="seitenkopf">
-    <span class="seitenlogo">Hermes</span>
+    <span class="seitenlogo"><svg class="zeichen" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="6.5" fill="currentColor"/><ellipse cx="16" cy="16" rx="14" ry="5.2" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 16 16)"/></svg>Atlas</span>
     <div class="kopfknoepfe">
       <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -512,7 +710,7 @@
 
       <section data-bereich="erinnerungen" hidden>
         <h3 class="abschnitt">Erinnerungen</h3>
-        <p class="hinweis">Das weiß Hermes über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
+        <p class="hinweis">Das weiß Atlas über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
         <ul class="listen" id="liste"></ul>
         <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
       </section>
@@ -539,7 +737,7 @@
       <section data-bereich="ki" hidden>
         <h3 class="abschnitt">KI</h3>
         <p class="hinweis" id="kiHinweis">Lokal läuft alles auf dem Laptop, nichts verlässt ihn. Claude ist klüger und schneller, kostet aber pro Frage etwas Geld, und Nachricht, Verlauf, Erinnerungen und Suchergebnisse gehen an Anthropic.</p>
-        <p class="hinweis" id="kiOhneSchluessel" hidden>Für Claude fehlt der API-Schlüssel: in die Datei .env die Zeile ANTHROPIC_API_KEY=... eintragen und Hermes neu starten.</p>
+        <p class="hinweis" id="kiOhneSchluessel" hidden>Für Claude fehlt der API-Schlüssel: in die Datei .env die Zeile ANTHROPIC_API_KEY=... eintragen und Atlas neu starten.</p>
         <div class="stimmen">
           <button type="button" class="stimme" data-ki="lokal">LOKAL<small>Ollama auf dem Laptop</small></button>
           <button type="button" class="stimme" data-ki="claude" id="kiClaude" hidden>CLAUDE<small>online, mit API-Schlüssel</small></button>
@@ -548,7 +746,7 @@
 
       <section data-bereich="wake" hidden>
         <h3 class="abschnitt">Wake-Word</h3>
-        <p class="hinweis">Sagen Sie „Hey Hermes“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Hermes, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
+        <p class="hinweis">Sagen Sie „Hey Atlas“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Atlas, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
         <div class="schalter-zeile" id="wakeZeile">
           <b id="wakeText">AUS</b>
           <button type="button" class="schalter" id="wakeSchalter" role="switch" aria-checked="false" aria-label="Wake-Word an/aus"></button>
@@ -573,7 +771,7 @@
   let beschaeftigt = false;
   let abbruch = null;  // AbortController der laufenden Antwort (für den Stopp-Knopf)
   let chatsAlle = [];
-  const STANDARD = matchMedia("(max-width: 480px)").matches ? "Nachricht an Hermes" : "Schreiben Sie Hermes etwas ...";  // lang passt aufs Handy nicht
+  const STANDARD = "Nachricht an Atlas";  // lang passt aufs Handy nicht
 
   const chat = document.getElementById("chat");
   const fenster = document.getElementById("fenster");
@@ -605,6 +803,11 @@
     if (eingabe.value) eingabe.style.height = Math.min(eingabe.scrollHeight, 180) + "px";  // leer bleibt einzeilig
   }
   eingabe.addEventListener("input", () => { wachse(); sendeStatus(); });
+  document.querySelectorAll("#vorschlaege button").forEach((b) => b.addEventListener("click", () => {
+    if (beschaeftigt) return;
+    eingabe.value = b.dataset.text; wachse(); sendeStatus();
+    document.getElementById("form").requestSubmit();
+  }));
   eingabe.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
   });
@@ -651,7 +854,7 @@
       const r = await (await fetch("/pdf-lesen", { method: "POST", body: fd })).json();
       if (r.fehler) { platzhalter(r.fehler, 5000); return; }
       pdfs.push(r);
-      platzhalter(r.gekuerzt ? "PDF ist lang: Hermes sieht nur den Anfang (ca. 9000 Zeichen)." : "PDF gelesen.", 4000);
+      platzhalter(r.gekuerzt ? "PDF ist lang: Atlas sieht nur den Anfang (ca. 9000 Zeichen)." : "PDF gelesen.", 4000);
     } catch (e) { platzhalter("PDF konnte nicht gelesen werden (läuft der Server?).", 4000); }
     zeichneVorschau();
   }
@@ -735,7 +938,7 @@
 
   // ---------- Kopieren ----------
   function kopieren(text, knopf) {
-    const fertig = () => { knopf.textContent = "✓"; setTimeout(() => { knopf.textContent = "⧉"; }, 1500); };
+    const fertig = () => { knopf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'; setTimeout(() => { knopf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>'; }, 1500); };
     const notloesung = () => {
       const feld = document.createElement("textarea");
       feld.value = text;
@@ -764,7 +967,7 @@
     const knopf = document.createElement("button");
     knopf.className = "kopie";
     knopf.title = "Kopieren";
-    knopf.textContent = "⧉";
+    knopf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
     knopf.addEventListener("click", () => kopieren(huelle.dataset.roh, knopf));
     huelle.append(inhalt, knopf);
     chat.appendChild(huelle);
@@ -773,9 +976,27 @@
 
   }
 
+  // Neuer Text blendet weich ein (wie bei Claude): Nur was seit dem letzten Zeichnen dazukam, bekommt die Animation.
   function aktualisiere(huelle, text) {
     huelle.dataset.roh = text;
-    rendern(huelle.querySelector(".inhalt"), text);
+    const el = huelle.querySelector(".inhalt");
+    rendern(el, text);
+    const vorher = Number(huelle.dataset.gezeigt || 0);
+    const weg = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => n.parentElement.closest(".katex") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const knoten = []; let n; while ((n = weg.nextNode())) knoten.push(n);
+    let zaehler = 0;
+    for (const t of knoten) {
+      const laenge = t.nodeValue.length;
+      if (zaehler + laenge > vorher && t.nodeValue.trim()) {
+        const ab = Math.max(0, vorher - zaehler);
+        const neu = ab > 0 ? t.splitText(ab) : t;
+        const span = document.createElement("span"); span.className = "neu";
+        neu.parentNode.insertBefore(span, neu); span.appendChild(neu);
+      }
+      zaehler += laenge;
+    }
+    huelle.dataset.gezeigt = zaehler;
   }
 
   // ---------- Modus ----------
@@ -795,7 +1016,7 @@
     modus = m;
     try { localStorage.setItem("hermes-modus2", m); } catch (e) {}
     document.querySelectorAll("#plusmenue [data-m]").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
-    document.getElementById("modusname").textContent = { auto: "AUTO", schnell: "SCHNELL", gruendlich: "GRÜNDLICH" }[m];
+    document.getElementById("modusname").textContent = { auto: "Auto", schnell: "Schnell", gruendlich: "Gründlich" }[m];
     modusHinweis();
   }
   document.querySelectorAll("#plusmenue [data-m]").forEach((b) => b.addEventListener("click", () => { setzeModus(b.dataset.m); plusMenue(false); }));
@@ -807,7 +1028,7 @@
   document.addEventListener("click", (e) => { if (!plusFeld.contains(e.target) && !plusKnopf.contains(e.target)) plusMenue(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") plusMenue(false); });
 
-  // Merken: Hermes fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
+  // Merken: Atlas fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
   const SIE_FORM = { "heißt": "heißen", wohnt: "wohnen", lebt: "leben", studiert: "studieren", hat: "haben", ist: "sind",
     mag: "mögen", spielt: "spielen", arbeitet: "arbeiten", kommt: "kommen", liebt: "lieben", hasst: "hassen",
     isst: "essen", macht: "machen", geht: "gehen", lernt: "lernen", "fährt": "fahren" };
@@ -933,7 +1154,7 @@
     nein.addEventListener("click", () => vorschlagBeantworten(eintrag, false));
     fenster.scrollTop = fenster.scrollHeight;
   }
-  // Gibt zurück, was Hermes danach sagt, und schreibt es als normale Nachricht weiter
+  // Gibt zurück, was Atlas danach sagt, und schreibt es als normale Nachricht weiter
   async function vorschlagBeantworten(eintrag, ja) {
     if (offenerVorschlag === eintrag) offenerVorschlag = null;
     const huelle = eintrag.karte.parentNode;
@@ -989,7 +1210,8 @@
     const inhalt = huelle.querySelector(".inhalt");
     if (aktiveKette) aktiveKette.binde(huelle);
     inhalt.classList.add("typing");
-    inhalt.textContent = "denkt nach ...";
+    inhalt.innerHTML = '<span class="schimmer">Denkt nach</span>';
+    const statusText = (t) => { const sp = inhalt.querySelector(".schimmer"); if (sp) sp.textContent = t; };
     window.hermesDenkt = true; window.hermesSucht = false;
     const warNeu = aktuellerChat === null;
     let roh = "", karte = null, offen = null, schritte = 0, geplant = false, gestoppt = false;
@@ -1022,21 +1244,23 @@
           else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { /* kein Internet-Suchen: kein Kasten */ }
           else if (ev.typ === "status" && ev.detail !== undefined) {
             schritte++; window.hermesSucht = true;
+            statusText(ev.text === "liest" ? "Liest Seiten" : "Sucht im Internet");
             // Im Gespräch: Die Suche dauert, also sagt er kurz Bescheid, statt still zu bleiben
             if (ev.text === "sucht" && aktiveKette) aktiveKette.ansage("Moment, ich schaue nach.");
             if (!karte) {
               karte = document.createElement("details"); karte.className = "recherche"; karte.open = true;
               karte.innerHTML = "<summary></summary>"; huelle.insertBefore(karte, inhalt);
             }
-            karte.querySelector("summary").textContent = "RECHERCHE · " + schritte + (schritte === 1 ? " SCHRITT" : " SCHRITTE");
+            karte.querySelector("summary").textContent = "Recherche · " + schritte + (schritte === 1 ? " Schritt" : " Schritte");
             offen = document.createElement("div"); offen.className = "schritt";
-            offen.innerHTML = "<b>" + (ev.text === "liest" ? "LIEST" : "SUCHT") + "</b><span></span><i class=\"puls\"></i>";
+            offen.innerHTML = "<b>" + (ev.text === "liest" ? "Liest" : "Sucht") + "</b><span class=\"schimmer\"></span><i class=\"puls\"></i>";
             offen.querySelector("span").textContent = ev.detail;
             karte.appendChild(offen);
           } else if (ev.typ === "status") {
             if (!offen) window.hermesSucht = false;
           } else if (ev.typ === "ergebnis" && offen) {
-            const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen = null; window.hermesSucht = false;
+            const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen.querySelector("span").classList.remove("schimmer"); offen = null; window.hermesSucht = false;
+            statusText("Denkt nach");
           } else if (ev.typ === "token") {
             window.hermesDenkt = false; window.hermesSucht = false;
             roh += ev.text;
@@ -1060,8 +1284,8 @@
     } catch (fehler) {
       if (fehler && fehler.name === "AbortError") gestoppt = true;
       // Ollama-Fehler meldet der Server selbst. Hier ist der Server gar nicht erreichbar oder hat abgelehnt.
-      else if (!roh) roh = fehler && fehler.message === "Serverfehler" ? "Der Hermes-Server hat die Anfrage abgelehnt. Bitte laden Sie die Seite neu."
-        : "Der Hermes-Server ist nicht erreichbar. Bitte starten Sie ihn über „Hermes starten“ im Ordner „Hermes Box“ auf dem Desktop.";
+      else if (!roh) roh = fehler && fehler.message === "Serverfehler" ? "Der Atlas-Server hat die Anfrage abgelehnt. Bitte laden Sie die Seite neu."
+        : "Der Atlas-Server ist nicht erreichbar. Bitte starten Sie ihn über „Atlas starten“ im Ordner „Atlas“ auf dem Desktop.";
     }
     abbruch = null;
     if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";
@@ -1175,7 +1399,7 @@
   let sprecher = null;         // gerade spielendes Audio
   let lauschLauf = 0;          // wird hochgezählt, um laufende Schleifen zu beenden
   let antwortWarter = null;    // wartet auf das Ende einer Antwort (siehe form submit)
-  const WAKE = /\b(?:(?:hey|hi|hallo|okay|ok|he|ey)[\s,.!]*)?herm[eèé]s\b/i;
+  const WAKE = /\b(?:(?:hey|hi|hallo|okay|ok|he|ey)[\s,.!]*)?(?:atlas+|adlas+|attlas)\b/i;
   const ENDE = /^\s*(stopp?|ende|beenden|tschüss|danke,? das war'?s|das war'?s)\W*$/i;
 
   async function ohrOeffnen() {
@@ -1229,7 +1453,7 @@
     try {
       const daten = new FormData();
       daten.append("datei", blob, "aufnahme.webm");
-      if (schnell) daten.append("schnell", "true");  // kleines Modell: nur fürs Lauschen auf "Hey Hermes"
+      if (schnell) daten.append("schnell", "true");  // kleines Modell: nur fürs Lauschen auf "Hey Atlas"
       const antwort = await (await fetch("/stt", { method: "POST", body: daten })).json();
       return (antwort.text || "").trim();
     } catch (e) { return ""; }
@@ -1266,7 +1490,7 @@
     if (url && lauf === lauschLauf) await abspielen(url);
   }
 
-  // Live: Hermes fängt schon an zu sprechen, während die Antwort noch entsteht. Der erste Satz geht sofort los,
+  // Live: Atlas fängt schon an zu sprechen, während die Antwort noch entsteht. Der erste Satz geht sofort los,
   // danach werden die Sätze zu längeren Stücken gebündelt und vorgeladen, damit zwischen ihnen keine Lücke entsteht.
   let aktiveKette = null;
   function satzGrenze(t, min) {
@@ -1355,7 +1579,7 @@
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
-    const url = await holeAudio("Guten Abend. Ich bin Hermes. So klinge ich, wenn ich Ihnen antworte.");
+    const url = await holeAudio("Guten Abend. Ich bin Atlas. So klinge ich, wenn ich Ihnen antworte.");
     if (url) await abspielen(url);
     b.classList.remove("spielt");
   }));
@@ -1445,7 +1669,7 @@
     });
   }
 
-  // Kurzer, weicher Ton nach "Hey Hermes": Ich höre jetzt zu. Zwei leise Töne, schnell ausklingend.
+  // Kurzer, weicher Ton nach "Hey Atlas": Ich höre jetzt zu. Zwei leise Töne, schnell ausklingend.
   function hoerTon() {
     try {
       const ctx = new AudioContext(), t0 = ctx.currentTime + 0.02;
@@ -1460,7 +1684,7 @@
     } catch (e) {}
   }
 
-  // Reinreden: Solange Hermes spricht, wird das Mikrofon beobachtet. Bleibt der Pegel kurz deutlich über dem,
+  // Reinreden: Solange Atlas spricht, wird das Mikrofon beobachtet. Bleibt der Pegel kurz deutlich über dem,
   // was gerade als Echo der eigenen Stimme ankommt, hört er auf und lauscht. (Das Mikrofon läuft mit Echounterdrückung.)
   function reinredenWaechter(beiReinreden) {
     let boden = 0.01, laut = 0, ausgeloest = false;
@@ -1531,7 +1755,7 @@
 
   function liveAnzeige(an) {
     liveKnopf.classList.toggle("an", an);
-    liveKnopf.title = an ? "Live-Gespräch beenden" : "Live-Gespräch starten (oder „Hey Hermes“ sagen)";
+    liveKnopf.title = an ? "Live-Gespräch beenden" : "Live-Gespräch starten (oder „Hey Atlas“ sagen)";
     document.getElementById("livestatus").hidden = !an;
   }
   liveKnopf.addEventListener("click", () => { if (liveAn) liveBeenden(); else liveStarten(""); });
@@ -1542,7 +1766,7 @@
       platzhalter("Mikrofon nicht erlaubt: Wake-Word geht nicht.", 6000); wakeSetzen(false); return;
     }
     while (wache && !liveAn && lauf === lauschLauf) {
-      // kurze Stücke: "Hey Hermes" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
+      // kurze Stücke: "Hey Atlas" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
       const blob = await aeusserung(lauf, { maxWarten: 10000, maxDauer: 7000, stille: 700 });
       if (!blob || beschaeftigt || lauf !== lauschLauf) continue;
       const text = await erkennen(blob, true);
@@ -1551,7 +1775,7 @@
         hoerTon();
         let rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
         if (rest.length > 3) {
-          // Frage direkt hinterher ("Hey Hermes, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen
+          // Frage direkt hinterher ("Hey Atlas, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen
           const genau = await erkennen(blob, false);
           const m2 = genau.match(WAKE);
           if (m2) rest = genau.slice(m2.index + m2[0].length).replace(/^[\s,.!?]+/, "") || rest;
@@ -1567,7 +1791,7 @@
     try { localStorage.setItem("hermes-wake", an ? "an" : "aus"); } catch (e) {}
     document.getElementById("wakeSchalter").setAttribute("aria-checked", an ? "true" : "false");
     document.getElementById("wakeZeile").classList.toggle("an", an);
-    document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY HERMES“" : "AUS";
+    document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY ATLAS“" : "AUS";
     if (liveAn) return;
     if (an) wachLauschen(); else { lauschLauf++; ohrSchliessen(); }
   }
@@ -1576,6 +1800,8 @@
   // ---------- Seitenleiste ----------
   function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
   function schliesseSeite() { seite.classList.remove("offen"); schleier.classList.remove("offen"); }
+  document.getElementById("menueKnopf").addEventListener("click", () => oeffneSeite());
+  document.getElementById("modusKnopf").addEventListener("click", (e) => { e.stopPropagation(); document.getElementById("plus").click(); });
   document.getElementById("auge").addEventListener("click", () => {
     if (seite.classList.contains("offen")) schliesseSeite(); else oeffneSeite();
   });
@@ -1619,9 +1845,19 @@
     neuerChat();
   });
 
+  let nutzerName = "";
+  function begruessen() {
+    const h = new Date().getHours();
+    const gruss = h >= 5 && h < 11 ? "Guten Morgen" : h >= 11 && h < 14 ? "Guten Mittag" : h >= 14 && h < 18 ? "Guten Tag"
+      : h >= 18 && h < 23 ? "Guten Abend" : "Hallo";
+    document.getElementById("gruss").textContent = gruss + (nutzerName ? ", " + nutzerName : "");
+  }
+  begruessen();
+  setInterval(begruessen, 60000);
   async function ladeStatus() {
     try {
       const s = await (await fetch("/status")).json();
+      nutzerName = s.nutzer || ""; begruessen();
       modiInfo = s.modi; modusHinweis();
       statuspunkt.className = s.ollama ? "an" : "aus";
       claudeDa = !!s.claude; kiAnzeigen();

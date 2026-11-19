@@ -1,4 +1,4 @@
-"""Feste Testliste für Hermes. Fängt ab, dass etwas kaputtgeht, das vorher lief.
+"""Feste Testliste für Atlas. Fängt ab, dass etwas kaputtgeht, das vorher lief.
 
     python testliste.py          schnell: nur die Wege der Fragen, ohne KI (Sekunden)
     python testliste.py --voll   zusätzlich echte Antworten mit Ollama und Internet (einige Minuten)
@@ -68,16 +68,16 @@ WEGE = [
     ("wie viel grad hat die sonne", "suche"), ("Stell einen Timer auf 5 Minuten", "timer"), ("Timer stopp", "timer"),
     ("Wirf eine Münze", "münze"), ("Kannst du eine Münze werfen?", "münze"), ("Kopf oder Zahl?", "münze"),
     ("Was ist eine Münze?", "suche"), ("Würfel mal", "würfel"), ("Was ist ein Würfel?", "suche"),
-    ("Was kannst du so alles?", "fähigkeiten"), ("Was sind die Fähigkeiten von Hermes?", "fähigkeiten"),
-    ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("hermes wie funktioniert das Thema grenzwerte", "suche"),
-    ("hermes wir sind hier in einem bewerbungsgespräch sag mal was über dich was du kannst etc", "vorstellung"),
+    ("Was kannst du so alles?", "fähigkeiten"), ("Was sind die Fähigkeiten von Atlas?", "fähigkeiten"),
+    ("Welche Fähigkeiten hast du?", "fähigkeiten"), ("atlas wie funktioniert das Thema grenzwerte", "suche"),
+    ("atlas wir sind hier in einem bewerbungsgespräch sag mal was über dich was du kannst etc", "vorstellung"),
     ("Wer bist du?", "vorstellung"), ("Stell dich mal kurz vor", "vorstellung"), ("Erzähl mir was über dich", "vorstellung"),
-    ("Hermes, wer hat dich gebaut?", "herkunft"), ("Von wem wurdest du entwickelt?", "herkunft"),
+    ("Atlas, wer hat dich gebaut?", "herkunft"), ("Von wem wurdest du entwickelt?", "herkunft"),
     ("Hat Alex dich komplett selbst programmiert?", "herkunft"), ("Wer hat das iPhone erfunden?", "suche"),
     ("Kannst du dich vorstellen?", "vorstellung"), ("Kannst du dir vorstellen, dass es regnet?", "wetter"),
     ("Erzähl mir was über Rom", "router"), ("Mach einfach, was du kannst", "router"),
-    ("Hermes, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
-    ("Wer ist Hermes in der griechischen Mythologie?", "suche"), ("Wie hoch ist der Eiffelturm?", "suche"),
+    ("Atlas, wie funktioniert ein Motor?", "suche"), ("Welche Funktionen hat das iPhone 16?", "suche"), ("Wer ist Bundeskanzler?", "suche"),
+    ("Wer ist Atlas in der griechischen Mythologie?", "suche"), ("Wie hoch ist der Eiffelturm?", "suche"),
     ("Was sind 18 Prozent von 2450?", "router"), ("Wie schreibe ich eine Schleife in Python?", "router"),
     ("Schreib mir ein Gedicht über Katzen", "kein werkzeug"), ("Stimmt das?", "router"),
 ]
@@ -85,7 +85,7 @@ SPRUCH_ERLAUBT = {"Poah, heute muss ich echt viel machen": True, "Ich bin so mü
                   "Mein Opa ist gestorben, ich bin traurig": False, "Was muss ich für die Klausur lernen?": False}
 PDF_WUNSCH = {"Mach mir ein PDF über Istanbul": True, "Schreib mir aus dem PDF raus, wann meine Tests sind": False,
               "Was steht im PDF?": False, "Kannst du das als PDF speichern?": True}
-STIL = {"Antworte ab jetzt kürzer": True, "Hermes, sei in Zukunft lockerer": True, "Sprich nicht mehr so förmlich": True,
+STIL = {"Antworte ab jetzt kürzer": True, "Atlas, sei in Zukunft lockerer": True, "Sprich nicht mehr so förmlich": True,
         "Ich möchte, dass du ab jetzt ausführlicher antwortest": True, "Schreib das kürzer": False,
         "Schreib mir einen Text, der immer lustig ist": False, "Ab jetzt regnet es immer": False}
 KORREKTUREN = {"Nein, das stimmt nicht, der Eiffelturm ist 330 Meter hoch": True, "Das ist falsch": True,
@@ -103,24 +103,24 @@ ANTWORTEN = [
     ("Was sind 18 Prozent von 2450?", ["441"], []),
     ("Wie spät ist es in Tokio?", ["Tokio"], []),
     ("Was kannst du so alles?", ["Das kann ich"], ["Felo", "Cron"]),
-    ("hermes wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
-    ("hermes wie heiße ich", ["nicht", "noch"], ["Ich heiße [", "testedich"]),
+    ("atlas wie funktioniert das Thema grenzwerte", ["grenzwert"], ["Sperrgut", "Versand", "Das kann ich"]),
+    ("atlas wie heiße ich", ["nicht", "noch"], ["Ich heiße [", "testedich"]),
     ("Wie lange muss ich Eier kochen?", ["Minuten"], []),
-    ("hermes wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Hermes"], ["Ich bin Alex", "studiere"]),
+    ("atlas wir sind in einem bewerbungsgespräch sag mal was über dich was du kannst etc", ["Ich bin Atlas"], ["Ich bin Alex", "studiere"]),
 ]
 # Analyse-Schritt: Nachricht und erwartete Art. Diese Sätze haben ihn nicht geformt, sie messen ihn.
 ANALYSE = {
-    "route": ["Wie lange fahre ich von Köln nach Bonn?", "Wie weit ist es von München nach Salzburg?", "hermes wie lange dauert der weg von freiburg bis heilbronn techcampus"],
+    "route": ["Wie lange fahre ich von Köln nach Bonn?", "Wie weit ist es von München nach Salzburg?", "atlas wie lange dauert der weg von freiburg bis heilbronn techcampus"],
     "wetter": ["ist es morgen kalt?", "Brauche ich heute einen Schirm?", "Wird es am Wochenende warm?", "Soll ich eine Jacke mitnehmen?",
                "Schneit es morgen in München?", "wie warm ist es gerade in Rom"],
-    "nutzer": ["hermes wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
+    "nutzer": ["atlas wie heiße ich", "Wo wohne ich?", "Was studiere ich eigentlich?", "Wie alt bin ich?", "Was ist mein Lieblingsessen?",
                "Weißt du, wie ich heiße?", "Wie heißt mein Hund?", "was weißt du über mich", "Habe ich einen Bruder?"],
-    "hermes": ["Was sind deine Stärken?", "Welches Modell benutzt du?", "Bist du schon in einer Box eingebaut?", "Was machst du in deiner Freizeit?"],
+    "atlas": ["Was sind deine Stärken?", "Welches Modell benutzt du?", "Bist du schon in einer Box eingebaut?", "Was machst du in deiner Freizeit?"],
     "gespraech": ["Stimmt das?", "Warum?", "du lügst doch", "Ok danke dir", "Das war aber eine schlechte Antwort"],
     "aufgabe": ["Schreib mir ein Gedicht über Katzen", "Übersetze guten Morgen ins Englische", "Wie schreibe ich eine Schleife in Python?"],
     "rechnen": ["Was sind 18 Prozent von 2450?", "Wie viel ist 12 mal 12?", "wurzel aus 144"],
-    "internet": ["Wer ist aktuell Bundeskanzler?", "hermes wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
-                 "Wer ist Hermes in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?", "Wie weit ist der Mond von der Erde entfernt?",
+    "internet": ["Wer ist aktuell Bundeskanzler?", "atlas wie funktioniert das Thema grenzwerte", "Wie mache ich Pizzateig?", "Welche Rechte habe ich als Mieter?",
+                 "Wer ist Atlas in der griechischen Mythologie?", "Wann hat Albert Einstein mit 50 Cent When It Rains It Pours geschrieben?", "Wie weit ist der Mond von der Erde entfernt?",
                  "Wie lange dauert ein Flug nach Rom?", "Wer hat die Fußball-WM 2098 gewonnen?", "Welche Funktionen hat das iPhone 16?", "wie viel grad hat die sonne", "Wie kalt ist flüssiger Stickstoff?", "Wie kalt war der kälteste Winter in Deutschland?",
                  "Wie warm wird eine Herdplatte?",
                  "was kostet gerade ein liter diesel", "Google mal wie alt Angela Merkel ist", "Wie kündige ich meinen Handyvertrag?",
@@ -206,16 +206,16 @@ for text, soll in {"Wie viel sind 5 Meilen in km": "5 Meilen sind 8,05 Kilometer
 for text in ["Wie weit ist Köln von Bonn?", "Ich habe 5 km in 30 Minuten geschafft", "Was sind 18 Prozent von 2450?", "Wie viel kostet 1 Liter Diesel in Deutschland?",
              "Wer hat 2014 in Rio gewonnen?", "Treffen wir uns um 5 in Berlin?"]:
     pruefe(f"Kein Umrechnen: {text}", server.werkzeuge.umrechnung_erkennen(text), None)
-for text, soll in {"hermes wie lange dauert der weg von freiburg bis heilbronn techcampus": ("freiburg", "heilbronn techcampus"),
+for text, soll in {"atlas wie lange dauert der weg von freiburg bis heilbronn techcampus": ("freiburg", "heilbronn techcampus"),
                    "Wie lange fahre ich von Köln nach Bonn?": ("Köln", "Bonn"), "Wie weit ist es von München nach Salzburg?": ("München", "Salzburg"),
                    "wie lange von stuttgart hauptbahnhof zum flughafen frankfurt": ("stuttgart hauptbahnhof", "flughafen frankfurt"),
                    "Wie lange brauche ich mit dem Auto von Ulm nach Augsburg?": ("Ulm", "Augsburg"), "wie lange von ulm nach augsburg mit dem auto": ("ulm", "augsburg"),
                    "kannst du mir sagen wie lange der weg von freiburg bis heilbronn dauert?": ("freiburg", "heilbronn"),
                    "Wie weit ist Heilbronn von Stuttgart entfernt?": ("Stuttgart", "Heilbronn"), "Wie weit ist es nach Paris?": ("", "Paris"), "Wie komme ich nach Rom?": ("", "Rom"),
-                   "hermes wie weit ist es von hier nach berlin? ich wohne in freiburg": ("freiburg", "berlin"), "Ich wohne in Ulm. Wie weit ist es nach Berlin?": ("Ulm", "Berlin"),
+                   "atlas wie weit ist es von hier nach berlin? ich wohne in freiburg": ("freiburg", "berlin"), "Ich wohne in Ulm. Wie weit ist es nach Berlin?": ("Ulm", "Berlin"),
                    "Wie weit ist es von zuhause nach München?": ("", "München"), "wie lange von hier bis stuttgart": ("", "stuttgart"),
                    "Ich wohne in Ulm. Wie lange von Köln nach Bonn?": ("Köln", "Bonn"),
-                   "hermes ich bin gerade im techcampus heilbronn wie lange dauert es mit dem auto zum bildungscampus heilbronn?": ("techcampus heilbronn", "bildungscampus heilbronn"),
+                   "atlas ich bin gerade im techcampus heilbronn wie lange dauert es mit dem auto zum bildungscampus heilbronn?": ("techcampus heilbronn", "bildungscampus heilbronn"),
                    "Ich stehe gerade am Hauptbahnhof Stuttgart, wie weit ist es zum Flughafen Stuttgart?": ("Hauptbahnhof Stuttgart", "Flughafen Stuttgart"),
                    "Ich bin bei der Hochschule Heilbronn. Wie lange fahre ich nach Freiburg?": ("Hochschule Heilbronn", "Freiburg"),
                    "wir sind gerade in köln wie lange dauert es bis nach bonn": ("köln", "bonn"), "Ich fahre von Köln nach Bonn, wie lange dauert das?": ("Köln", "Bonn"),
@@ -249,8 +249,8 @@ if "--voll" in sys.argv:
         for text in saetze:
             art, anfrage = server.analysieren(text, [])
             print(f"  {art:9} {text!r}" + (f" -> {anfrage!r}" if art == "internet" else ""), flush=True)
-            # hermes, gespraech und aufgabe nehmen denselben Weg: antworten ohne Werkzeug
-            ohne_werkzeug = ("hermes", "gespraech", "aufgabe")
+            # atlas, gespraech und aufgabe nehmen denselben Weg: antworten ohne Werkzeug
+            ohne_werkzeug = ("atlas", "gespraech", "aufgabe")
             pruefe(f"Analyse: {text}", "ohne werkzeug" if art in ohne_werkzeug else art, "ohne werkzeug" if soll in ohne_werkzeug else soll)
     pruefe("Suchanfrage ohne erfundenes Jahr", any(j in server.analysieren("Wer ist aktuell Bundeskanzler?", [])[1] for j in ("2022", "2023", "2024", "2025")), False)
     print("Wikipedia:")

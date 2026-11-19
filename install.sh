@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hermes – Installer für Linux (Fedora; kennt auch Ubuntu/Debian, Arch, openSUSE)
+# Atlas – Installer für Linux (Fedora; kennt auch Ubuntu/Debian, Arch, openSUSE)
 # Ausführen als normaler Nutzer:  ./install.sh   (fragt bei Bedarf nach sudo)
 set -euo pipefail
 
@@ -43,15 +43,13 @@ fi
 
 green "Python-Umgebung anlegen (.venv, Python 3.12)"
 "$UV" venv --python 3.12 --allow-existing .venv
-REQ=requirements.txt
-if command -v nvidia-smi >/dev/null && nvidia-smi -L >/dev/null 2>&1; then
-    green "NVIDIA-Grafikkarte gefunden: GPU-Pakete werden mitinstalliert"
-    REQ=requirements-gpu.txt
-elif command -v lspci >/dev/null && lspci | grep -qi nvidia; then
-    warn "NVIDIA-Grafikkarte erkannt, aber kein Treiber aktiv (nvidia-smi fehlt). Hermes läuft dann auf dem"
+# Keine CUDA-Pakete nötig: Die Spracherkennung läuft auf der CPU, Ollama bringt seine eigenen GPU-Bibliotheken mit.
+if ! (command -v nvidia-smi >/dev/null && nvidia-smi -L >/dev/null 2>&1) \
+   && command -v lspci >/dev/null && lspci | grep -qi nvidia; then
+    warn "NVIDIA-Grafikkarte erkannt, aber kein Treiber aktiv (nvidia-smi fehlt). Atlas läuft dann auf dem"
     warn "Prozessor, deutlich langsamer. Treiber für Fedora: siehe README, danach ./install.sh erneut starten."
 fi
-"$UV" pip install --python .venv/bin/python -r "$REQ"
+"$UV" pip install --python .venv/bin/python -r requirements.txt
 
 # --- Ollama (lokale KI) --------------------------------------------------------------------------
 if ! command -v ollama >/dev/null; then
@@ -71,12 +69,12 @@ chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$APPS"
 if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-    green "Hermes als Dienst einrichten (startet erst beim ersten Aufruf, vom Laptop oder Handy)"
+    green "Atlas als Dienst einrichten (startet erst beim ersten Aufruf, vom Laptop oder Handy)"
     UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     mkdir -p "$UNIT_DIR"
     cat > "$UNIT_DIR/hermes.socket" <<EOF
 [Unit]
-Description=Hermes Box: startet Hermes beim ersten Aufruf (Laptop oder Handy)
+Description=Atlas: startet Atlas beim ersten Aufruf (Laptop oder Handy)
 
 [Socket]
 ListenStream=127.0.0.1:8000
@@ -86,7 +84,7 @@ WantedBy=sockets.target
 EOF
     cat > "$UNIT_DIR/hermes.service" <<EOF
 [Unit]
-Description=Hermes Box (lokaler KI-Assistent)
+Description=Atlas (lokaler KI-Assistent)
 Requires=hermes.socket
 After=hermes.socket network-online.target
 
@@ -100,7 +98,7 @@ EOF
     systemctl --user enable --now hermes.socket
     EXEC="$DIR/hermes-app.sh"; TERM_APP=false
 else
-    warn "Kein systemd: Hermes startet über ein Terminalfenster (./start.sh)."
+    warn "Kein systemd: Atlas startet über ein Terminalfenster (./start.sh)."
     EXEC="$DIR/start.sh"; TERM_APP=true
 fi
 
@@ -108,18 +106,18 @@ green "Eintrag im App-Menü"
 cat > "$APPS/hermes.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Hermes
+Name=Atlas
 Comment=Lokaler KI-Assistent
 Exec="$EXEC"
 Path=$DIR
 Icon=$DIR/hermes.png
 Terminal=$TERM_APP
 Categories=Utility;
-Keywords=ki;assistent;jarvis;hermes;
+Keywords=ki;assistent;jarvis;atlas;hermes;
 StartupWMClass=hermes
 EOF
 update-desktop-database "$APPS" 2>/dev/null || true
 
-green "Fertig! Hermes startet jetzt. Später: App-Menü → Hermes. Fenster schließen = Hermes beenden."
+green "Fertig! Atlas startet jetzt. Später: App-Menü → Atlas. Fenster schließen = Atlas beenden."
 warn "Tipp: Ein Passwort kommt in die Datei .env (siehe README), sobald das Handy zugreifen soll."
 exec "$EXEC"
