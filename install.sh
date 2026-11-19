@@ -114,7 +114,7 @@ Icon=$DIR/hermes.png
 Terminal=$TERM_APP
 Categories=Utility;
 Keywords=ki;assistent;jarvis;atlas;hermes;
-StartupWMClass=hermes
+StartupWMClass=chrome-localhost__-Default
 EOF
 update-desktop-database "$APPS" 2>/dev/null || true
 

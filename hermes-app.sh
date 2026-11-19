@@ -21,9 +21,14 @@ for b in chromium-browser chromium google-chrome brave-browser microsoft-edge; d
   command -v "$b" >/dev/null && BROWSER="$b" && break
 done
 
+# Schon offen? Dann kein zweites Fenster. (Das App-Menü holt das offene Fenster selbst nach vorne,
+# weil StartupWMClass im App-Eintrag zur Fenster-ID "chrome-localhost__-Default" passt.)
+PROFIL="${XDG_DATA_HOME:-$HOME/.local/share}/hermes-fenster"
+if pgrep -f -- "--user-data-dir=$PROFIL" >/dev/null; then exit 0; fi
+
 if [ -n "$BROWSER" ]; then
   # Eigenes Profil: Das Fenster ist ein eigener Prozess, das Skript wartet, bis es geschlossen wird.
-  "$BROWSER" --app="$URL" --user-data-dir="${XDG_DATA_HOME:-$HOME/.local/share}/hermes-fenster" \
+  "$BROWSER" --app="$URL" --user-data-dir="$PROFIL" \
              --class=hermes --no-first-run --no-default-browser-check >/dev/null 2>&1
   if [ -n "$DIENST" ]; then systemctl --user stop hermes.service; else kill "$SERVER_PID" 2>/dev/null; fi
 else
