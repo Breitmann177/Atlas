@@ -625,6 +625,17 @@
   [data-theme="hell"] { --akzent:#1f5a41; --akzent-fg:#ffffff; }
   [data-theme="grau"] { --akzent:#2f6f52; --akzent-fg:#f3f1ea; }
   .senden:not(:disabled):hover { background:color-mix(in srgb, var(--akzent) 88%, #fff); opacity:1; }
+
+  /* ---- Dunkel = echtes Schwarz (OLED), Grau = das bisherige Anthrazit ---- */
+  :root { --bg:#000000; --fg:#f2f1ec; --dim:#8f8d86; --line:#1a1a1a; --karte:#151515; --rand:rgba(255,255,255,.09);
+          --feld:#101010; --panel:#000000; --btn:#f2f1ec; --btnfg:#000000;
+          --schatten:0 1px 0 rgba(255,255,255,.05) inset, 0 10px 40px -12px rgba(0,0,0,.9); }
+  [data-theme="grau"] { --bg:#191918; --fg:#f2f1ec; --dim:#9a988f; --line:#2b2a28; --karte:#252523; --rand:rgba(255,255,255,.08);
+          --feld:#232322; --panel:#141413; --btn:#f2f1ec; --btnfg:#191918;
+          --schatten:0 1px 0 rgba(255,255,255,.04) inset, 0 10px 40px -12px rgba(0,0,0,.55); }
+  .kachel[data-design="dunkel"] { background-color:#000000; color:#f2f1ec; }
+  .kachel[data-design="grau"] { background-color:#191918; color:#f2f1ec; }
+  :root:not([data-theme]) #seite, [data-theme="dunkel"] #seite { border-right-color:#1c1c1c; }
 </style>
 
 </head>
@@ -741,9 +752,9 @@
       <section data-bereich="design" hidden>
         <h3 class="abschnitt">Design</h3>
         <div class="kacheln">
-          <button class="kachel" data-design="dunkel">DUNKEL</button>
-          <button class="kachel" data-design="grau">GRAU</button>
-          <button class="kachel" data-design="hell">HELL</button>
+          <button class="kachel" data-design="dunkel">Schwarz</button>
+          <button class="kachel" data-design="grau">Grau</button>
+          <button class="kachel" data-design="hell">Hell</button>
         </div>
       </section>
 
