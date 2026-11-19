@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/hermes.png">
-<link rel="apple-touch-icon" href="/hermes.png">
+<link rel="icon" href="/hermes.png?v=2">
+<link rel="apple-touch-icon" href="/hermes.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Atlas">
@@ -619,6 +619,12 @@
   body.wurf::before { display:block; background:var(--bg); opacity:.92; }
   @media (max-width:480px) { #hero #auge { width:150px; } }
   #wurfanzeige { color:var(--fg); top:300px; font-size:22px; font-weight:600; letter-spacing:0; }
+
+  /* ---- Akzent: Dunkelgrün ---- */
+  :root { --akzent:#2f6f52; --akzent-fg:#f3f1ea; }
+  [data-theme="hell"] { --akzent:#1f5a41; --akzent-fg:#ffffff; }
+  [data-theme="grau"] { --akzent:#2f6f52; --akzent-fg:#f3f1ea; }
+  .senden:not(:disabled):hover { background:color-mix(in srgb, var(--akzent) 88%, #fff); opacity:1; }
 </style>
 
 </head>
