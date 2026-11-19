@@ -1,8 +1,11 @@
-# Hermes Box – lokaler KI-Assistent
+<p align="center"><img src="hermes.png" width="88" alt=""></p>
 
-Ein selbst gehosteter Sprachassistent im Stil von Jarvis, der auf dem eigenen Rechner läuft: Chat mit Verlauf und
-Erinnerungen, Websuche mit Quellen, Sprache rein und raus, dazu kleine Werkzeuge wie Wetter, Routen und Umrechner.
-Läuft unter **Windows** und **Linux (Fedora)**. Langfristig soll daraus eine physische "Hermes Box" werden.
+<h1 align="center">Hermes Box</h1>
+
+<p align="center">Ein lokaler Sprachassistent im Stil von Jarvis: Chat, Websuche mit Quellen, Sprache rein und raus,<br>
+Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und Linux.</p>
+
+---
 
 > **Hinweis:** Die Idee, das Konzept, die Hardware-Planung, das Testen und der Betrieb sind von mir.
 > Der Großteil des Codes wurde mit KI (Claude) geschrieben. Ich lerne ihn Schritt für Schritt und
@@ -23,45 +26,48 @@ Läuft unter **Windows** und **Linux (Fedora)**. Langfristig soll daraus eine ph
 - Passwortschutz und Zugriff vom Handy (z. B. über Tailscale)
 
 ## Voraussetzungen
-- Python **3.12** (neuere Versionen haben teils noch keine fertigen Pakete für die Spracherkennung)
-- [Ollama](https://ollama.com)
+- Windows 10/11 oder Linux (getestet wird auf Fedora)
 - Empfohlen: NVIDIA-Grafikkarte mit 8 GB Speicher. Ohne läuft alles auf dem Prozessor, nur deutlich langsamer.
+- Etwa 12 GB freier Speicherplatz (KI-Modelle und Pakete)
 
-## Installieren unter Windows
-```
-py -3.12 -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-ollama pull qwen3:8b
-ollama pull qwen3.5:4b
-```
-Danach `start.bat` doppelklicken. Der Browser öffnet `http://localhost:8000` von selbst.
+## Installation
 
-## Installieren unter Linux (Fedora)
-1. Grundpakete:
+<details open><summary><b>Linux (Fedora)</b></summary>
+
+```bash
+git clone https://github.com/Breitmann177/hermes-box.git
+cd hermes-box
+./install.sh
+```
+
+Das Skript installiert ein paar Systempakete, legt eine eigene Python-Umgebung an (über `uv`), installiert
+Ollama mit dem offiziellen Skript, lädt die KI-Modelle (einmalig etwa 8,5 GB) und trägt Hermes ins App-Menü ein.
+Später startet Hermes über das App-Menü oder `./start.sh`.
+
+**NVIDIA-Treiber:** Fedora bringt ohne Zusatz nur den freien Treiber mit, damit läuft die KI auf dem Prozessor.
+Den NVIDIA-Treiber gibt es über RPM Fusion:
+```bash
+sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
+```
+Danach ein paar Minuten warten (der Treiber wird gebaut), neu starten und `./install.sh` noch einmal ausführen.
+`nvidia-smi` muss die Karte zeigen. Ist Secure Boot an, muss der Treiber zusätzlich signiert werden
+(siehe Anleitung von RPM Fusion).
+</details>
+
+<details><summary><b>Windows</b></summary>
+
+1. **Python 3.12 (64-bit)** von [python.org](https://www.python.org/downloads/) und [Ollama](https://ollama.com) installieren.
+2. Im Hermes-Ordner (am besten ein kurzer Pfad wie `C:\Hermes`, Windows erlaubt nur kurze Dateipfade):
    ```
-   sudo dnf install python3.12 git curl
-   ```
-2. NVIDIA-Treiber über RPM Fusion (nur mit NVIDIA-Grafikkarte):
-   ```
-   sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-   sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
-   ```
-   Danach ein paar Minuten warten (der Treiber wird gebaut) und neu starten. `nvidia-smi` muss die Karte zeigen.
-   Ist Secure Boot an, muss der Treiber zusätzlich signiert werden (siehe RPM-Fusion-Anleitung).
-3. Ollama und die Modelle:
-   ```
-   curl -fsSL https://ollama.com/install.sh | sh
+   py -3.12 -m venv .venv
+   .venv\Scripts\pip install -r requirements-gpu.txt
    ollama pull qwen3:8b
    ollama pull qwen3.5:4b
    ```
-4. Hermes:
-   ```
-   git clone https://github.com/Breitmann177/hermes-box.git
-   cd hermes-box
-   python3.12 -m venv .venv
-   .venv/bin/pip install -r requirements.txt
-   ./start.sh
-   ```
+   Ohne NVIDIA-Grafikkarte `requirements.txt` statt `requirements-gpu.txt`.
+3. `start.bat` doppelklicken. Der Browser öffnet `http://localhost:8000` von selbst.
+</details>
 
 Ob die KI wirklich auf der Grafikkarte läuft, zeigt `ollama ps` während einer Antwort ("100% GPU").
 
