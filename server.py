@@ -329,6 +329,30 @@ def claude_aktiv() -> bool:
     return bool(CLAUDE_KEY) and getattr(_ki, "wahl", "lokal") == "claude"
 
 
+ENV_DATEI = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+
+
+def env_schreiben(name: str, wert: str | None):
+    """Setzt oder entfernt eine Zeile NAME=... in .env (nur für den Besitzer lesbar)."""
+    try:
+        zeilen = open(ENV_DATEI, encoding="utf-8").read().splitlines()
+    except FileNotFoundError:
+        zeilen = []
+    zeilen = [z for z in zeilen if not z.strip().startswith(name + "=")]
+    if wert:
+        zeilen.append(f"{name}={wert}")
+    with open(os.open(ENV_DATEI, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
+        f.write("\n".join(zeilen) + "\n")
+    os.chmod(ENV_DATEI, 0o600)
+
+
+def claude_schluessel_setzen(schluessel: str | None):
+    global CLAUDE_KEY, _claude_client
+    CLAUDE_KEY = (schluessel or "").strip()
+    _claude_client = None
+    env_schreiben("ANTHROPIC_API_KEY", CLAUDE_KEY or None)
+
+
 def claude():
     global _claude_client
     if _claude_client is None:
@@ -633,7 +657,7 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "grafikkarte": grafikkarte_aktiv(), "nutzer": os.environ.get("ATLAS_NUTZER", "").strip(),
+    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "claude_ende": CLAUDE_KEY[-4:] if CLAUDE_KEY else "", "grafikkarte": grafikkarte_aktiv(), "nutzer": os.environ.get("ATLAS_NUTZER", "").strip(),
             "ersatzstimme": time.time() < _online_pause_bis}
 
 
@@ -794,23 +818,41 @@ MAX_ANTWORT = 1500
 MAX_ZEICHEN = 12000  # grob 3000-4000 Token Verlauf
 
 
-def fuers_modell(text: str, werkzeuge_: str | None) -> str:
-    """Alte Antworten fürs Modell: ohne Quellenliste und PDF-Link (die ahmte es sonst nach und erfand eigene Quellen),
-    dafür mit dem Hinweis, welches Werkzeug sie geliefert hat (sonst "warf" es bei "nochmal" die Münze im Kopf)."""
+def fuers_modell(nid: int, rolle: str, text: str, werkzeuge_: str | None) -> list[dict]:
+    """Eine gespeicherte Nachricht fürs Modell. Alte Antworten ohne Quellenliste und PDF-Link (die ahmte es sonst nach).
+    Hat eine Antwort Werkzeuge benutzt, stehen die Aufrufe davor so im Verlauf, wie sie damals wirklich liefen
+    (Aufruf + Ergebnis). So sieht das Modell bei "nochmal", dass es das Werkzeug wieder aufrufen muss, und hat
+    keinen Text-Vermerk, den es nachahmen könnte."""
+    if rolle != "assistant":
+        return [{"role": rolle, "content": text}]
     text = re.split(r"\n\n---\n\*\*Quellen\*\*", text)[0]
     text = re.sub(r"\n*\[PDF herunterladen\]\([^)]*\)", "", text).rstrip()
-    return f"[Ergebnis von Werkzeug: {werkzeuge_}]\n{text}" if werkzeuge_ else text
+    if not werkzeuge_:
+        return [{"role": "assistant", "content": text}]
+    try:
+        aufrufe = json.loads(werkzeuge_)
+    except ValueError:  # ältere Einträge: nur Namen, durch Komma getrennt
+        aufrufe = [{"name": n, "args": {}, "ergebnis": "(Ergebnis wurde dem Nutzer gezeigt)"} for n in werkzeuge_.split(",") if n]
+    ids = [f"h{nid}_{i}" for i in range(len(aufrufe))]
+    return ([{"role": "assistant", "content": "", "tool_calls": [
+                {"id": i, "function": {"name": a["name"], "arguments": a.get("args") or {}}} for i, a in zip(ids, aufrufe)]}]
+            + [{"role": "tool", "tool_name": a["name"], "tool_call_id": i, "content": a.get("ergebnis") or "(leer)"}
+               for i, a in zip(ids, aufrufe)]
+            + [{"role": "assistant", "content": text}])
 
 
 def kuerzen(verlauf: list[dict], limit: int = MAX_ZEICHEN) -> list[dict]:
     """Behält die neuesten Nachrichten, solange die Gesamtlänge unter dem Limit bleibt."""
     behalten, summe = [], 0
     for m in reversed(verlauf):  # von neu nach alt
-        summe += len(m["content"])
+        summe += len(m["content"] or "")
         if summe > limit and behalten:
             break
         behalten.append(m)
-    return behalten[::-1]  # wieder alt -> neu
+    behalten = behalten[::-1]  # wieder alt -> neu
+    while len(behalten) > 1 and behalten[0]["role"] != "user":  # nicht mitten in einem Werkzeug-Aufruf beginnen
+        behalten.pop(0)
+    return behalten
 
 
 MIN_SEITE = 300  # Zeichen; kürzer ist meist nur ein Cookie-Hinweis oder eine leere Seite
@@ -888,8 +930,7 @@ Werkzeuge:
   dann kurz grüßen, Wetter am Wohnort und die 3-4 wichtigsten Schlagzeilen, als Fließtext.
 - rechnen für jede Rechnung mit Zahlen, umrechnen für Einheiten und Währungen, weltzeit für die Uhrzeit in anderen Orten,
   route für Strecke und Fahrzeit, timer, muenze_werfen und wuerfeln. Nimm deren Ergebnisse genau so und rechne nicht nach.
-- Steht in einer früheren Antwort "[Ergebnis von Werkzeug: ...]", kam sie von einem Werkzeug. Bei "nochmal" oder einer
-  ähnlichen Bitte rufst du dasselbe Werkzeug erneut auf. Diesen Vermerk schreibst du selbst nie.
+- Bei "nochmal" oder einer ähnlichen Bitte rufst du dasselbe Werkzeug wie davor erneut auf.
 - erinnerung_speichern: Wenn der Nutzer etwas Dauerhaftes über sich sagt (Name, Alter, Wohnort, Studium, Beruf, Familie,
   Haustiere, feste Vorlieben, Allergien) oder ausdrücklich "merk dir ..." sagt, oder wenn er sich eine Antwortweise auf
   Dauer wünscht ("antworte ab jetzt kürzer"). Nichts Vorübergehendes ("lernt gerade Mathe", "ist müde", "hat morgen
@@ -939,6 +980,9 @@ WERKZEUGE = [
               art={"type": "string", "enum": ["nutzer", "stil", "wissen"],
                    "description": "nutzer = über den Nutzer, stil = wie du antworten sollst, wissen = eine Korrektur/Tatsache, die er dir beibringt"},
               ausdruecklich={"type": "boolean", "description": "true, wenn der Nutzer ausdrücklich 'merk dir' gesagt hat"}),
+    _werkzeug("ki_wechseln", "Wechselt, welche KI ab der nächsten Nachricht antwortet: lokal (Ollama auf dem Laptop, "
+              "kostenlos, privat) oder claude (online über die API, klüger, kostet pro Frage). Nur wenn der Nutzer das will.",
+              ziel={"type": "string", "enum": ["lokal", "claude"]}),
     _werkzeug("pdf_erstellen", "Erstellt ein PDF zum Herunterladen.",
               titel={"type": "string"}, inhalt={"type": "string", "description": "fertiger Text, Absätze mit Leerzeile, kein Markdown"}),
 ]
@@ -953,7 +997,7 @@ class Lauf:
         self.cid, self.live = cid, live
         self.quellen: dict[str, str] = {}
         self.anhang = ""
-        self.benutzt: list[str] = []
+        self.benutzt: list[dict] = []  # Werkzeug-Aufrufe mit gekürztem Ergebnis, für den Verlauf
 
 
 def _suchen(anfrage: str, lauf: Lauf):
@@ -1087,6 +1131,13 @@ def werkzeug_ausfuehren(name: str, args: dict, lauf: Lauf):
         return f"Ergebnis: {ergebnis}. Nenne es in einem kurzen Satz."
     if name == "erinnerung_speichern":
         return (yield from _erinnerung(str(args.get("fakt") or ""), str(args.get("art") or "nutzer"), bool(args.get("ausdruecklich"))))
+    if name == "ki_wechseln":
+        ziel = "claude" if str(args.get("ziel")).lower() == "claude" else "lokal"
+        if ziel == "claude" and not CLAUDE_KEY:
+            return ("Kein API-Schlüssel hinterlegt, Wechsel nicht möglich. Sag dem Nutzer: Einstellungen -> KI, "
+                    "dort den Schlüssel von console.anthropic.com eintragen (im Terminal: /schluessel).")
+        yield ev(typ="ki", ki=ziel)
+        return f"Gewechselt: ab der nächsten Nachricht antwortet {'Claude (online)' if ziel == 'claude' else 'die lokale KI'}. Sag das kurz."
     if name == "pdf_erstellen":
         pfad = werkzeuge.pdf_erstellen(str(args.get("titel") or "Dokument")[:120], str(args.get("inhalt") or ""))
         if pfad.startswith("FEHLER"):
@@ -1171,8 +1222,9 @@ def _chat_stream(frage: Frage):
         c.execute("INSERT INTO nachrichten (chat_id, rolle, text) VALUES (?,?,?)", (cid, "user", gespeichert))
         dokumente = [dict(r) for r in c.execute(
             "SELECT name, text FROM dokumente WHERE chat_id=? ORDER BY id DESC LIMIT 3", (cid,))][::-1]
-        verlauf = [{"role": r["rolle"], "content": fuers_modell(r["text"], r["werkzeuge"])} for r in c.execute(
-            "SELECT rolle, text, werkzeuge FROM nachrichten WHERE chat_id=? ORDER BY id DESC LIMIT 20", (cid,))][::-1]
+        verlauf = [m for r in list(c.execute(
+            "SELECT id, rolle, text, werkzeuge FROM nachrichten WHERE chat_id=? ORDER BY id DESC LIMIT 20", (cid,)))[::-1]
+            for m in fuers_modell(r["id"], r["rolle"], r["text"], r["werkzeuge"])]
     yield ev(typ="start", chat_id=cid)
 
     if not claude_aktiv() and not ollama_erreichbar():
@@ -1233,8 +1285,8 @@ def _chat_stream(frage: Frage):
                                                 for i, a in zip(ids, aufrufe)]})
                 for i, a in zip(ids, aufrufe):
                     print("WERKZEUG:", a["name"], json.dumps(a["args"], ensure_ascii=False)[:200], flush=True)
-                    lauf.benutzt.append(a["name"])
                     ergebnis = yield from werkzeug_ausfuehren(a["name"], a["args"], lauf)
+                    lauf.benutzt.append({"name": a["name"], "args": a["args"], "ergebnis": str(ergebnis)[:600]})
                     messages.append({"role": "tool", "tool_name": a["name"], "tool_call_id": i, "content": str(ergebnis)})
                 yield ev(typ="status", text="denkt nach")
                 if not gezeigt:
@@ -1269,7 +1321,7 @@ def _chat_stream(frage: Frage):
         if antwort.strip():
             with db() as c:
                 c.execute("INSERT INTO nachrichten (chat_id, rolle, text, werkzeuge) VALUES (?,?,?,?)",
-                          (cid, "assistant", antwort, ",".join(lauf.benutzt) or None))
+                          (cid, "assistant", antwort, json.dumps(lauf.benutzt, ensure_ascii=False) if lauf.benutzt else None))
     yield ev(typ="fertig")
 
 
@@ -1326,6 +1378,35 @@ def pdf_holen(name: str):
     if not pfad.is_file():
         raise HTTPException(status_code=404)
     return FileResponse(pfad, media_type="application/pdf", filename=name)
+
+
+class Schluessel(BaseModel):
+    schluessel: str
+
+
+@app.post("/claude-schluessel")
+def claude_schluessel(s: Schluessel):
+    """Speichert den Anthropic-API-Schlüssel in .env und prüft ihn mit einer Mini-Anfrage. Gilt sofort, ohne Neustart."""
+    k = s.schluessel.strip()
+    if not re.fullmatch(r"sk-ant-[A-Za-z0-9_\-]{20,300}", k):
+        raise HTTPException(400, "Das sieht nicht wie ein Anthropic-Schlüssel aus (beginnt mit sk-ant-).")
+    try:
+        import anthropic
+        anthropic.Anthropic(api_key=k, max_retries=0).models.list(limit=1)
+    except ImportError:
+        raise HTTPException(500, "Das Paket anthropic fehlt: .venv/bin/pip install anthropic")
+    except Exception as e:
+        if type(e).__name__ == "AuthenticationError":
+            raise HTTPException(400, "Anthropic lehnt diesen Schlüssel ab.")
+        raise HTTPException(502, "Anthropic ist gerade nicht erreichbar. Schlüssel nicht gespeichert.")
+    claude_schluessel_setzen(k)
+    return {"ok": True, "ende": k[-4:]}
+
+
+@app.delete("/claude-schluessel")
+def claude_schluessel_weg():
+    claude_schluessel_setzen(None)
+    return {"ok": True}
 
 
 @app.get("/chats")

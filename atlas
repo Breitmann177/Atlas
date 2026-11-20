@@ -7,11 +7,12 @@ Terminal-Chats stehen in der App im Ordner "Terminal".
     atlas -r              Terminal-Chats auflisten und einen fortsetzen
     atlas "frage"         eine Frage stellen und fertig
 
-Im Gespräch: /neu  /chats  /weiter <nr>  /modus auto|schnell|gruendlich  /claude  /lokal  /hilfe  /exit
+Im Gespräch: /help zeigt alle Befehle. "Wechsel zu Claude" geht auch einfach als Satz.
 Zeile mit \\ beenden = neue Zeile statt Absenden. Strg+C bricht eine Antwort ab.
 """
 import http.cookiejar
 import itertools
+import getpass
 import json
 import os
 import re
@@ -298,6 +299,10 @@ class Gespraech:
                 elif typ == "wurf":
                     spinner.stopp()
                     print(f"  {DIM}[{'Münze' if e.get('art') == 'muenze' else 'Würfel'}: {e.get('ergebnis')}]{AUS}")
+                elif typ == "ki":
+                    self.ki = e.get("ki", self.ki)
+                    spinner.stopp()
+                    print(f"  {DIM}KI jetzt: {'Claude (online)' if self.ki == 'claude' else 'lokal'}{AUS}")
                 elif typ == "timer":
                     threading.Thread(target=timer_klingeln, args=(e.get("sekunden", 0),), daemon=True).start()
                 elif typ == "gemerkt":
@@ -355,12 +360,64 @@ class Gespraech:
             print(f"  {wer} {DIM}{text}{AUS}")
         print()
 
+    BEFEHLE = [
+        ("/help", "zeigt alle Befehle (auch /hilfe)"),
+        ("/neu", "neuer Chat (auch /clear)"),
+        ("/chats", "deine Terminal-Chats anzeigen"),
+        ("/weiter <nr>", "Chat Nummer <nr> fortsetzen"),
+        ("/modus <art>", "auto, schnell oder gruendlich"),
+        ("/ki <wer>", "lokal oder claude"),
+        ("/schluessel", "Claude-API-Schlüssel eintragen oder entfernen"),
+        ("/status", "zeigt KI, Modus und Chat"),
+        ("/exit", "beenden (auch Strg+D)"),
+    ]
+
+    def hilfe(self):
+        print(f"  {FETT}Befehle{AUS}")
+        for b, t in self.BEFEHLE:
+            print(f"  {AKZENT}{b:<14}{AUS} {DIM}{t}{AUS}")
+        print(f"\n  {FETT}Sonst noch{AUS}\n  {DIM}Zeile mit \\ beenden  neue Zeile statt Absenden\n"
+              f"  Strg+C               Antwort abbrechen\n  Pfeil hoch           frühere Eingaben\n"
+              f"  atlas -c / atlas -r  letzten Chat fortsetzen / Chat auswählen\n"
+              f"  Du kannst auch einfach sagen: „Wechsel zu Claude“ oder „Wechsel zur lokalen KI“.{AUS}")
+
+    def schluessel(self):
+        try:
+            st = json.load(anfrage("/status"))
+        except Exception:
+            st = {}
+        if st.get("claude"):
+            print(f"  {DIM}Gespeichert: sk-ant-…{st.get('claude_ende', '')}{AUS}")
+            if input(f"  {DIM}Entfernen? (j/n) {AUS}").strip().lower().startswith("j"):
+                anfrage("/claude-schluessel", methode="DELETE")
+                self.ki = "lokal"
+                print(f"  {DIM}Entfernt. KI jetzt: lokal{AUS}")
+            return
+        print(f"  {DIM}Schlüssel von console.anthropic.com (API Keys). Er wird nur auf dem Laptop gespeichert.{AUS}")
+        k = getpass.getpass("  Schlüssel (unsichtbar): ").strip()
+        if not k:
+            return
+        print(f"  {DIM}Prüfe ...{AUS}")
+        try:
+            anfrage("/claude-schluessel", {"schluessel": k}, timeout=30)
+        except urllib.error.HTTPError as e:
+            try:
+                print(f"  {ROT}{json.load(e).get('detail')}{AUS}")
+            except Exception:
+                print(f"  {ROT}Fehler {e.code}{AUS}")
+            return
+        self.ki = "claude"
+        print(f"  {DIM}Gespeichert. KI jetzt: Claude (online){AUS}")
+
     def befehl(self, text):
         teile = text.split()
-        b = teile[0]
+        b = teile[0].lower()
+        arg = teile[1].lower() if len(teile) > 1 else ""
         if b in ("/exit", "/quit", "/q"):
             raise EOFError
-        if b in ("/neu", "/clear"):
+        if b in ("/help", "/hilfe", "/?", "/h"):
+            self.hilfe()
+        elif b in ("/neu", "/clear"):
             self.chat_id = None
             print(f"  {DIM}Neuer Chat.{AUS}")
         elif b in ("/chats", "/resume"):
@@ -368,21 +425,33 @@ class Gespraech:
                 print(f"  {DIM}Fortsetzen mit /weiter <nr>{AUS}")
         elif b == "/weiter":
             chats = self.terminal_chats()
-            nr = int(teile[1]) if len(teile) > 1 and teile[1].isdigit() else 1
+            nr = int(arg) if arg.isdigit() else 1
             if 1 <= nr <= len(chats):
                 self.fortsetzen(chats[nr - 1])
             else:
                 print(f"  {DIM}Diesen Chat gibt es nicht. /chats zeigt alle.{AUS}")
-        elif b == "/modus" and len(teile) > 1 and teile[1] in ("auto", "schnell", "gruendlich"):
-            self.modus = teile[1]
-            print(f"  {DIM}Modus: {self.modus}{AUS}")
-        elif b in ("/claude", "/lokal"):
-            self.ki = b[1:]
-            print(f"  {DIM}KI: {self.ki}{AUS}")
+        elif b == "/modus":
+            if arg in ("auto", "schnell", "gruendlich"):
+                self.modus = arg
+                print(f"  {DIM}Modus: {self.modus}{AUS}")
+            else:
+                print(f"  {DIM}Modus ist {self.modus}. Möglich: /modus auto | schnell | gruendlich{AUS}")
+        elif b in ("/ki", "/claude", "/lokal"):
+            ziel = b[1:] if b != "/ki" else arg
+            if ziel not in ("lokal", "claude"):
+                print(f"  {DIM}KI ist {self.ki}. Möglich: /ki lokal | claude{AUS}")
+            elif ziel == "claude" and not json.load(anfrage("/status")).get("claude"):
+                print(f"  {DIM}Noch kein API-Schlüssel. Mit /schluessel eintragen.{AUS}")
+            else:
+                self.ki = ziel
+                print(f"  {DIM}KI: {self.ki}{AUS}")
+        elif b in ("/schluessel", "/key", "/apikey"):
+            self.schluessel()
+        elif b == "/status":
+            print(f"  {DIM}KI: {self.ki} · Modus: {self.modus} · Chat: {self.chat_id or 'neu'}{AUS}")
         else:
-            print(f"  {DIM}/neu        neuer Chat\n  /chats      Terminal-Chats anzeigen\n  /weiter N   Chat N fortsetzen\n"
-                  f"  /modus auto|schnell|gruendlich\n  /claude  /lokal\n  /exit       beenden (oder Strg+D)\n"
-                  f"  Zeile mit \\ beenden = neue Zeile. Strg+C bricht eine Antwort ab.{AUS}")
+            print(f"  {ROT}Unbekannter Befehl {b}{AUS}")
+            self.hilfe()
 
 
 def eingabe():
@@ -402,7 +471,7 @@ def kopf():
     print(f"{AKZENT}╭{'─' * (b - 2)}╮{AUS}")
     titel = f"{FETT}● ● Atlas{AUS}{DIM} im Terminal{AUS}"
     print(f"{AKZENT}│{AUS} {titel}{' ' * (b - 23)}{AKZENT}│{AUS}")
-    hilfe = "/hilfe für Befehle · Strg+D beendet"
+    hilfe = "/help für alle Befehle · Strg+D beendet"
     print(f"{AKZENT}│{AUS} {DIM}{hilfe}{AUS}{' ' * (b - 3 - len(hilfe))}{AKZENT}│{AUS}")
     print(f"{AKZENT}╰{'─' * (b - 2)}╯{AUS}\n")
 
@@ -426,6 +495,10 @@ def main():
         except OSError:
             pass
         readline.set_history_length(1000)
+        namen = sorted({b.split()[0] for b, _ in Gespraech.BEFEHLE} | {"/hilfe", "/clear", "/claude", "/lokal"})
+        readline.set_completer(lambda t, i: ([n for n in namen if n.startswith(t)] + [None])[i])
+        readline.set_completer_delims(" ")
+        readline.parse_and_bind("tab: complete")
         import atexit
         atexit.register(readline.write_history_file, verlauf)
     except ImportError:

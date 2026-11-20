@@ -67,8 +67,14 @@ pruefe("Stil wird direkt gespeichert", [e["typ"] for e in ausfuehren("erinnerung
 pruefe("Nur angeboten heißt nicht gespeichert", server.wohnort(), "")
 
 print("Bausteine:")
-pruefe("Quellen fürs Modell entfernt", server.fuers_modell("Merz.\n\n---\n**Quellen**\n- [a](b)", None), "Merz.")
-pruefe("Werkzeug-Vermerk", server.fuers_modell("Kopf.", "muenze_werfen"), "[Ergebnis von Werkzeug: muenze_werfen]\nKopf.")
+pruefe("Quellen fürs Modell entfernt", server.fuers_modell(1, "assistant", "Merz.\n\n---\n**Quellen**\n- [a](b)", None),
+       [{"role": "assistant", "content": "Merz."}])
+m = server.fuers_modell(2, "assistant", "Kopf.", '[{"name": "muenze_werfen", "args": {}, "ergebnis": "Ergebnis: Kopf."}]')
+pruefe("Werkzeug im Verlauf als echter Aufruf", [x["role"] for x in m], ["assistant", "tool", "assistant"])
+pruefe("Alte Einträge (nur Namen)", server.fuers_modell(3, "assistant", "Zahl.", "muenze_werfen")[0]["tool_calls"][0]["function"]["name"], "muenze_werfen")
+pruefe("Verlauf beginnt nicht mitten im Aufruf", server.kuerzen(m + [{"role": "user", "content": "nochmal"}], 10)[0]["role"], "user")
+sys_, cl = server.claude_nachrichten([{"role": "system", "content": "s"}, {"role": "user", "content": "wirf"}] + m + [{"role": "user", "content": "nochmal"}])
+pruefe("Claude-Format mit Verlauf-Aufrufen", [x["role"] for x in cl], ["user", "assistant", "user", "assistant", "user"])
 system, nachrichten = server.claude_nachrichten([
     {"role": "system", "content": "S"}, {"role": "user", "content": "Wirf eine Münze"},
     {"role": "assistant", "content": "", "tool_calls": [{"id": "t1", "function": {"name": "muenze_werfen", "arguments": {}}}]},

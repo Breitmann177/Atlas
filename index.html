@@ -659,6 +659,13 @@
 
   .ordnerkopf { display:flex; align-items:center; gap:6px; margin:14px 0 4px; padding:0 10px; color:var(--dim); font-size:12px; font-weight:500; }
   .ordnerkopf svg { width:14px; height:14px; }
+  #schluesselForm, #schluesselDa { display:flex; flex-direction:column; gap:8px; }
+  #schluesselDa[hidden], #schluesselForm[hidden] { display:none; }
+  #schluesselFeld { width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--rand); background:var(--feld);
+                    color:var(--fg); font:inherit; font-size:13px; }
+  .schluesselknopf { align-self:flex-start; padding:7px 14px; border-radius:10px; border:1px solid var(--rand); background:var(--karte);
+                     color:var(--fg); font:inherit; font-size:13px; cursor:pointer; }
+  .schluesselknopf:disabled { opacity:.5; cursor:default; }
   /* ---- Eigene Farben ---- */
   .farbreihe { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0 16px; }
   .farbe { width:30px; height:30px; border-radius:50%; border:2px solid var(--rand); padding:0; cursor:pointer; background:var(--f); }
@@ -814,11 +821,20 @@
       <section data-bereich="ki" hidden>
         <h3 class="abschnitt">KI</h3>
         <p class="hinweis" id="kiHinweis">Lokal läuft alles auf dem Laptop, nichts verlässt ihn. Claude ist klüger und schneller, kostet aber pro Frage etwas Geld, und Nachricht, Verlauf, Erinnerungen und Suchergebnisse gehen an Anthropic.</p>
-        <p class="hinweis" id="kiOhneSchluessel" hidden>Für Claude fehlt der API-Schlüssel: in die Datei .env die Zeile ANTHROPIC_API_KEY=... eintragen und Atlas neu starten.</p>
         <div class="stimmen">
           <button type="button" class="stimme" data-ki="lokal">LOKAL<small>Ollama auf dem Laptop</small></button>
           <button type="button" class="stimme" data-ki="claude" id="kiClaude" hidden>CLAUDE<small>online, mit API-Schlüssel</small></button>
         </div>
+        <h5>Claude-API-Schlüssel</h5>
+        <div id="schluesselDa" hidden><p class="hinweis">Gespeichert: sk-ant-…<span id="schluesselEnde"></span></p>
+          <button type="button" class="schluesselknopf" id="schluesselWeg">Schlüssel entfernen</button></div>
+        <form id="schluesselForm" autocomplete="off">
+          <p class="hinweis">Den Schlüssel bekommen Sie auf console.anthropic.com unter „API Keys“. Er wird nur auf dem Laptop gespeichert (Datei .env).</p>
+          <input type="password" id="schluesselFeld" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <button class="schluesselknopf" id="schluesselSpeichern">Speichern</button>
+          <p class="hinweis" id="schluesselMeldung" hidden></p>
+        </form>
+        <p class="hinweis" style="margin-top:10px">Tipp: Sie können auch einfach sagen „Wechsel zu Claude“ oder „Wechsel zur lokalen KI“.</p>
       </section>
 
       <section data-bereich="wake" hidden>
@@ -1359,6 +1375,7 @@
           else if (ev.typ === "route") routeKarte(huelle, ev);
           else if (ev.typ === "sprechgrenze") { if (aktiveKette) aktiveKette.begrenze(ev.saetze); }
           else if (ev.typ === "timer") timerStarten(ev.sekunden);
+          else if (ev.typ === "ki") setzeKi(ev.ki);
           else if (ev.typ === "wurf") wurfStarten(ev.art, ev.ergebnis);
           else if (ev.typ === "fehler") { inhalt.classList.remove("typing"); roh += "\n\n**" + ev.text + "**"; if (aktiveKette) aktiveKette.rein("\n" + ev.text); else zeige(); }
         }
@@ -1675,7 +1692,8 @@
   const kiAktiv = () => (kiWahl === "claude" && claudeDa ? "claude" : "lokal");
   function kiAnzeigen() {
     document.getElementById("kiClaude").hidden = !claudeDa;
-    document.getElementById("kiOhneSchluessel").hidden = claudeDa;
+    document.getElementById("schluesselDa").hidden = !claudeDa;
+    document.getElementById("schluesselForm").hidden = claudeDa;
     document.querySelectorAll("[data-ki]").forEach((b) => b.classList.toggle("aktiv", b.dataset.ki === kiAktiv()));
   }
   document.querySelectorAll("[data-ki]").forEach((b) => b.addEventListener("click", () => {
@@ -1683,6 +1701,33 @@
     try { localStorage.setItem("hermes-ki", kiWahl); } catch (e) {}
     kiAnzeigen(); ladeStatus();
   }));
+
+  function setzeKi(k) {  // auch vom Werkzeug ki_wechseln ("Wechsel zu Claude")
+    kiWahl = k === "claude" ? "claude" : "lokal";
+    try { localStorage.setItem("hermes-ki", kiWahl); } catch (e) {}
+    kiAnzeigen(); ladeStatus();
+  }
+  document.getElementById("schluesselForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const feld = document.getElementById("schluesselFeld"), knopf = document.getElementById("schluesselSpeichern"),
+          meldung = document.getElementById("schluesselMeldung");
+    if (!feld.value.trim()) return;
+    knopf.disabled = true; meldung.hidden = false; meldung.textContent = "Prüfe den Schlüssel ...";
+    try {
+      const r = await fetch("/claude-schluessel", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schluessel: feld.value.trim() }) });
+      const d = await r.json();
+      if (!r.ok) { meldung.textContent = d.detail || "Fehler beim Speichern."; return; }
+      feld.value = ""; meldung.hidden = true;
+      claudeDa = true; setzeKi("claude");
+    } catch (err) { meldung.textContent = "Atlas ist nicht erreichbar."; }
+    finally { knopf.disabled = false; }
+  });
+  document.getElementById("schluesselWeg").addEventListener("click", async () => {
+    if (!confirm("API-Schlüssel entfernen? Atlas nutzt dann wieder nur die lokale KI.")) return;
+    await fetch("/claude-schluessel", { method: "DELETE" });
+    claudeDa = false; setzeKi("lokal");
+  });
 
   // ---------- Münze und Würfel im Auge ----------
   const WURF_DAUER = 2100, WURF_ZEIGEN = 1800;  // ms: so lange fliegt es, so lange bleibt das Ergebnis stehen
@@ -1940,7 +1985,7 @@
       nutzerName = s.nutzer || ""; begruessen();
       modiInfo = s.modi; modusHinweis();
       statuspunkt.className = s.ollama ? "an" : "aus";
-      claudeDa = !!s.claude; kiAnzeigen();
+      claudeDa = !!s.claude; document.getElementById("schluesselEnde").textContent = s.claude_ende || ""; kiAnzeigen();
       if (kiAktiv() === "claude") {
         statuspunkt.className = "an"; statustext.textContent = "Laptop · Claude";
       } else {
