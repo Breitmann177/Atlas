@@ -971,7 +971,10 @@ Werkzeuge:
   und Morgen-Briefing, rechnen und umrechnen, Route und Fahrzeit, Timer, Weltzeit, Münze und Würfel, PDFs lesen und
   erstellen, Bilder beschreiben, Texte schreiben und übersetzen, beim Programmieren helfen, per Sprache reden ("Hey Atlas")
   und dir Dinge über den Nutzer merken. Du kannst keine Programme oder Dateien auf dem Laptop steuern.
-- Wer dich gebaut hat: "Ich bin Alexs Projekt." Mehr weißt du darüber nicht."""
+- Wer dich gebaut hat: "Ich bin ERBAUER_PROJEKT." Mehr weißt du darüber nicht."""
+# Name kommt aus .env (ATLAS_NUTZER), damit er nicht im Code steht
+_erbauer = os.environ.get("ATLAS_NUTZER", "").strip()
+WERKZEUG_REGELN = WERKZEUG_REGELN.replace("ERBAUER_PROJEKT", f"{_erbauer}s Projekt" if _erbauer else "ein privates Projekt")
 
 
 def _werkzeug(name: str, beschreibung: str, **parameter) -> dict:

@@ -85,7 +85,7 @@ Eine Datei `.env` im Atlas-Ordner anlegen. Sie wird nie hochgeladen (steht in `.
 ```
 HERMES_PASSWORT=dein-langes-passwort      # empfohlen, sobald andere Geräte zugreifen
 HERMES_HOSTS=mein-laptop.tailnet.ts.net   # weitere Adressen für Zugriff von anderen Geräten, mit Komma getrennt
-ATLAS_NUTZER=Alex                         # dein Name für die Begrüßung ("Guten Morgen, Alex")
+ATLAS_NUTZER=Alex                          # dein Name für die Begrüßung ("Guten Morgen, Alex")
 ANTHROPIC_API_KEY=...                      # schaltet Claude in den Einstellungen frei
 CLAUDE_MODELL=claude-sonnet-5-5            # Standard; z. B. claude-opus-5-5 für schwierigere Aufgaben
 ELEVENLABS_API_KEY=...                     # schaltet die Stimme "George" frei

@@ -120,8 +120,8 @@ GESPRAECHE = [
     (["atlas wie gehts dir"], None, ["gut", "danke"], ["Dokument"]),
     (["atlas wie gehts dir", "welches dokument"], None, ["kein", "nicht"], ["Quellen"]),
     (["Was kannst du?"], None, ["Wetter", "Internet"], []),
-    (["Wer hat dich gebaut?"], None, ["Alex"], ["Team"]),
-    (["Ich bin 19 Jahre alt"], "vorschlag", [""], []),
+    (["Wer hat dich gebaut?"], None, ["Projekt"], ["Team"]),
+    (["Ich bin 25 Jahre alt"], "vorschlag", [""], []),
     (["ich lerne gerade mathe"], None, ["Mathe", "Thema", "Aufgabe", "helfen"], []),
     (["Erkläre kurz, was ein Grenzwert in der Mathematik ist."], None, ["Grenzwert"], []),
 ]
