@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Atlas im Terminal. Spricht mit demselben Atlas-Server wie die App (gleiche Chats, Erinnerungen, Werkzeuge).
+
+    atlas                 Gespräch starten
+    atlas "frage"         eine Frage stellen und fertig
+
+Im Gespräch:  /neu  neuer Chat   /modus auto|schnell|gruendlich   /claude  /lokal   /hilfe   /exit (oder Strg+D)
+"""
+import http.cookiejar
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+ORDNER = os.path.dirname(os.path.realpath(__file__))
+URL = os.environ.get("ATLAS_URL", "http://127.0.0.1:8000")
+tty = sys.stdout.isatty()
+DIM, FETT, AKZENT, ROT, AUS = ("\033[2m", "\033[1m", "\033[36m", "\033[31m", "\033[0m") if tty else ("",) * 5
+STATUS = {"sucht": "sucht", "liest": "liest", "wetter": "Wetter", "rechnet": "rechnet", "denkt nach": "denkt nach"}
+
+kekse = http.cookiejar.CookieJar()
+netz = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(kekse))
+
+
+def anfrage(pfad, daten=None, timeout=10):
+    req = urllib.request.Request(URL + pfad, data=json.dumps(daten).encode() if daten is not None else None,
+                                 headers={"Content-Type": "application/json"})
+    return netz.open(req, timeout=timeout)
+
+
+def env_wert(name):
+    try:
+        for zeile in open(os.path.join(ORDNER, ".env"), encoding="utf-8"):
+            if zeile.strip().startswith(name + "="):
+                return zeile.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return os.environ.get(name, "")
+
+
+def server_laeuft():
+    try:
+        return json.load(anfrage("/auth-status", timeout=1))
+    except Exception:
+        return None
+
+
+def server_starten():
+    if server_laeuft() is not None:
+        return
+    print(f"{DIM}Atlas startet ...{AUS}", flush=True)
+    if subprocess.run(["systemctl", "--user", "cat", "hermes.service"], capture_output=True).returncode == 0:
+        subprocess.run(["systemctl", "--user", "start", "hermes.service"])
+    else:
+        subprocess.Popen([os.path.join(ORDNER, ".venv/bin/python"), "-m", "uvicorn", "server:app", "--host", "127.0.0.1",
+                          "--port", "8000"], cwd=ORDNER, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    for _ in range(120):
+        if server_laeuft() is not None:
+            return
+        time.sleep(0.5)
+    sys.exit(f"{ROT}Atlas-Server startet nicht.{AUS}")
+
+
+def anmelden():
+    pw = env_wert("HERMES_PASSWORT")
+    if pw:
+        try:
+            anfrage("/login", {"passwort": pw})
+        except urllib.error.HTTPError as e:
+            sys.exit(f"{ROT}Anmeldung fehlgeschlagen ({e.code}).{AUS}")
+
+
+def timer_klingeln(sek):
+    time.sleep(sek)
+    print(f"\n{AKZENT}{FETT}⏰ Timer abgelaufen!{AUS}\a", flush=True)
+
+
+class Gespraech:
+    def __init__(self):
+        self.chat_id, self.modus, self.ki = None, "auto", "lokal"
+
+    def frage(self, text):
+        daten = {"text": text, "chat_id": self.chat_id, "modus": self.modus, "ki": self.ki}
+        try:
+            antwort = anfrage("/chat/stream", daten, timeout=600)
+        except urllib.error.URLError as e:
+            print(f"{ROT}Keine Verbindung: {e}{AUS}")
+            return
+        vorschlaege, status_offen, schrieb = [], False, False
+        print(f"{AKZENT}{FETT}Atlas{AUS} ", end="", flush=True)
+        for zeile in antwort:
+            try:
+                e = json.loads(zeile)
+            except ValueError:
+                continue
+            typ = e.get("typ")
+            if typ == "start":
+                self.chat_id = e.get("chat_id", self.chat_id)
+            elif typ == "status" and not schrieb and tty:
+                detail = f" {e['detail']}" if e.get("detail") else ""
+                print(f"\r\033[K{AKZENT}{FETT}Atlas{AUS} {DIM}{STATUS.get(e.get('text'), e.get('text'))}{detail} ...{AUS}",
+                      end="", flush=True)
+                status_offen = True
+            elif typ == "token":
+                if status_offen and tty:
+                    print(f"\r\033[K{AKZENT}{FETT}Atlas{AUS} ", end="")
+                    status_offen = False
+                schrieb = True
+                print(e.get("text", ""), end="", flush=True)
+            elif typ == "wurf":
+                print(("\r\033[K" if tty else "") + f"{DIM}[{'Münze' if e.get('art') == 'muenze' else 'Würfel'}: "
+                      f"{e.get('ergebnis')}]{AUS}\n{AKZENT}{FETT}Atlas{AUS} ", end="", flush=True)
+                status_offen = False
+            elif typ == "timer":
+                threading.Thread(target=timer_klingeln, args=(e.get("sekunden", 0),), daemon=True).start()
+            elif typ == "gemerkt":
+                print(f"\n{DIM}Gemerkt: {e.get('fakt')}{AUS}", end="")
+            elif typ == "vorschlag":
+                vorschlaege += e.get("fakten", [])
+            elif typ == "fehler":
+                print(f"\n{ROT}{e.get('text')}{AUS}", end="")
+        print()
+        for fakt in vorschlaege:
+            try:
+                if input(f"{DIM}Merken: „{fakt}“? (j/n) {AUS}").strip().lower().startswith("j"):
+                    anfrage("/erinnerungen", {"text": fakt})
+                    print(f"{DIM}Gemerkt.{AUS}")
+            except EOFError:
+                break
+
+    def befehl(self, text):
+        teile = text.split()
+        if teile[0] in ("/exit", "/quit", "/q"):
+            raise EOFError
+        if teile[0] == "/neu":
+            self.chat_id = None
+            print(f"{DIM}Neuer Chat.{AUS}")
+        elif teile[0] == "/modus" and len(teile) > 1 and teile[1] in ("auto", "schnell", "gruendlich"):
+            self.modus = teile[1]
+            print(f"{DIM}Modus: {self.modus}{AUS}")
+        elif teile[0] in ("/claude", "/lokal"):
+            self.ki = teile[0][1:]
+            print(f"{DIM}KI: {self.ki}{AUS}")
+        else:
+            print(f"{DIM}/neu  /modus auto|schnell|gruendlich  /claude  /lokal  /exit{AUS}")
+
+
+def main():
+    server_starten()
+    anmelden()
+    g = Gespraech()
+    if len(sys.argv) > 1:
+        g.frage(" ".join(sys.argv[1:]))
+        return
+    try:
+        import readline  # noqa: F401  Pfeiltasten und Verlauf in der Eingabe
+    except ImportError:
+        pass
+    print(f"{AKZENT}{FETT}● ● Atlas{AUS} {DIM}im Terminal · /hilfe für Befehle · Strg+D beendet{AUS}\n")
+    while True:
+        try:
+            text = input(f"{FETT}› {AUS}").strip()
+            if not text:
+                continue
+            g.befehl(text) if text.startswith("/") else g.frage(text)
+            print()
+        except KeyboardInterrupt:
+            print()
+        except EOFError:
+            print()
+            break
+
+
+if __name__ == "__main__":
+    main()

@@ -636,6 +636,36 @@
   .kachel[data-design="dunkel"] { background-color:#000000; color:#f2f1ec; }
   .kachel[data-design="grau"] { background-color:#191918; color:#f2f1ec; }
   :root:not([data-theme]) #seite, [data-theme="dunkel"] #seite { border-right-color:#1c1c1c; }
+  /* ---- Modus-Wahl oben neben dem Namen (wie Gemini) ---- */
+  .modus { min-height:0; margin:0; }
+  .modus:not(:has(:not([hidden]))) { display:none; }
+  #moduswahl { position:relative; margin-left:2px; }
+  #modusKnopf { display:flex; align-items:center; gap:4px; padding:5px 10px; border:0; border-radius:10px; background:none;
+                color:var(--dim); font:inherit; font-size:14px; cursor:pointer; }
+  #modusKnopf:hover, #modusKnopf[aria-expanded="true"] { background:var(--karte); color:var(--fg); }
+  #modusKnopf svg { width:15px; height:15px; transition:transform .15s; }
+  #modusKnopf[aria-expanded="true"] svg { transform:rotate(180deg); }
+  #modusname { display:inline; }
+  #modusmenue { position:absolute; z-index:30; top:calc(100% + 6px); left:0; width:240px; padding:6px; background:var(--feld);
+                border:1px solid var(--rand); border-radius:16px; box-shadow:0 16px 48px -12px rgba(0,0,0,.6); animation:runterfahren .14s ease-out; }
+  @keyframes runterfahren { from { opacity:0; transform:translateY(-6px) scale(.98); } }
+  #modusmenue button { display:flex; align-items:center; gap:12px; width:100%; padding:9px 12px; background:none; border:0; border-radius:10px;
+                       color:var(--fg); font:inherit; font-size:14px; text-align:left; cursor:pointer; }
+  #modusmenue button:hover { background:var(--karte); }
+  #modusmenue small { display:block; color:var(--dim); font-size:12px; }
+  #modusmenue b { font-weight:400; }
+  #modusmenue .haken { width:18px; height:18px; margin-left:auto; visibility:hidden; flex-shrink:0; }
+  #modusmenue button.aktiv .haken { visibility:visible; }
+
+  /* ---- Eigene Farben ---- */
+  .farbreihe { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0 16px; }
+  .farbe { width:30px; height:30px; border-radius:50%; border:2px solid var(--rand); padding:0; cursor:pointer; background:var(--f); }
+  .farbe.aktiv { outline:2px solid var(--fg); outline-offset:2px; }
+  .farbe.eigen { position:relative; overflow:hidden; background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red); }
+  .farbe.eigen input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; border:0; padding:0; }
+  .einst h5 { margin:14px 0 2px; font-size:13px; font-weight:500; color:var(--fg); }
+  #farbenZurueck { margin-top:4px; background:none; border:1px solid var(--rand); color:var(--dim); border-radius:10px; padding:7px 12px; font:inherit; font-size:13px; cursor:pointer; }
+  #farbenZurueck:hover { color:var(--fg); }
 </style>
 
 </head>
@@ -649,6 +679,14 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
   </button>
   <div class="logo">Atlas</div>
+  <div id="moduswahl">
+    <button type="button" id="modusKnopf" title="Modus wählen" aria-expanded="false" aria-controls="modusmenue"><span id="modusname"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div id="modusmenue" hidden>
+        <button type="button" data-m="auto"><span><b>Auto</b><small>wählt selbst</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
+        <button type="button" data-m="schnell"><span><b>Schnell</b><small>antwortet direkt</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
+        <button type="button" data-m="gruendlich"><span><b>Gründlich</b><small>denkt immer nach</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
+    </div>
+  </div>
 </header>
 
 <main id="fenster">
@@ -671,10 +709,6 @@
         </svg>
         <b>Bild oder PDF anhängen</b>
       </button>
-      <h4>Modus</h4>
-      <button type="button" data-m="auto"><span><b>Auto</b><small>wählt selbst</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
-      <button type="button" data-m="schnell"><span><b>Schnell</b><small>antwortet direkt</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
-      <button type="button" data-m="gruendlich"><span><b>Gründlich</b><small>denkt immer nach</small></span><svg class="haken" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></button>
     </div>
     <textarea id="eingabe" rows="1" placeholder="Nachricht an Atlas" autocomplete="off" autofocus></textarea>
     <button type="button" class="rund mic" id="mic" title="Sprechen">
@@ -696,7 +730,7 @@
       <svg class="ico-stopp" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
     </button>
   </div>
-  <div class="modus" id="modus"><button type="button" id="modusKnopf" title="Modus wählen"><span id="modusname"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><span id="modushinweis"></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Atlas neu starten.">Grafikkarte aus · langsam</span></div>
+  <div class="modus" id="modus"><span id="modushinweis" hidden></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Atlas neu starten.">Grafikkarte aus · langsam</span></div>
   <div id="vorschlaege">
     <button type="button" data-text="Wie wird das Wetter heute?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Wetter</button>
     <button type="button" data-text="Was gibt es Neues in den Nachrichten?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Nachrichten</button>
@@ -756,6 +790,13 @@
           <button class="kachel" data-design="grau">Grau</button>
           <button class="kachel" data-design="hell">Hell</button>
         </div>
+        <h5>Eigene Hintergrundfarbe</h5>
+        <div class="farbreihe" data-farbe="bg"></div>
+        <h5>Augen von Atlas</h5>
+        <div class="farbreihe" data-farbe="auge"></div>
+        <h5>Senden-Knopf und Akzent</h5>
+        <div class="farbreihe" data-farbe="akzent"></div>
+        <button type="button" id="farbenZurueck">Farben zurücksetzen</button>
       </section>
 
       <section data-bereich="stimme" hidden>
@@ -1049,11 +1090,16 @@
   function setzeModus(m) {
     modus = m;
     try { localStorage.setItem("hermes-modus2", m); } catch (e) {}
-    document.querySelectorAll("#plusmenue [data-m]").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
+    document.querySelectorAll("#modusmenue [data-m]").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
     document.getElementById("modusname").textContent = { auto: "Auto", schnell: "Schnell", gruendlich: "Gründlich" }[m];
     modusHinweis();
   }
-  document.querySelectorAll("#plusmenue [data-m]").forEach((b) => b.addEventListener("click", () => { setzeModus(b.dataset.m); plusMenue(false); }));
+  const modusKnopf = document.getElementById("modusKnopf"), modusFeld = document.getElementById("modusmenue");
+  function modusMenue(an) { modusFeld.hidden = !an; modusKnopf.setAttribute("aria-expanded", an); }
+  modusKnopf.addEventListener("click", (e) => { e.stopPropagation(); modusMenue(modusFeld.hidden); });
+  document.querySelectorAll("#modusmenue [data-m]").forEach((b) => b.addEventListener("click", () => { setzeModus(b.dataset.m); modusMenue(false); }));
+  document.addEventListener("click", (e) => { if (!modusFeld.contains(e.target)) modusMenue(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") modusMenue(false); });
 
   // Plus-Menü: schließt nach einer Auswahl, bei Klick daneben und mit Escape
   const plusKnopf = document.getElementById("plus"), plusFeld = document.getElementById("plusmenue");
@@ -1837,7 +1883,6 @@
   function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
   function schliesseSeite() { seite.classList.remove("offen"); schleier.classList.remove("offen"); }
   document.getElementById("menueKnopf").addEventListener("click", () => oeffneSeite());
-  document.getElementById("modusKnopf").addEventListener("click", (e) => { e.stopPropagation(); document.getElementById("plus").click(); });
   schleier.addEventListener("click", schliesseSeite);
   document.getElementById("zu").addEventListener("click", schliesseSeite);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") schliesseSeite(); });
@@ -2033,7 +2078,65 @@
     document.querySelectorAll(".kachel[data-design]").forEach((k) => k.classList.toggle("aktiv", k.dataset.design === gewaehlt));
     if (window.augeFarbe) window.augeFarbe();
   }
-  document.querySelectorAll(".kachel[data-design]").forEach((k) => k.addEventListener("click", () => setzeDesign(k.dataset.design)));
+  document.querySelectorAll(".kachel[data-design]").forEach((k) => k.addEventListener("click", () => { farben.bg = ""; speichereFarben(); setzeDesign(k.dataset.design); }));
+
+  // ---------- Eigene Farben: Hintergrund, Augen, Senden-Knopf ----------
+  const VORLAGEN = {
+    bg: ["#0d1b2a", "#1a1033", "#10231a", "#2a1414", "#1c1c1c", "#f3ece0"],
+    auge: ["#d9d7cf", "#5ad1ff", "#7cff9b", "#ff6b6b", "#ffb347", "#c792ea"],
+    akzent: ["#2f6f52", "#3b82f6", "#8b5cf6", "#e11d48", "#f59e0b", "#f2f1ec"],
+  };
+  let farben = { bg: "", auge: "", akzent: "" };
+  try { farben = Object.assign(farben, JSON.parse(localStorage.getItem("atlas-farben") || "{}")); } catch (e) {}
+  function speichereFarben() { try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {} }
+  function hell(hex) {
+    const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+  }
+  function wendeFarbenAn() {
+    const st = document.documentElement.style;
+    ["--bg", "--panel", "--karte", "--feld", "--line", "--akzent", "--akzent-fg"].forEach((v) => st.removeProperty(v));
+    if (farben.bg) {
+      const h = hell(farben.bg), gegen = h ? "#000" : "#fff";
+      document.documentElement.dataset.theme = h ? "hell" : "dunkel";
+      st.setProperty("--bg", farben.bg);
+      st.setProperty("--panel", `color-mix(in srgb, ${farben.bg} 92%, #000)`);
+      st.setProperty("--karte", `color-mix(in srgb, ${farben.bg} 88%, ${gegen})`);
+      st.setProperty("--feld", `color-mix(in srgb, ${farben.bg} 93%, ${gegen})`);
+      st.setProperty("--line", `color-mix(in srgb, ${farben.bg} 85%, ${gegen})`);
+      document.querySelectorAll(".kachel[data-design]").forEach((k) => k.classList.remove("aktiv"));
+    }
+    if (farben.akzent) {
+      st.setProperty("--akzent", farben.akzent);
+      st.setProperty("--akzent-fg", hell(farben.akzent) ? "#111" : "#fff");
+    }
+    document.querySelectorAll(".farbreihe").forEach((reihe) => {
+      const art = reihe.dataset.farbe;
+      reihe.querySelectorAll(".farbe[data-wert]").forEach((b) => b.classList.toggle("aktiv", b.dataset.wert === farben[art]));
+      const eigen = reihe.querySelector(".eigen");
+      eigen.classList.toggle("aktiv", !!farben[art] && !VORLAGEN[art].includes(farben[art]));
+    });
+    if (window.augeFarbe) window.augeFarbe();
+  }
+  window.atlasFarben = () => farben;
+  document.querySelectorAll(".farbreihe").forEach((reihe) => {
+    const art = reihe.dataset.farbe;
+    VORLAGEN[art].forEach((wert) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "farbe"; b.dataset.wert = wert;
+      b.style.setProperty("--f", wert); b.title = wert;
+      b.addEventListener("click", () => { farben[art] = wert; speichereFarben(); wendeFarbenAn(); });
+      reihe.append(b);
+    });
+    const eigen = document.createElement("label"); eigen.className = "farbe eigen"; eigen.title = "Eigene Farbe";
+    const wahl = document.createElement("input"); wahl.type = "color"; wahl.value = farben[art] || VORLAGEN[art][0];
+    wahl.addEventListener("input", () => { farben[art] = wahl.value; speichereFarben(); wendeFarbenAn(); });
+    eigen.append(wahl); reihe.append(eigen);
+  });
+  document.getElementById("farbenZurueck").addEventListener("click", () => {
+    farben = { bg: "", auge: "", akzent: "" }; speichereFarben(); wendeFarbenAn();
+    let d = "dunkel"; try { d = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
+    setzeDesign(d);
+  });
 
   // ---------- Roboter-Augen ----------
   // Zwei schlichte Augen als "Gesicht" von Atlas (in der App und später vorne auf der Box). Stimmungen:
@@ -2069,6 +2172,8 @@
     window.augeFarbe = () => {
       const hell = document.documentElement.dataset.theme === "hell";
       farbe = hell ? "#2b2a26" : "#d9d7cf"; schein = hell ? "transparent" : "rgba(255,255,255,.16)";
+      const eigen = window.atlasFarben && window.atlasFarben().auge;
+      if (eigen) { farbe = eigen; schein = hell ? "transparent" : eigen + "40"; }
     };
     window.augeFarbe();
     const grund = () => getComputedStyle(document.body).backgroundColor;
@@ -2261,6 +2366,7 @@
   let gespeichert = "dunkel";
   try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
   setzeDesign(gespeichert);
+  wendeFarbenAn();
   setzeModus(modus);
   eingabe.placeholder = STANDARD;
   let wakeGespeichert = false;
