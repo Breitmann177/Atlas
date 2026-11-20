@@ -657,8 +657,12 @@
   #modusmenue .haken { width:18px; height:18px; margin-left:auto; visibility:hidden; flex-shrink:0; }
   #modusmenue button.aktiv .haken { visibility:visible; }
 
-  .ordnerkopf { display:flex; align-items:center; gap:6px; margin:14px 0 4px; padding:0 10px; color:var(--dim); font-size:12px; font-weight:500; }
-  .ordnerkopf svg { width:14px; height:14px; }
+  .umschalter { display:flex; gap:2px; padding:3px; margin-right:6px; border-radius:12px; background:var(--karte); }
+  .umschalter button { display:grid; place-items:center; width:32px; height:28px; padding:0; border:0; border-radius:9px;
+                       background:none; color:var(--dim); cursor:pointer; }
+  .umschalter button:hover { color:var(--fg); }
+  .umschalter button.aktiv { background:var(--bg); color:var(--fg); box-shadow:0 0 0 1px var(--rand); }
+  .umschalter svg { width:17px; height:17px; }
   #schluesselForm, #schluesselDa { display:flex; flex-direction:column; gap:8px; }
   #schluesselDa[hidden], #schluesselForm[hidden] { display:none; }
   #schluesselFeld { width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--rand); background:var(--feld);
@@ -754,6 +758,10 @@
   <div class="seitenkopf">
     <span class="seitenlogo">Atlas</span>
     <div class="kopfknoepfe">
+      <div class="umschalter" role="tablist" aria-label="Chats oder Terminal">
+        <button type="button" data-liste="app" title="Chats" aria-label="Chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12Z"/></svg></button>
+        <button type="button" data-liste="terminal" title="Terminal-Chats" aria-label="Terminal-Chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 4 4-4 4"/><path d="M12 17h7"/></svg></button>
+      </div>
       <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -768,7 +776,7 @@
   <div class="bereich" id="ansicht-chats">
     <button class="neuerchat" id="neuerChat"><span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></span>Neuer Chat</button>
     <label class="suchfeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="suche" id="suche" placeholder="Chats durchsuchen" autocomplete="off"></label>
-    <h3 class="abschnitt">Chats</h3>
+    <h3 class="abschnitt" id="listeTitel">Chats</h3>
     <ul class="listen" id="chatListe"></ul>
   </div>
 
@@ -2023,23 +2031,16 @@
 
   function zeichneChats() {
     const filter = suche.value.trim().toLowerCase();
-    const treffer = chatsAlle.filter((c) => c.titel.toLowerCase().includes(filter));
+    const treffer = chatsAlle.filter((c) => c.titel.toLowerCase().includes(filter) && (c.quelle === "terminal") === (listeArt === "terminal"));
     chatListe.innerHTML = "";
     if (!treffer.length) {
       const leer = document.createElement("li");
       leer.className = "leer";
-      leer.textContent = chatsAlle.length ? "Nichts gefunden." : "Noch keine Chats.";
+      leer.textContent = filter ? "Nichts gefunden." : listeArt === "terminal" ? "Noch keine Terminal-Chats. Im Terminal: atlas" : "Noch keine Chats.";
       chatListe.appendChild(leer);
       return;
     }
-    // Terminal-Chats in einem eigenen Ordner unter den normalen Chats
-    const terminal = treffer.filter((c) => c.quelle === "terminal");
-    treffer.filter((c) => c.quelle !== "terminal").concat(terminal).forEach((c, index) => {
-      if (c === terminal[0]) {
-        const kopf = document.createElement("li"); kopf.className = "ordnerkopf";
-        kopf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 4 4-4 4"/><path d="M12 17h7"/></svg>Terminal';
-        chatListe.appendChild(kopf);
-      }
+    treffer.forEach((c, index) => {
       const zeile = document.createElement("li");
       zeile.style.setProperty("--i", index);
       const titel = document.createElement("button");
@@ -2059,6 +2060,19 @@
     });
   }
   suche.addEventListener("input", zeichneChats);
+  // Umschalter oben rechts: normale Chats oder Terminal-Chats (wie Chat/Code in der Claude-App)
+  let listeArt = "app";
+  try { if (localStorage.getItem("atlas-liste") === "terminal") listeArt = "terminal"; } catch (e) {}
+  function zeigeListe(art) {
+    listeArt = art;
+    try { localStorage.setItem("atlas-liste", art); } catch (e) {}
+    document.querySelectorAll(".umschalter [data-liste]").forEach((b) => {
+      b.classList.toggle("aktiv", b.dataset.liste === art); b.setAttribute("aria-selected", b.dataset.liste === art); });
+    document.getElementById("listeTitel").textContent = art === "terminal" ? "Terminal-Chats" : "Chats";
+    zeichneChats();
+  }
+  document.querySelectorAll(".umschalter [data-liste]").forEach((b) => b.addEventListener("click", () => zeigeListe(b.dataset.liste)));
+  zeigeListe(listeArt);
 
   async function ladeChats() {
     try { chatsAlle = await (await fetch("/chats")).json(); } catch (e) { return; }
