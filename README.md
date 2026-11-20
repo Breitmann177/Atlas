@@ -5,6 +5,16 @@
 <p align="center">Ein lokaler Sprachassistent im Stil von Jarvis: Chat, Websuche mit Quellen, Sprache rein und raus,<br>
 Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und Linux.</p>
 
+<p align="center">
+  <a href="https://github.com/Breitmann177/Atlas/archive/refs/heads/main.zip"><img src="https://img.shields.io/badge/%E2%86%93%20Download%20(Windows%20%26%20Linux)-2F6FEB?style=for-the-badge" alt="Download"></a>
+</p>
+
+<p align="center"><sub>
+  <b>Linux:</b> entpacken → <code>./install.sh</code> &nbsp;·&nbsp;
+  <b>Windows:</b> entpacken → siehe <a href="#installation">Installation</a><br>
+  Beim ersten Start wird das KI-Modell einmalig geladen (etwa 6,6 GB).
+</sub></p>
+
 ---
 
 > **Hinweis:** Die Idee, das Konzept, die Hardware-Planung, das Testen und der Betrieb sind von mir.
@@ -41,8 +51,8 @@ Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funk
 <details open><summary><b>Linux (Fedora)</b></summary>
 
 ```bash
-git clone https://github.com/Breitmann177/hermes-box.git
-cd hermes-box
+git clone https://github.com/Breitmann177/Atlas.git
+cd Atlas
 ./install.sh
 ```
 
