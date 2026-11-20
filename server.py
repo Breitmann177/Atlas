@@ -124,6 +124,28 @@ class SicherheitsHeader:
 
 app.add_middleware(SicherheitsHeader)
 
+
+class NurEigeneSeite:
+    """Zweite Schutzschicht gegen fremde Webseiten (CSRF): Ändernde Anfragen (POST, PUT, DELETE), die ein Browser
+    von einer anderen Seite schickt, werden abgelehnt. Erkennt man am Origin-Header, den Browser immer mitsenden.
+    Terminal und curl senden keinen Origin und sind nicht betroffen."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] not in ("GET", "HEAD", "OPTIONS"):
+            origin = dict(scope["headers"]).get(b"origin", b"").decode("latin-1")
+            host = re.sub(r"^[a-z]+://", "", origin).split("/")[0].rsplit(":", 1)[0].strip("[]") if origin else ""
+            if origin and host not in ERLAUBTE_HOSTS:
+                await send({"type": "http.response.start", "status": 403, "headers": [(b"content-type", b"text/plain")]})
+                await send({"type": "http.response.body", "body": b"Fremde Seite"})
+                return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(NurEigeneSeite)
+
 BASIS_PROMPT = """Du bist Atlas, ein persönlicher KI-Assistent: kompetent, ehrlich, ruhig und aufmerksam, wie J.A.R.V.I.S.
 Du läufst lokal auf dem Laptop des Nutzers.
 

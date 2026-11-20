@@ -657,12 +657,28 @@
   #modusmenue .haken { width:18px; height:18px; margin-left:auto; visibility:hidden; flex-shrink:0; }
   #modusmenue button.aktiv .haken { visibility:visible; }
 
-  .umschalter { display:flex; gap:2px; padding:3px; margin-right:6px; border-radius:12px; background:var(--karte); }
-  .umschalter button { display:grid; place-items:center; width:32px; height:28px; padding:0; border:0; border-radius:9px;
-                       background:none; color:var(--dim); cursor:pointer; }
-  .umschalter button:hover { color:var(--fg); }
-  .umschalter button.aktiv { background:var(--bg); color:var(--fg); box-shadow:0 0 0 1px var(--rand); }
-  .umschalter svg { width:17px; height:17px; }
+  /* Umschalter Chats/Terminal: ein Feld gleitet unter das gewählte Symbol */
+  .umschalter { position:relative; display:flex; gap:2px; padding:3px; margin-right:2px; border-radius:12px; background:var(--karte); }
+  .umschalter::before { content:""; position:absolute; top:3px; bottom:3px; left:0; width:var(--w, 32px); border-radius:9px;
+                        transform:translateX(var(--x, 3px));
+                        background:var(--bg); box-shadow:0 0 0 1px var(--rand), 0 1px 3px rgba(0,0,0,.25);
+                        transition:transform .28s cubic-bezier(.34,1.3,.5,1), width .28s; }
+  .umschalter button { position:relative; z-index:1; display:grid; place-items:center; width:32px; height:28px; padding:0; border:0;
+                       border-radius:9px; background:none; color:var(--dim); cursor:pointer; transition:color .2s; }
+  .umschalter button:hover, .umschalter button.aktiv { color:var(--fg); }
+  .umschalter svg { width:17px; height:17px; transition:transform .28s cubic-bezier(.34,1.3,.5,1); }
+  .umschalter button.aktiv svg { transform:scale(1.08); }
+  @media (prefers-reduced-motion:reduce) { .umschalter::before, .umschalter svg { transition:none; } }
+  /* Fuß: Einstellungen unten, Status nur bei Problemen */
+  .fuss { justify-content:space-between; gap:8px; }
+  .fuss .zahnrad { display:flex; align-items:center; gap:10px; padding:8px 10px; margin-left:-10px; border:0; border-radius:10px;
+                   background:none; color:var(--fg); opacity:1; font:inherit; font-size:14px; cursor:pointer; }
+  .fuss .zahnrad:hover, .fuss .zahnrad.aktiv { background:var(--karte); }
+  .fuss .zahnrad svg { width:18px; height:18px; transition:transform .4s; }
+  .fuss .zahnrad:hover svg { transform:rotate(45deg); }
+  #status { display:flex; align-items:center; gap:7px; color:var(--rot); font-size:12px; }
+  #status[hidden] { display:none; }
+  #statuspunkt { width:7px; height:7px; border-radius:50%; background:var(--rot); border:0; animation:none; }
   #schluesselForm, #schluesselDa { display:flex; flex-direction:column; gap:8px; }
   #schluesselDa[hidden], #schluesselForm[hidden] { display:none; }
   #schluesselFeld { width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--rand); background:var(--feld);
@@ -762,11 +778,7 @@
         <button type="button" data-liste="app" title="Chats" aria-label="Chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12Z"/></svg></button>
         <button type="button" data-liste="terminal" title="Terminal-Chats" aria-label="Terminal-Chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 4 4-4 4"/><path d="M12 17h7"/></svg></button>
       </div>
-      <button class="leise zahnrad" id="zahnrad" title="Einstellungen" aria-label="Einstellungen">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg></button>
+
       <button class="leise" id="zu" title="Schließen" aria-label="Schließen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
@@ -862,7 +874,13 @@
     </div>
   </div>
 
-  <div class="fuss"><i id="statuspunkt"></i><span id="statustext">...</span></div>
+  <div class="fuss">
+    <button type="button" class="zahnrad" id="zahnrad" title="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg><span>Einstellungen</span></button>
+    <span id="status" hidden><i id="statuspunkt"></i><span id="statustext"></span></span>
+  </div>
 </aside>
 
 <script>
@@ -1935,7 +1953,7 @@
   document.getElementById("wakeSchalter").addEventListener("click", () => wakeSetzen(!wache));
 
   // ---------- Seitenleiste ----------
-  function oeffneSeite() { zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
+  function oeffneSeite() { requestAnimationFrame(() => zeigeListe(listeArt)); zeigeAnsicht("chats"); seite.classList.add("offen"); schleier.classList.add("offen"); ladeChats(); ladeStatus(); }
   function schliesseSeite() { seite.classList.remove("offen"); schleier.classList.remove("offen"); }
   document.getElementById("menueKnopf").addEventListener("click", () => oeffneSeite());
   schleier.addEventListener("click", schliesseSeite);
@@ -1956,6 +1974,7 @@
     document.getElementById("ansicht-chats").hidden = einst;
     document.getElementById("ansicht-einstellungen").hidden = !einst;
     document.getElementById("zahnrad").classList.toggle("aktiv", einst);
+    document.querySelector(".umschalter").hidden = einst;
   }
   document.getElementById("zahnrad").addEventListener("click", () => {
     zeigeAnsicht(document.getElementById("ansicht-einstellungen").hidden ? "einstellungen" : "chats");
@@ -1992,18 +2011,14 @@
       const s = await (await fetch("/status")).json();
       nutzerName = s.nutzer || ""; begruessen();
       modiInfo = s.modi; modusHinweis();
-      statuspunkt.className = s.ollama ? "an" : "aus";
       claudeDa = !!s.claude; document.getElementById("schluesselEnde").textContent = s.claude_ende || ""; kiAnzeigen();
-      if (kiAktiv() === "claude") {
-        statuspunkt.className = "an"; statustext.textContent = "Laptop · Claude";
-      } else {
-        statustext.textContent = "Laptop · " + (s.ollama ? "Online" : "Ollama aus");
-      }
+      // Status nur zeigen, wenn etwas nicht geht
+      const problem = kiAktiv() === "claude" || s.ollama ? "" : "Lokale KI (Ollama) ist aus";
+      statustext.textContent = problem; document.getElementById("status").hidden = !problem;
       document.getElementById("gpuwarnung").hidden = s.grafikkarte || kiAktiv() === "claude";
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
-      statuspunkt.className = "aus";
-      statustext.textContent = "Server nicht erreichbar";
+      statustext.textContent = "Laptop nicht erreichbar"; document.getElementById("status").hidden = false;
     }
   }
 
@@ -2066,6 +2081,9 @@
   function zeigeListe(art) {
     listeArt = art;
     try { localStorage.setItem("atlas-liste", art); } catch (e) {}
+    const feld = document.querySelector(".umschalter"), ziel = feld.querySelector(`[data-liste="${art}"]`);
+    feld.dataset.art = art;
+    if (ziel.offsetWidth) { feld.style.setProperty("--x", ziel.offsetLeft + "px"); feld.style.setProperty("--w", ziel.offsetWidth + "px"); }
     document.querySelectorAll(".umschalter [data-liste]").forEach((b) => {
       b.classList.toggle("aktiv", b.dataset.liste === art); b.setAttribute("aria-selected", b.dataset.liste === art); });
     document.getElementById("listeTitel").textContent = art === "terminal" ? "Terminal-Chats" : "Chats";
