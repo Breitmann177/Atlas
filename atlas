@@ -12,7 +12,10 @@ Zeile mit \\ beenden = neue Zeile statt Absenden. Strg+C bricht eine Antwort ab.
 """
 import http.cookiejar
 import itertools
+import base64
 import getpass
+import mimetypes
+import uuid
 import json
 import os
 import re
@@ -135,6 +138,19 @@ class Schreiber:
         self.fett = self.code = self.kursiv = False
         self.block = False  # ``` Codeblock
         self.einzug = 0
+        self.link = None
+        self.links: list[str] = []
+
+    def _link_raus(self, text, adresse):
+        self.links.append(adresse)
+        alt, self.link = self.link, None
+        for c in text:
+            self._zeichen(c)
+        ziel = re.sub(r"^https?://(www\.)?", "", adresse).split("/")[0] if adresse.startswith("http") else ""
+        if ziel:
+            self._wort_raus()
+            self.wort = " " + DIM + ziel + AUS + self._stil()
+            self._wort_raus()
 
     def _raus(self, s):
         sys.stdout.write(s)
@@ -151,7 +167,7 @@ class Schreiber:
         self.wort = ""
         if not w:
             return
-        sichtbar = len(re.sub(r"\*\*|`", "", w))
+        sichtbar = len(re.sub(r"\*\*|`|\033\[[0-9;]*m", "", w))
         if self.spalte + sichtbar > breite() and self.spalte > len(self.EINRUECK) + self.einzug:
             self._neue_zeile()
             self._raus(self.EINRUECK + " " * self.einzug)
@@ -167,7 +183,7 @@ class Schreiber:
                 self._raus(self._stil())
             elif t:
                 self._raus(t)
-                self.spalte += len(t)
+                self.spalte += len(re.sub(r"\033\[[0-9;]*m", "", t))
 
     def _zeile_beginnen(self, anfang):
         """Entscheidet am Zeilenanfang über Überschrift, Liste, Codeblock."""
@@ -222,6 +238,11 @@ class Schreiber:
                 self.zeilenanfang = True
             self.spalte = len(self.EINRUECK) + len(anfang)
             return
+        if anfang.strip() in ("---", "***", "___"):  # Trennlinie
+            self._raus(self.EINRUECK + DIM + "─" * 24 + AUS + ("\n" if anfang.endswith("\n") else ""))
+            self.spalte = 0 if anfang.endswith("\n") else 26
+            self.zeilenanfang = anfang.endswith("\n")
+            return
         rest, ueberschrift = self._zeile_beginnen(anfang)
         self.ueberschrift = ueberschrift
         for z in rest:
@@ -235,6 +256,28 @@ class Schreiber:
             else:
                 self._raus(z)
             return
+        if self.link is not None:  # [Text](Adresse) sammeln und dann schön ausgeben
+            self.link += z
+            m = re.fullmatch(r"\[([^\]\n]*)\]\(([^)\s]*)\)", self.link)
+            if m:
+                self.link = None
+                self._link_raus(m.group(1), m.group(2))
+            elif z == "\n" or len(self.link) > 400 or re.fullmatch(r"\[[^\]\n]*\][^(]", self.link):
+                self._kein_link()
+            return
+        if z == "[":
+            self.link = "["
+            return
+        self._normal(z)
+
+    def _kein_link(self):
+        """War doch kein Link: gesammelten Text normal ausgeben."""
+        roh, self.link = self.link, None
+        self._normal(roh[0])
+        for c in roh[1:]:
+            self._zeichen(c)
+
+    def _normal(self, z):
         if z == "\n":
             self._wort_raus()
             if getattr(self, "ueberschrift", False):
@@ -251,6 +294,8 @@ class Schreiber:
         sys.stdout.flush()
 
     def ende(self):
+        if self.link is not None:
+            self._kein_link()
         if self.zeilenanfang and self.anfang:
             self._zeilenanfang_fertig()
         self._wort_raus()
@@ -265,12 +310,87 @@ def timer_klingeln(sek):
     print(f"\n{AKZENT}{FETT}⏰ Timer abgelaufen!{AUS}\a", flush=True)
 
 
+EINSTELLUNGEN = os.path.expanduser("~/.config/atlas/terminal.json")
+BILD_ENDUNGEN = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def pdf_hochladen(pfad):
+    """Schickt ein PDF an /pdf-lesen (multipart) und gibt {"name", "text"} oder einen Fehlertext zurück."""
+    grenze = uuid.uuid4().hex
+    name = os.path.basename(pfad).replace('"', "")
+    with open(pfad, "rb") as f:
+        inhalt = f.read()
+    koerper = (f"--{grenze}\r\nContent-Disposition: form-data; name=\"datei\"; filename=\"{name}\"\r\n"
+               f"Content-Type: application/pdf\r\n\r\n").encode() + inhalt + f"\r\n--{grenze}--\r\n".encode()
+    req = urllib.request.Request(URL + "/pdf-lesen", data=koerper,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={grenze}"})
+    d = json.load(netz.open(req, timeout=120))
+    return d.get("fehler") or {"name": d["name"], "text": d["text"]}
+
+
 class Gespraech:
     def __init__(self):
         self.chat_id, self.modus, self.ki = None, "auto", "lokal"
+        self.bilder, self.dokumente = [], []
+        try:
+            e = json.load(open(EINSTELLUNGEN, encoding="utf-8"))
+            self.modus = e.get("modus") if e.get("modus") in ("auto", "schnell", "gruendlich") else "auto"
+            self.ki = "claude" if e.get("ki") == "claude" else "lokal"
+        except (OSError, ValueError):
+            pass
+
+    def speichern(self):
+        try:
+            os.makedirs(os.path.dirname(EINSTELLUNGEN), exist_ok=True)
+            json.dump({"modus": self.modus, "ki": self.ki}, open(EINSTELLUNGEN, "w", encoding="utf-8"))
+        except OSError:
+            pass
+
+    def anhaengen(self, pfad):
+        pfad = os.path.expanduser(pfad.strip().strip("'\""))
+        if not os.path.isfile(pfad):
+            print(f"  {ROT}Datei nicht gefunden: {pfad}{AUS}")
+            return
+        endung = os.path.splitext(pfad)[1].lower()
+        if endung in BILD_ENDUNGEN:
+            if len(self.bilder) >= 3:
+                print(f"  {ROT}Höchstens 3 Bilder pro Nachricht.{AUS}")
+                return
+            with open(pfad, "rb") as f:
+                self.bilder.append(base64.b64encode(f.read()).decode())
+        elif endung == ".pdf":
+            print(f"  {DIM}Lese PDF ...{AUS}")
+            try:
+                d = pdf_hochladen(pfad)
+            except Exception as e:
+                print(f"  {ROT}PDF nicht lesbar: {e}{AUS}")
+                return
+            if isinstance(d, str):
+                print(f"  {ROT}{d}{AUS}")
+                return
+            self.dokumente.append(d)
+        else:
+            print(f"  {ROT}Nur Bilder (png, jpg, webp, gif) und PDFs.{AUS}")
+            return
+        print(f"  {DIM}📎 angehängt: {os.path.basename(pfad)} – jetzt deine Frage dazu schreiben{AUS}")
+
+    def pdfs_speichern(self, links):
+        for l in links:
+            m = re.fullmatch(r"/pdf/([A-Za-z0-9_-]{1,60}\.pdf)", l)
+            if not m:
+                continue
+            ziel = os.path.join(os.path.expanduser("~/Downloads"), m.group(1))
+            try:
+                with netz.open(URL + l, timeout=30) as r, open(ziel, "wb") as f:
+                    f.write(r.read())
+                print(f"  {AKZENT}PDF gespeichert:{AUS} {ziel}")
+            except Exception as e:
+                print(f"  {ROT}PDF nicht gespeichert: {e}{AUS}")
 
     def frage(self, text):
-        daten = {"text": text, "chat_id": self.chat_id, "modus": self.modus, "ki": self.ki, "quelle": "terminal"}
+        daten = {"text": text, "chat_id": self.chat_id, "modus": self.modus, "ki": self.ki, "quelle": "terminal",
+                 "bilder": self.bilder, "dokumente": self.dokumente}
+        self.bilder, self.dokumente = [], []
         spinner, schreiber = Spinner(), Schreiber()
         spinner.start("denkt nach")
         vorschlaege, schrieb = [], False
@@ -301,6 +421,7 @@ class Gespraech:
                     print(f"  {DIM}[{'Münze' if e.get('art') == 'muenze' else 'Würfel'}: {e.get('ergebnis')}]{AUS}")
                 elif typ == "ki":
                     self.ki = e.get("ki", self.ki)
+                    self.speichern()
                     spinner.stopp()
                     print(f"  {DIM}KI jetzt: {'Claude (online)' if self.ki == 'claude' else 'lokal'}{AUS}")
                 elif typ == "timer":
@@ -324,6 +445,7 @@ class Gespraech:
             return
         spinner.stopp()
         schreiber.ende()
+        self.pdfs_speichern(schreiber.links)
         for fakt in vorschlaege:
             try:
                 if input(f"  {DIM}Merken: „{fakt}“? (j/n) {AUS}").strip().lower().startswith("j"):
@@ -367,6 +489,7 @@ class Gespraech:
         ("/weiter <nr>", "Chat Nummer <nr> fortsetzen"),
         ("/modus <art>", "auto, schnell oder gruendlich"),
         ("/ki <wer>", "lokal oder claude"),
+        ("/datei <pfad>", "Bild oder PDF an die nächste Frage hängen (oder Datei reinziehen)"),
         ("/schluessel", "Claude-API-Schlüssel eintragen oder entfernen"),
         ("/status", "zeigt KI, Modus und Chat"),
         ("/exit", "beenden (auch Strg+D)"),
@@ -391,6 +514,7 @@ class Gespraech:
             if input(f"  {DIM}Entfernen? (j/n) {AUS}").strip().lower().startswith("j"):
                 anfrage("/claude-schluessel", methode="DELETE")
                 self.ki = "lokal"
+                self.speichern()
                 print(f"  {DIM}Entfernt. KI jetzt: lokal{AUS}")
             return
         print(f"  {DIM}Schlüssel von console.anthropic.com (API Keys). Er wird nur auf dem Laptop gespeichert.{AUS}")
@@ -407,6 +531,7 @@ class Gespraech:
                 print(f"  {ROT}Fehler {e.code}{AUS}")
             return
         self.ki = "claude"
+        self.speichern()
         print(f"  {DIM}Gespeichert. KI jetzt: Claude (online){AUS}")
 
     def befehl(self, text):
@@ -433,6 +558,7 @@ class Gespraech:
         elif b == "/modus":
             if arg in ("auto", "schnell", "gruendlich"):
                 self.modus = arg
+                self.speichern()
                 print(f"  {DIM}Modus: {self.modus}{AUS}")
             else:
                 print(f"  {DIM}Modus ist {self.modus}. Möglich: /modus auto | schnell | gruendlich{AUS}")
@@ -444,7 +570,13 @@ class Gespraech:
                 print(f"  {DIM}Noch kein API-Schlüssel. Mit /schluessel eintragen.{AUS}")
             else:
                 self.ki = ziel
+                self.speichern()
                 print(f"  {DIM}KI: {self.ki}{AUS}")
+        elif b in ("/datei", "/bild", "/pdf", "/anhang"):
+            if len(teile) > 1:
+                self.anhaengen(text.split(None, 1)[1])
+            else:
+                print(f"  {DIM}/datei <pfad>, z. B. /datei ~/Bilder/foto.jpg{AUS}")
         elif b in ("/schluessel", "/key", "/apikey"):
             self.schluessel()
         elif b == "/status":
@@ -466,14 +598,25 @@ def eingabe():
         return "\n".join(zeilen).strip()
 
 
-def kopf():
-    b = min(breite(), 60)
-    print(f"{AKZENT}╭{'─' * (b - 2)}╮{AUS}")
-    titel = f"{FETT}● ● Atlas{AUS}{DIM} im Terminal{AUS}"
-    print(f"{AKZENT}│{AUS} {titel}{' ' * (b - 23)}{AKZENT}│{AUS}")
-    hilfe = "/help für alle Befehle · Strg+D beendet"
-    print(f"{AKZENT}│{AUS} {DIM}{hilfe}{AUS}{' ' * (b - 3 - len(hilfe))}{AKZENT}│{AUS}")
-    print(f"{AKZENT}╰{'─' * (b - 2)}╯{AUS}\n")
+def kopf(g):
+    """Begrüßungskasten wie bei Claude Code: Logo (die Augen von Atlas) links, Infos rechts."""
+    ordner = os.getcwd().replace(os.path.expanduser("~"), "~", 1)
+    ki = "Claude (online)" if g.ki == "claude" else "lokal"
+    rechts = [(f"{FETT}Atlas{AUS}{DIM} im Terminal{AUS}", "Atlas im Terminal"),
+              (f"{DIM}KI: {ki} · Modus: {g.modus}{AUS}", f"KI: {ki} · Modus: {g.modus}"),
+              (f"{DIM}{ordner}{AUS}", ordner)]
+    auge = f"{AKZENT}▐█▌ ▐█▌{AUS}"
+    links = [f"  {AKZENT}▗▄▖ ▗▄▖{AUS}", f"  {auge}", f"  {AKZENT}▝▀▘ ▝▀▘{AUS}"]
+    innen = max(len(r[1]) for r in rechts) + 15
+    innen = min(max(innen, 44), breite() - 2)
+    print(f"{AKZENT}╭{'─' * innen}╮{AUS}")
+    for l, (farbig, roh) in zip(links, rechts):
+        if len(roh) > innen - 14:
+            farbig = f"{DIM}…{roh[-(innen - 15):]}{AUS}"
+            roh = "…" + roh[-(innen - 15):]
+        print(f"{AKZENT}│{AUS}{l}   {farbig}{' ' * (innen - 12 - len(roh))}{AKZENT}│{AUS}")
+    print(f"{AKZENT}╰{'─' * innen}╯{AUS}")
+    print(f"  {DIM}/help für alle Befehle · Strg+D beendet{AUS}\n")
 
 
 def main():
@@ -503,7 +646,7 @@ def main():
         atexit.register(readline.write_history_file, verlauf)
     except ImportError:
         pass
-    kopf()
+    kopf(g)
     if args[:1] == ["-c"]:
         chats = g.terminal_chats()
         if chats:
@@ -522,6 +665,10 @@ def main():
         try:
             text = eingabe()
             if not text:
+                continue
+            nackt = text.strip("'\"")
+            if nackt.startswith(("/", "~")) and os.path.isfile(os.path.expanduser(nackt)):
+                g.anhaengen(nackt)  # Datei ins Terminal gezogen
                 continue
             print()
             g.befehl(text) if text.startswith("/") else g.frage(text)
