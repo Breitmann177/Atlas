@@ -184,6 +184,7 @@ def db():
     c.execute("PRAGMA journal_mode=WAL")  # Lesen und Schreiben blockieren sich nicht gegenseitig
     c.execute("CREATE TABLE IF NOT EXISTS erinnerungen (id INTEGER PRIMARY KEY, text TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS chats (id INTEGER PRIMARY KEY, titel TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS einstellungen (name TEXT PRIMARY KEY, wert TEXT)")
     c.execute(
         "CREATE TABLE IF NOT EXISTS nachrichten "
         "(id INTEGER PRIMARY KEY, chat_id INTEGER, rolle TEXT, text TEXT)"
@@ -1431,6 +1432,31 @@ def claude_schluessel(s: Schluessel):
 @app.delete("/claude-schluessel")
 def claude_schluessel_weg():
     claude_schluessel_setzen(None)
+    return {"ok": True}
+
+
+class Farben(BaseModel):
+    bg: str = ""
+    auge: str = ""
+    akzent: str = ""
+
+
+@app.get("/farben")
+def farben_holen():
+    """Eigene Farben (Hintergrund, Augen, Senden-Knopf): gelten für App, Handy und Terminal gleich."""
+    with db() as c:
+        r = c.execute("SELECT wert FROM einstellungen WHERE name='farben'").fetchone()
+    try:
+        return json.loads(r["wert"]) if r else {}
+    except ValueError:
+        return {}
+
+
+@app.put("/farben")
+def farben_setzen(f: Farben):
+    werte = {k: v for k, v in f.model_dump().items() if re.fullmatch(r"#[0-9a-fA-F]{6}", v or "")}
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO einstellungen (name, wert) VALUES ('farben', ?)", (json.dumps(werte),))
     return {"ok": True}
 
 

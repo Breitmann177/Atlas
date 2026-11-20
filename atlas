@@ -598,6 +598,18 @@ def eingabe():
         return "\n".join(zeilen).strip()
 
 
+def augenfarbe():
+    """Augenfarbe aus den App-Einstellungen (Design -> Augen von Atlas), sonst das gedämpfte Weiß der App."""
+    try:
+        f = json.load(anfrage("/farben", timeout=2)).get("auge") or "#d9d7cf"
+    except Exception:
+        f = "#d9d7cf"
+    if not TTY or not re.fullmatch(r"#[0-9a-fA-F]{6}", f):
+        return ""
+    r, g_, b = (int(f[i:i + 2], 16) for i in (1, 3, 5))
+    return f"\033[38;2;{r};{g_};{b}m"
+
+
 def kopf(g):
     """Begrüßungskasten wie bei Claude Code: Logo (die Augen von Atlas) links, Infos rechts."""
     ordner = os.getcwd().replace(os.path.expanduser("~"), "~", 1)
@@ -605,16 +617,16 @@ def kopf(g):
     rechts = [(f"{FETT}Atlas{AUS}{DIM} im Terminal{AUS}", "Atlas im Terminal"),
               (f"{DIM}KI: {ki} · Modus: {g.modus}{AUS}", f"KI: {ki} · Modus: {g.modus}"),
               (f"{DIM}{ordner}{AUS}", ordner)]
-    auge = f"{AKZENT}▐█▌ ▐█▌{AUS}"
-    links = [f"  {AKZENT}▗▄▖ ▗▄▖{AUS}", f"  {auge}", f"  {AKZENT}▝▀▘ ▝▀▘{AUS}"]
+    a = augenfarbe()
+    links = [f"  {a}▄██▄ ▄██▄{AUS}", f"  {a}████ ████{AUS}", f"  {a}▀██▀ ▀██▀{AUS}"]
     innen = max(len(r[1]) for r in rechts) + 15
     innen = min(max(innen, 44), breite() - 2)
     print(f"{AKZENT}╭{'─' * innen}╮{AUS}")
     for l, (farbig, roh) in zip(links, rechts):
-        if len(roh) > innen - 14:
-            farbig = f"{DIM}…{roh[-(innen - 15):]}{AUS}"
-            roh = "…" + roh[-(innen - 15):]
-        print(f"{AKZENT}│{AUS}{l}   {farbig}{' ' * (innen - 12 - len(roh))}{AKZENT}│{AUS}")
+        if len(roh) > innen - 16:
+            farbig = f"{DIM}…{roh[-(innen - 17):]}{AUS}"
+            roh = "…" + roh[-(innen - 17):]
+        print(f"{AKZENT}│{AUS}{l}   {farbig}{' ' * (innen - 14 - len(roh))}{AKZENT}│{AUS}")
     print(f"{AKZENT}╰{'─' * innen}╯{AUS}")
     print(f"  {DIM}/help für alle Befehle · Strg+D beendet{AUS}\n")
 

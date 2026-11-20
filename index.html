@@ -2174,7 +2174,10 @@
   };
   let farben = { bg: "", auge: "", akzent: "" };
   try { farben = Object.assign(farben, JSON.parse(localStorage.getItem("atlas-farben") || "{}")); } catch (e) {}
-  function speichereFarben() { try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {} }
+  function speichereFarben() {  // auf dem Laptop speichern: gilt dann auch fürs Handy und das Terminal
+    try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {}
+    fetch("/farben", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(farben) }).catch(() => {});
+  }
   function hell(hex) {
     const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
     return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
@@ -2453,6 +2456,18 @@
   try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
   setzeDesign(gespeichert);
   wendeFarbenAn();
+  fetch("/farben").then((r) => r.ok ? r.json() : null).then((d) => {
+    if (!d) return;
+    // Laptop hat noch nichts gespeichert, der Browser schon (alte Version): dann die Browser-Farben übernehmen
+    if (!Object.keys(d).length) { if (farben.bg || farben.auge || farben.akzent) speichereFarben(); return; }
+    const neu ={ bg: d.bg || "", auge: d.auge || "", akzent: d.akzent || "" };
+    if (JSON.stringify(neu) === JSON.stringify(farben)) return;
+    const vorher = farben.bg;
+    farben = neu;
+    try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {}
+    if (vorher && !farben.bg) { let t = "dunkel"; try { t = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {} setzeDesign(t); }
+    wendeFarbenAn();
+  }).catch(() => {});
   setzeModus(modus);
   eingabe.placeholder = STANDARD;
   let wakeGespeichert = false;
