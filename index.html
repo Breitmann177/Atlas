@@ -657,6 +657,8 @@
   #modusmenue .haken { width:18px; height:18px; margin-left:auto; visibility:hidden; flex-shrink:0; }
   #modusmenue button.aktiv .haken { visibility:visible; }
 
+  .ordnerkopf { display:flex; align-items:center; gap:6px; margin:14px 0 4px; padding:0 10px; color:var(--dim); font-size:12px; font-weight:500; }
+  .ordnerkopf svg { width:14px; height:14px; }
   /* ---- Eigene Farben ---- */
   .farbreihe { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0 16px; }
   .farbe { width:30px; height:30px; border-radius:50%; border:2px solid var(--rand); padding:0; cursor:pointer; background:var(--f); }
@@ -1985,7 +1987,14 @@
       chatListe.appendChild(leer);
       return;
     }
-    treffer.forEach((c, index) => {
+    // Terminal-Chats in einem eigenen Ordner unter den normalen Chats
+    const terminal = treffer.filter((c) => c.quelle === "terminal");
+    treffer.filter((c) => c.quelle !== "terminal").concat(terminal).forEach((c, index) => {
+      if (c === terminal[0]) {
+        const kopf = document.createElement("li"); kopf.className = "ordnerkopf";
+        kopf.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 4 4-4 4"/><path d="M12 17h7"/></svg>Terminal';
+        chatListe.appendChild(kopf);
+      }
       const zeile = document.createElement("li");
       zeile.style.setProperty("--i", index);
       const titel = document.createElement("button");

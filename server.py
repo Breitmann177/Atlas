@@ -166,6 +166,8 @@ def db():
         "CREATE TABLE IF NOT EXISTS nachrichten "
         "(id INTEGER PRIMARY KEY, chat_id INTEGER, rolle TEXT, text TEXT)"
     )
+    if "quelle" not in {r[1] for r in c.execute("PRAGMA table_info(chats)")}:
+        c.execute("ALTER TABLE chats ADD COLUMN quelle TEXT DEFAULT 'app'")  # "app" oder "terminal"
     if "werkzeuge" not in {r[1] for r in c.execute("PRAGMA table_info(nachrichten)")}:
         c.execute("ALTER TABLE nachrichten ADD COLUMN werkzeuge TEXT")  # welche Werkzeuge eine Antwort benutzt hat
     # Angehängte PDFs bleiben beim Chat, damit auch Folgefragen ("und was steht auf Seite 3?") funktionieren
@@ -652,6 +654,7 @@ class Frage(BaseModel):
     bilder: list[str] = []  # base64 (mit oder ohne "data:image/...;base64,"-Anfang)
     ki: str = "lokal"  # "lokal" (Ollama) oder "claude" (nur mit ANTHROPIC_API_KEY in .env)
     live: bool = False  # Live-Sprachmodus: Antwort wird vorgelesen, also kurz und ohne Markdown
+    quelle: str = "app"  # "app" oder "terminal": Terminal-Chats stehen in der App in einem eigenen Ordner
 
 
 def ev(**kw) -> str:
@@ -1159,7 +1162,8 @@ def _chat_stream(frage: Frage):
     with db() as c:
         cid = frage.chat_id
         if cid is None:
-            cid = c.execute("INSERT INTO chats (titel) VALUES (?)", (frage.text[:40],)).lastrowid
+            cid = c.execute("INSERT INTO chats (titel, quelle) VALUES (?,?)",
+                            (frage.text[:40], "terminal" if frage.quelle == "terminal" else "app")).lastrowid
         gespeichert = frage.text + ("\n[Bild angehängt]" if bilder else "")
         for d in frage.dokumente[:3]:
             gespeichert += f"\n[PDF angehängt: {d.name[:60]}]"
@@ -1327,7 +1331,7 @@ def pdf_holen(name: str):
 @app.get("/chats")
 def chats():
     with db() as c:
-        return [dict(r) for r in c.execute("SELECT id, titel FROM chats ORDER BY id DESC")]
+        return [dict(r) for r in c.execute("SELECT id, titel, quelle FROM chats ORDER BY id DESC")]
 
 
 @app.get("/chats/{cid}")
