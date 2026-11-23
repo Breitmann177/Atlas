@@ -6,3 +6,17 @@ pdfs/
 .env
 stimmen/
 hoerproben/
+
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.kdbx
+*.db
+*.sqlite
+*.sqlite3
+*.log
