@@ -6,7 +6,7 @@
 Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und Linux.</p>
 
 <p align="center">
-  <a href="https://github.com/Breitmann177/Atlas/archive/refs/heads/main.zip"><img src="https://img.shields.io/badge/%E2%86%93%20Download%20(Windows%20%26%20Linux)-2F6FEB?style=for-the-badge" alt="Download"></a>
+  <a href="https://github.com/Breitmann177/Namik/archive/refs/heads/main.zip"><img src="https://img.shields.io/badge/%E2%86%93%20Download%20(Windows%20%26%20Linux)-2F6FEB?style=for-the-badge" alt="Download"></a>
 </p>
 
 <p align="center"><sub>
@@ -51,7 +51,7 @@ Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funk
 <details open><summary><b>Linux (Fedora)</b></summary>
 
 ```bash
-git clone https://github.com/Breitmann177/Atlas.git Namik
+git clone https://github.com/Breitmann177/Namik.git
 cd Namik
 ./install.sh
 ```

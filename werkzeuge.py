@@ -226,7 +226,7 @@ def wetter(ort: str) -> str:
 # ---------- Wikipedia direkt: ganzer Artikelanfang statt Schnipsel aus der Websuche ----------
 WIKIPEDIA_API = "https://de.wikipedia.org/w/api.php"
 # Wikipedia verlangt eine Kennung mit Kontakt. Ohne Link kam nach wenigen Anfragen Fehler 429
-WIKIPEDIA_KOPF = {"User-Agent": "Namik/1.0 (https://github.com/Breitmann177/Atlas) python-requests"}
+WIKIPEDIA_KOPF = {"User-Agent": "Namik/1.0 (https://github.com/Breitmann177/Namik) python-requests"}
 
 
 def _wiki_titel(suchwort: str) -> list[str]:
