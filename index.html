@@ -553,7 +553,7 @@
           --feld:#ffffff; --panel:#f1efe8; --btn:#1b1a17; --btnfg:#ffffff; --akzent:#c7772c; --akzent-fg:#ffffff;
           --schatten:0 1px 2px rgba(0,0,0,.05), 0 10px 32px -14px rgba(0,0,0,.18); }
   [data-theme="grau"] { --bg:#1f2023; --fg:#eeeef0; --dim:#9b9ca4; --line:#2f3034; --karte:#2a2b2f; --rand:rgba(255,255,255,.08);
-          --feld:#28292d; --panel:#18191b; --btn:#eeeef0; --btnfg:#1f2023; --akzent:#8fb3ff; --akzent-fg:#0d1626; }
+          --feld:#28292d; --panel:#18191b; --btn:#eeeef0; --btnfg:#1f2023; --akzent:#b8b6af; --akzent-fg:#222220; }
   body, #seite, .leiste textarea, button, input { font-family:"Inter Variable",system-ui,-apple-system,"Segoe UI",sans-serif;
          font-feature-settings:"cv11","ss01"; }
   body { background:var(--bg); }
@@ -759,7 +759,7 @@
       <svg class="ico-stopp" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
     </button>
   </div>
-  <div class="modus" id="modus"><span id="modushinweis" hidden></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Namik neu starten.">Grafikkarte aus · langsam</span></div>
+  <div class="modus" id="modus"><span id="modushinweis" hidden></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="Hardware-Zustand und Ollama-Nutzung">GPU-Status</span></div>
   <div id="vorschlaege">
     <button type="button" data-text="Wie wird das Wetter heute?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Wetter</button>
     <button type="button" data-text="Was gibt es Neues in den Nachrichten?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Nachrichten</button>
@@ -2023,7 +2023,14 @@
       // Status nur zeigen, wenn etwas nicht geht
       const problem = kiAktiv() === "claude" || s.ollama ? "" : "Lokale KI (Ollama) ist aus";
       statustext.textContent = problem; document.getElementById("status").hidden = !problem;
-      document.getElementById("gpuwarnung").hidden = s.grafikkarte || kiAktiv() === "claude";
+      const gpu = s.gpu || {}, warn = document.getElementById("gpuwarnung");
+      const labels = { aus: "GPU aus", schlaf: "GPU im Ruhezustand", aktiv: "GPU aktiv", bereit: "GPU bereit",
+        treiber: "NVIDIA-Treiber fehlt", nicht_erkannt: "GPU nicht erkannt", unbekannt: "GPU-Status unbekannt" };
+      const cpu = gpu.ollama === "cpu";
+      warn.textContent = cpu ? "Ollama nutzt CPU" : gpu.ollama === "gpu" ? "Ollama nutzt GPU" : (labels[gpu.hardware] || "GPU-Status unbekannt");
+      warn.title = (labels[gpu.hardware] || "GPU-Status unbekannt") + (cpu ? " · Modell ggf. neu laden, wenn die GPU wieder bereit ist." : "");
+      warn.style.color = cpu || ["aus", "treiber", "nicht_erkannt"].includes(gpu.hardware) ? "var(--rot)" : "var(--dim)";
+      warn.hidden = kiAktiv() === "claude" || !s.ollama;
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;
     } catch (e) {
       statustext.textContent = "Laptop nicht erreichbar"; document.getElementById("status").hidden = false;
@@ -2176,9 +2183,9 @@
 
   // ---------- Eigene Farben: Hintergrund, Augen, Senden-Knopf ----------
   const VORLAGEN = {
-    bg: ["#0d1b2a", "#1a1033", "#10231a", "#2a1414", "#1c1c1c", "#f3ece0"],
-    auge: ["#d9d7cf", "#5ad1ff", "#7cff9b", "#ff6b6b", "#ffb347", "#c792ea"],
-    akzent: ["#2f6f52", "#3b82f6", "#8b5cf6", "#e11d48", "#f59e0b", "#f2f1ec"],
+    bg: ["#202020", "#1a1033", "#10231a", "#2a1414", "#1c1c1c", "#f3ece0"],
+    auge: ["#d9d7cf", "#b8b6af", "#7cff9b", "#ff6b6b", "#ffb347", "#c792ea"],
+    akzent: ["#2f6f52", "#9a9890", "#8b5cf6", "#e11d48", "#f59e0b", "#f2f1ec"],
   };
   let farben = { bg: "", auge: "", akzent: "" };
   try { farben = Object.assign(farben, JSON.parse(localStorage.getItem("namik-farben") || "{}")); } catch (e) {}
@@ -2411,10 +2418,10 @@
       pos.x += (ziel.x - pos.x) * 0.32; pos.y += (ziel.y - pos.y) * 0.32;
 
       c.clearRect(0, 0, W, H);
-      c.shadowColor = schein; c.shadowBlur = 10;
+      c.shadowColor = "transparent"; c.shadowBlur = 0;
       c.fillStyle = farbe;
       const cx = W / 2, cy = H / 2;
-      const EW = 58, EH = 78, ABST = 52;  // Augenbreite, -höhe, halber Abstand
+      const EW = 46, EH = 70, ABST = 48;  // Augenbreite, -höhe, halber Abstand
       // Zielform der Kugel: Würfel eckiger, sonst rund
       const wuerfel = form === "wurf" && window.namikWurf && window.namikWurf.art !== "muenze";
       const D = wuerfel ? 80 : form === "wurf" ? 92 : 84, DR = wuerfel ? 16 : D / 2;
@@ -2434,7 +2441,7 @@
         const knall = f > 0.85 ? 1 + Math.sin(((f - 0.85) / 0.15) * Math.PI) * 0.08 : 1;
         const w = mix(EW * breite, D, f) * knall;
         const h0 = Math.max(6, EH * offen * lid);
-        const r = mix(Math.min(EW, h0) * 0.42, DR, f);
+        const r = mix(Math.min(EW, h0) * 0.48, DR, f);
         const abst = ABST * (1 - f), px = pos.x * (1 - f), py = pos.y * (1 - f);
         rr(cx - abst + px, cy + py, w, mix(h0 * (1 - schief), D, f) * knall, r); c.fill();
         rr(cx + abst + px, cy + py, w, mix(h0 * (1 + schief * 0.4), D, f) * knall, r); c.fill();
@@ -2485,7 +2492,7 @@
   ladeChats();
   ladeErinnerungen(true);
   ladeStatus();
-  setInterval(ladeStatus, 60000);  // merkt auch, wenn die Grafikkarte zwischendurch abgeschaltet wird
+  setInterval(ladeStatus, 5000);  // passiv: weckt die GPU nicht auf
 </script>
 </body>
 </html>

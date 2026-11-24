@@ -673,18 +673,57 @@ async def stt(datei: UploadFile = File(...), schnell: bool = Form(False)):
 
 
 # ---------- Status ----------
-def grafikkarte_aktiv() -> bool:
-    """False, wenn Namik ohne Grafikkarte läuft: Karte aus (ASUS-Eco-Modus) oder Ollama hat sie beim Start nicht
-    gesehen. Dann ist alles vielfach langsamer, und das soll man sehen, bevor man jemandem etwas vorführt."""
-    import subprocess
+def gpu_status():
+    """Hardware-Zustand und tatsächliche Ollama-Nutzung getrennt erfassen."""
+    from pathlib import Path
+    import sys
 
+    def lesen(p):
+        try:
+            return Path(p).read_text().strip()
+        except OSError:
+            return None
+
+    hardware = "unbekannt"
+    if sys.platform.startswith("linux"):
+        schalter = next((v for p in (
+            "/sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value",
+            "/sys/devices/platform/asus-nb-wmi/dgpu_disable",
+        ) if (v := lesen(p)) in ("0", "1")), None)
+        karten = [p for p in Path("/sys/bus/pci/devices").glob("*")
+                  if lesen(p / "vendor") == "0x10de"
+                  and (lesen(p / "class") or "").startswith("0x03")]
+        if schalter == "1" and not karten:
+            hardware = "aus"
+        elif karten:
+            treiber = [p for p in karten if (p / "driver").is_symlink()
+                       and (p / "driver").resolve().name == "nvidia"]
+            if not treiber:
+                hardware = "treiber"
+            elif any(lesen(p / "power/runtime_status") == "active" for p in treiber):
+                hardware = "aktiv"
+            elif all(lesen(p / "power/runtime_status") == "suspended" for p in treiber):
+                hardware = "schlaf"
+            else:
+                hardware = "bereit"
+        elif schalter == "0":
+            hardware = "nicht_erkannt"
     try:
-        if subprocess.run(["nvidia-smi", "-L"], capture_output=True, timeout=5).returncode != 0:
-            return False
-        geladen = requests.get(OLLAMA_URL + "/api/ps", timeout=2).json().get("models", [])
-    except Exception:
-        return False
-    return all(m.get("size_vram", 0) > 0 for m in geladen)
+        antwort = requests.get(OLLAMA_URL + "/api/ps", timeout=2)
+        antwort.raise_for_status()
+        geladen = antwort.json().get("models", [])
+        namen = {v["name"].lower() for v in MODELLE.values()}
+        relevant = [m for m in geladen if m.get("name", m.get("model", "")).lower() in namen
+                    or m.get("name", m.get("model", "")).lower().removesuffix(":latest") in namen]
+        vram = sum(m.get("size_vram") or 0 for m in relevant)
+        nutzung = "gpu" if vram > 0 else "cpu" if relevant else "leer"
+    except (requests.RequestException, ValueError, TypeError):
+        nutzung = "unbekannt"
+    return {"hardware": hardware, "ollama": nutzung}
+
+
+def grafikkarte_aktiv() -> bool:
+    return gpu_status()["ollama"] == "gpu"
 
 
 @app.get("/status")
@@ -697,7 +736,8 @@ def status():
         namen, online = set(), False
     modi = {k: {"name": v["name"], "da": any(n == v["name"].lower() or n.startswith(v["name"].lower() + ":") or n == v["name"].lower() + ":latest" for n in namen)}
             for k, v in MODELLE.items()}
-    return {"ollama": online, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "claude_ende": CLAUDE_KEY[-4:] if CLAUDE_KEY else "", "grafikkarte": grafikkarte_aktiv(), "nutzer": os.environ.get("NAMIK_NUTZER", os.environ.get("ATLAS_NUTZER", "")).strip(),
+    gpu = gpu_status()
+    return {"ollama": online, "gpu": gpu, "modi": modi, "elevenlabs": bool(ELEVENLABS_KEY), "claude": bool(CLAUDE_KEY), "claude_ende": CLAUDE_KEY[-4:] if CLAUDE_KEY else "", "grafikkarte": gpu["ollama"] == "gpu", "nutzer": os.environ.get("NAMIK_NUTZER", os.environ.get("ATLAS_NUTZER", "")).strip(),
             "ersatzstimme": time.time() < _online_pause_bis}
 
 
