@@ -5,11 +5,14 @@ import os
 import re
 import secrets
 import sqlite3
+import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -675,7 +678,6 @@ async def stt(datei: UploadFile = File(...), schnell: bool = Form(False)):
 # ---------- Status ----------
 def gpu_status():
     """Hardware-Zustand und tatsächliche Ollama-Nutzung getrennt erfassen."""
-    from pathlib import Path
     import sys
 
     def lesen(p):
@@ -709,17 +711,110 @@ def gpu_status():
         elif schalter == "0":
             hardware = "nicht_erkannt"
     try:
-        antwort = requests.get(OLLAMA_URL + "/api/ps", timeout=2)
-        antwort.raise_for_status()
-        geladen = antwort.json().get("models", [])
-        namen = {v["name"].lower() for v in MODELLE.values()}
-        relevant = [m for m in geladen if m.get("name", m.get("model", "")).lower() in namen
-                    or m.get("name", m.get("model", "")).lower().removesuffix(":latest") in namen]
+        geladen = _ollama_modelle()
+        namen = {_modellname(v["name"]) for v in MODELLE.values()}
+        relevant = [m for m in geladen if _modellname(m.get("name", m.get("model", ""))) in namen]
         vram = sum(m.get("size_vram") or 0 for m in relevant)
         nutzung = "gpu" if vram > 0 else "cpu" if relevant else "leer"
     except (requests.RequestException, ValueError, TypeError):
         nutzung = "unbekannt"
     return {"hardware": hardware, "ollama": nutzung}
+
+
+def _ollama_modelle():
+    antwort = requests.get(OLLAMA_URL + "/api/ps", timeout=2)
+    antwort.raise_for_status()
+    return antwort.json()["models"]
+
+
+def _modellname(name):
+    return name.lower().removesuffix(":latest")
+
+
+def _nvidia_generation():
+    """Sysfs und Gerätedateien abfragen, ohne eine schlafende GPU aufzuwecken."""
+    try:
+        ctl = Path("/dev/nvidiactl").stat()
+        uvm = Path("/dev/nvidia-uvm").stat()
+        for p in sorted(Path("/sys/bus/pci/devices").glob("*")):
+            try:
+                if ((p / "driver").resolve().name == "nvidia"
+                        and (p / "class").read_text().startswith("0x03")):
+                    return (p.name, p.stat().st_ino, ctl.st_ino, ctl.st_ctime_ns,
+                            uvm.st_ino, uvm.st_ctime_ns)
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return None
+
+
+_GPU_LOCK = threading.Lock()
+_ollama_aktiv = 0
+_gpu_zuletzt = None
+_gpu_beobachtet = False
+_gpu_zurueck = False
+_gpu_versucht = False
+
+
+def _ollama_gpu_vorbereiten(modell):
+    global _gpu_zuletzt, _gpu_beobachtet, _gpu_zurueck, _gpu_versucht
+    endpoint = urlsplit(OLLAMA_URL)
+    if endpoint.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        return
+    generation = _nvidia_generation()
+    if generation != _gpu_zuletzt:
+        _gpu_zurueck = _gpu_beobachtet and generation is not None
+        _gpu_versucht = False
+        _gpu_zuletzt = generation
+    _gpu_beobachtet = True
+    if generation is None or _gpu_versucht:
+        return
+
+    try:
+        geladen = _ollama_modelle()
+        cpu_modelle = [m for m in geladen if not m.get("size_vram")
+                       and _modellname(m.get("name", m.get("model", ""))) == _modellname(modell)]
+        if not cpu_modelle and not (_gpu_zurueck and not geladen):
+            return
+
+        _gpu_versucht = True
+        if cpu_modelle:
+            antwort = requests.post(OLLAMA_URL + "/api/generate",
+                                    json={"model": modell, "keep_alive": 0, "stream": False}, timeout=5)
+            antwort.raise_for_status()
+        # /api/ps listet Runner, kennt aber keine fremden laufenden oder wartenden Anfragen.
+        # Den Dienst-Neustart deshalb nur für eine ausdrücklich exklusive Installation erlauben.
+        if (endpoint.scheme == "http" and endpoint.port == 11434
+                and os.environ.get("NAMIK_OLLAMA_EXKLUSIV") == "1"
+                and _nvidia_generation() == generation and not _ollama_modelle()):
+            subprocess.run(
+                ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "try-restart", "ollama.service"],
+                capture_output=True, text=True, timeout=30, check=True,
+            )
+            for _ in range(10):
+                if ollama_erreichbar():
+                    print("Ollama für zurückgekehrte NVIDIA-GPU neu initialisiert.", flush=True)
+                    break
+                time.sleep(0.25)
+            else:
+                print("Ollama antwortet nach dem GPU-Neustart noch nicht.", flush=True)
+    except (requests.RequestException, ValueError, KeyError, OSError, subprocess.SubprocessError) as e:
+        print(f"Ollama GPU-Wiederherstellung: {e}", flush=True)
+
+
+@contextmanager
+def _ollama_anfrage(modell):
+    global _ollama_aktiv
+    with _GPU_LOCK:
+        if _ollama_aktiv == 0:
+            _ollama_gpu_vorbereiten(modell)
+        _ollama_aktiv += 1
+    try:
+        yield
+    finally:
+        with _GPU_LOCK:
+            _ollama_aktiv -= 1
 
 
 def grafikkarte_aktiv() -> bool:
@@ -1237,7 +1332,8 @@ def ollama_schritt(messages, modus, tools):
     if tools:
         body["tools"] = tools
     aufrufe, denken = [], 0
-    with requests.post(OLLAMA_URL + "/api/chat", json=body, stream=True, timeout=900) as r:
+    with (_ollama_anfrage(modus["name"]),
+          requests.post(OLLAMA_URL + "/api/chat", json=body, stream=True, timeout=900) as r):
         if r.status_code >= 400:
             raise OllamaFehler(f"{r.status_code}: {r.text[:300]}")
         for zeile in r.iter_lines():
