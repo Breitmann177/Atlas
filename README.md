@@ -141,4 +141,4 @@ python testliste.py --voll   # mit echten Antworten (dauert länger, Ollama muss
    `https://<laptop>.<tailnet>.ts.net` öffnen, Passwort eingeben, dann Teilen → „Zum Home-Bildschirm“.
 Ist Namik auf dem Laptop aus, startet es beim Aufruf vom Handy von selbst (Linux, mit install.sh eingerichtet). Über HTTPS funktioniert auch das Mikrofon.
 
-**Namenswechsel:** Bei einer bestehenden Linux-Installation zuerst Namik schließen, im bisherigen Projektordner `git pull` und anschließend `./install.sh` ausführen. Der Installer stellt den bisherigen Dienst und App-Menü-Eintrag um. Alte `.env`-Variablen sowie bestehende Datenbank und Browser-Einstellungen bleiben kompatibel. Der Terminalbefehl heißt `./namik`.
+**Namenswechsel:** Bei einer bestehenden Linux-Installation zuerst Namik schließen, im bisherigen Projektordner `git pull` und anschließend `./install.sh` ausführen. Der Installer stellt den bisherigen Dienst und App-Menü-Eintrag um. Alte `.env`-Variablen bleiben kompatibel. Die Datenbank und Browser-Einstellungen werden übernommen; nach dem Update kann eine erneute Anmeldung nötig sein. Der Terminalbefehl heißt `./namik`.

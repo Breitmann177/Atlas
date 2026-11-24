@@ -312,7 +312,8 @@ def timer_klingeln(sek):
     print(f"\n{AKZENT}{FETT}⏰ Timer abgelaufen!{AUS}\a", flush=True)
 
 
-EINSTELLUNGEN = os.path.expanduser("~/.config/atlas/terminal.json")
+EINSTELLUNGEN = os.path.expanduser("~/.config/namik/terminal.json")
+ALTE_EINSTELLUNGEN = os.path.expanduser("~/.config/atlas/terminal.json")
 BILD_ENDUNGEN = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
@@ -335,7 +336,7 @@ class Gespraech:
         self.chat_id, self.modus, self.ki = None, "auto", "lokal"
         self.bilder, self.dokumente = [], []
         try:
-            e = json.load(open(EINSTELLUNGEN, encoding="utf-8"))
+            e = json.load(open(EINSTELLUNGEN if os.path.exists(EINSTELLUNGEN) else ALTE_EINSTELLUNGEN, encoding="utf-8"))
             self.modus = e.get("modus") if e.get("modus") in ("auto", "schnell", "gruendlich") else "auto"
             self.ki = "claude" if e.get("ki") == "claude" else "lokal"
         except (OSError, ValueError):
@@ -646,9 +647,9 @@ def main():
         return
     try:
         import readline
-        verlauf = os.path.expanduser("~/.atlas_verlauf")
+        verlauf = os.path.expanduser("~/.namik_verlauf")
         try:
-            readline.read_history_file(verlauf)
+            readline.read_history_file(verlauf if os.path.exists(verlauf) else os.path.expanduser("~/.atlas_verlauf"))
         except OSError:
             pass
         readline.set_history_length(1000)

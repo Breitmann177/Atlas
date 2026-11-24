@@ -32,7 +32,8 @@ MODELLE = {
 # Überall dieselbe Kontextgröße: sonst lädt Ollama das Modell bei jedem Wechsel neu (kostet auf CPU Sekunden)
 NUM_CTX = 8192
 HALTEN = "30m"  # so lange bleibt ein Modell nach der letzten Anfrage im Speicher
-DB = "hermes.db"
+DB = "namik.db"
+_DB_UMSTELLUNG = threading.Lock()
 
 # ---------- Passwortschutz ----------
 def _env_laden(datei=".env"):
@@ -52,8 +53,8 @@ _env_laden()
 PASSWORT = os.environ.get("NAMIK_PASSWORT", os.environ.get("HERMES_PASSWORT", ""))
 # Sitzungs-Cookie: aus dem Passwort abgeleitet (scrypt ist absichtlich langsam). Bleibt nach Neustart gültig,
 # ändert sich mit dem Passwort. Selbst wenn jemand den Cookie kopiert, kann er daraus das Passwort kaum erraten.
-SITZUNG = hashlib.scrypt(PASSWORT.encode(), salt=b"hermes-sitzung-v1", n=2**14, r=8, p=1).hex()
-COOKIE = "hermes_sitzung"
+SITZUNG = hashlib.scrypt(PASSWORT.encode(), salt=b"namik-sitzung-v1", n=2**14, r=8, p=1).hex()
+COOKIE = "namik_sitzung"
 fehlversuche: dict[str, list[float]] = {}  # IP -> Zeitpunkte falscher Passwörter
 
 if not PASSWORT:
@@ -179,6 +180,22 @@ im Chat besser geht."""
 
 # ---------- Datenbank ----------
 def db():
+    # Einmalige Übernahme alter Chats; die bisherige Datenbank bleibt als Sicherung erhalten.
+    if DB == "namik.db" and not os.path.exists(DB):
+        with _DB_UMSTELLUNG:
+            if not os.path.exists(DB) and os.path.isfile("hermes.db"):
+                import tempfile
+                from contextlib import closing
+                fd, tmp = tempfile.mkstemp(prefix="namik-migration-", suffix=".db", dir=".")
+                os.close(fd)
+                try:
+                    with closing(sqlite3.connect("hermes.db", timeout=10)) as quelle:
+                        with closing(sqlite3.connect(tmp, timeout=10)) as ziel:
+                            quelle.backup(ziel)
+                    os.replace(tmp, DB)
+                finally:
+                    if os.path.exists(tmp):
+                        os.unlink(tmp)
     c = sqlite3.connect(DB, timeout=10)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA journal_mode=WAL")  # Lesen und Schreiben blockieren sich nicht gegenseitig

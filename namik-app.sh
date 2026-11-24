@@ -28,8 +28,12 @@ done
 
 # Schon offen? Dann kein zweites Fenster. (Das App-Menü holt das offene Fenster selbst nach vorne,
 # weil StartupWMClass im App-Eintrag zur Fenster-ID "chrome-localhost__-Default" passt.)
-PROFIL="${XDG_DATA_HOME:-$HOME/.local/share}/hermes-fenster"
-if pgrep -f -- "--user-data-dir=$PROFIL" >/dev/null; then exit 0; fi
+PROFIL="${XDG_DATA_HOME:-$HOME/.local/share}/namik-fenster"
+ALT_PROFIL="${XDG_DATA_HOME:-$HOME/.local/share}/hermes-fenster"
+if pgrep -f -- "--user-data-dir=$PROFIL" >/dev/null || pgrep -f -- "--user-data-dir=$ALT_PROFIL" >/dev/null; then exit 0; fi
+if [ ! -e "$PROFIL" ] && [ -d "$ALT_PROFIL" ]; then
+  mv -T -- "$ALT_PROFIL" "$PROFIL" || exit 1
+fi
 
 if [ -n "$BROWSER" ]; then
   # Eigenes Profil: Das Fenster ist ein eigener Prozess, das Skript wartet, bis es geschlossen wird.

@@ -884,6 +884,14 @@
 </aside>
 
 <script>
+  // Alte Einstellungen einmalig übernehmen, neue Schlüssel verwenden.
+  try {
+    for (const alt of ["hermes-modus2","hermes-stimme3","hermes-ki","hermes-wake","atlas-liste","hermes-design","atlas-farben"]) {
+      const neu = alt.replace(/^[^-]+/, "namik");
+      if (localStorage.getItem(neu) === null && localStorage.getItem(alt) !== null)
+        localStorage.setItem(neu, localStorage.getItem(alt));
+    }
+  } catch (e) {}
   window.namikDenkt = false;
   window.namikSucht = false;
   let aktuellerChat = null;
@@ -1120,7 +1128,7 @@
 
   // ---------- Modus ----------
   let modus = "auto", modiInfo = null;
-  try { const m = localStorage.getItem("hermes-modus2"); if (m === "schnell" || m === "gruendlich") modus = m; } catch (e) {}
+  try { const m = localStorage.getItem("namik-modus2"); if (m === "schnell" || m === "gruendlich") modus = m; } catch (e) {}
   function modusHinweis(gewaehlt) {
     if (modus === "auto") {
       document.getElementById("modushinweis").textContent = gewaehlt ? "gewählt: " + gewaehlt : "wählt selbst";
@@ -1133,7 +1141,7 @@
   }
   function setzeModus(m) {
     modus = m;
-    try { localStorage.setItem("hermes-modus2", m); } catch (e) {}
+    try { localStorage.setItem("namik-modus2", m); } catch (e) {}
     document.querySelectorAll("#modusmenue [data-m]").forEach((b) => b.classList.toggle("aktiv", b.dataset.m === m));
     document.getElementById("modusname").textContent = { auto: "Auto", schnell: "Schnell", gruendlich: "Gründlich" }[m];
     modusHinweis();
@@ -1696,13 +1704,13 @@
 
   // Stimmenauswahl (Einstellungen)
   let stimmeWahl = "alfred";
-  try { stimmeWahl = localStorage.getItem("hermes-stimme3") || "alfred"; } catch (e) {}
+  try { stimmeWahl = localStorage.getItem("namik-stimme3") || "alfred"; } catch (e) {}
   function stimmeAnzeigen() {
     document.querySelectorAll("[data-stimme]").forEach((b) => b.classList.toggle("aktiv", b.dataset.stimme === stimmeWahl));
   }
   document.querySelectorAll("[data-stimme]").forEach((b) => b.addEventListener("click", async () => {
     stimmeWahl = b.dataset.stimme;
-    try { localStorage.setItem("hermes-stimme3", stimmeWahl); } catch (e) {}
+    try { localStorage.setItem("namik-stimme3", stimmeWahl); } catch (e) {}
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
@@ -1714,7 +1722,7 @@
 
   // KI-Wahl (Einstellungen): lokal oder Claude. Claude gibt es nur, wenn der Server einen Schlüssel hat.
   let kiWahl = "lokal", claudeDa = false;
-  try { kiWahl = localStorage.getItem("hermes-ki") === "claude" ? "claude" : "lokal"; } catch (e) {}
+  try { kiWahl = localStorage.getItem("namik-ki") === "claude" ? "claude" : "lokal"; } catch (e) {}
   const kiAktiv = () => (kiWahl === "claude" && claudeDa ? "claude" : "lokal");
   function kiAnzeigen() {
     document.getElementById("kiClaude").hidden = !claudeDa;
@@ -1724,13 +1732,13 @@
   }
   document.querySelectorAll("[data-ki]").forEach((b) => b.addEventListener("click", () => {
     kiWahl = b.dataset.ki;
-    try { localStorage.setItem("hermes-ki", kiWahl); } catch (e) {}
+    try { localStorage.setItem("namik-ki", kiWahl); } catch (e) {}
     kiAnzeigen(); ladeStatus();
   }));
 
   function setzeKi(k) {  // auch vom Werkzeug ki_wechseln ("Wechsel zu Claude")
     kiWahl = k === "claude" ? "claude" : "lokal";
-    try { localStorage.setItem("hermes-ki", kiWahl); } catch (e) {}
+    try { localStorage.setItem("namik-ki", kiWahl); } catch (e) {}
     kiAnzeigen(); ladeStatus();
   }
   document.getElementById("schluesselForm").addEventListener("submit", async (e) => {
@@ -1943,7 +1951,7 @@
 
   function wakeSetzen(an) {
     wache = an;
-    try { localStorage.setItem("hermes-wake", an ? "an" : "aus"); } catch (e) {}
+    try { localStorage.setItem("namik-wake", an ? "an" : "aus"); } catch (e) {}
     document.getElementById("wakeSchalter").setAttribute("aria-checked", an ? "true" : "false");
     document.getElementById("wakeZeile").classList.toggle("an", an);
     document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY NAMIK“" : "AUS";
@@ -2077,10 +2085,10 @@
   suche.addEventListener("input", zeichneChats);
   // Umschalter oben rechts: normale Chats oder Terminal-Chats (wie Chat/Code in der Claude-App)
   let listeArt = "app";
-  try { if (localStorage.getItem("atlas-liste") === "terminal") listeArt = "terminal"; } catch (e) {}
+  try { if (localStorage.getItem("namik-liste") === "terminal") listeArt = "terminal"; } catch (e) {}
   function zeigeListe(art) {
     listeArt = art;
-    try { localStorage.setItem("atlas-liste", art); } catch (e) {}
+    try { localStorage.setItem("namik-liste", art); } catch (e) {}
     const feld = document.querySelector(".umschalter"), ziel = feld.querySelector(`[data-liste="${art}"]`);
     feld.dataset.art = art;
     if (ziel.offsetWidth) { feld.style.setProperty("--x", ziel.offsetLeft + "px"); feld.style.setProperty("--w", ziel.offsetWidth + "px"); }
@@ -2160,7 +2168,7 @@
   function setzeDesign(name) {
     const gewaehlt = (name === "hell" || name === "grau") ? name : "dunkel";
     document.documentElement.dataset.theme = gewaehlt;
-    try { localStorage.setItem("hermes-design", gewaehlt); } catch (e) {}
+    try { localStorage.setItem("namik-design", gewaehlt); } catch (e) {}
     document.querySelectorAll(".kachel[data-design]").forEach((k) => k.classList.toggle("aktiv", k.dataset.design === gewaehlt));
     if (window.augeFarbe) window.augeFarbe();
   }
@@ -2173,9 +2181,9 @@
     akzent: ["#2f6f52", "#3b82f6", "#8b5cf6", "#e11d48", "#f59e0b", "#f2f1ec"],
   };
   let farben = { bg: "", auge: "", akzent: "" };
-  try { farben = Object.assign(farben, JSON.parse(localStorage.getItem("atlas-farben") || "{}")); } catch (e) {}
+  try { farben = Object.assign(farben, JSON.parse(localStorage.getItem("namik-farben") || "{}")); } catch (e) {}
   function speichereFarben() {  // auf dem Laptop speichern: gilt dann auch fürs Handy und das Terminal
-    try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {}
+    try { localStorage.setItem("namik-farben", JSON.stringify(farben)); } catch (e) {}
     fetch("/farben", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(farben) }).catch(() => {});
   }
   function hell(hex) {
@@ -2223,7 +2231,7 @@
   });
   document.getElementById("farbenZurueck").addEventListener("click", () => {
     farben = { bg: "", auge: "", akzent: "" }; speichereFarben(); wendeFarbenAn();
-    let d = "dunkel"; try { d = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
+    let d = "dunkel"; try { d = localStorage.getItem("namik-design") || "dunkel"; } catch (e) {}
     setzeDesign(d);
   });
 
@@ -2453,7 +2461,7 @@
 
   // ---------- Start ----------
   let gespeichert = "dunkel";
-  try { gespeichert = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {}
+  try { gespeichert = localStorage.getItem("namik-design") || "dunkel"; } catch (e) {}
   setzeDesign(gespeichert);
   wendeFarbenAn();
   fetch("/farben").then((r) => r.ok ? r.json() : null).then((d) => {
@@ -2464,14 +2472,14 @@
     if (JSON.stringify(neu) === JSON.stringify(farben)) return;
     const vorher = farben.bg;
     farben = neu;
-    try { localStorage.setItem("atlas-farben", JSON.stringify(farben)); } catch (e) {}
-    if (vorher && !farben.bg) { let t = "dunkel"; try { t = localStorage.getItem("hermes-design") || "dunkel"; } catch (e) {} setzeDesign(t); }
+    try { localStorage.setItem("namik-farben", JSON.stringify(farben)); } catch (e) {}
+    if (vorher && !farben.bg) { let t = "dunkel"; try { t = localStorage.getItem("namik-design") || "dunkel"; } catch (e) {} setzeDesign(t); }
     wendeFarbenAn();
   }).catch(() => {});
   setzeModus(modus);
   eingabe.placeholder = STANDARD;
   let wakeGespeichert = false;
-  try { wakeGespeichert = localStorage.getItem("hermes-wake") === "an"; } catch (e) {}
+  try { wakeGespeichert = localStorage.getItem("namik-wake") === "an"; } catch (e) {}
   wakeSetzen(wakeGespeichert);
   sendeStatus();
   ladeChats();
