@@ -1,6 +1,6 @@
-<p align="center"><img src="hermes.png" width="88" alt=""></p>
+<p align="center"><img src="namik.png" width="88" alt=""></p>
 
-<h1 align="center">Atlas</h1>
+<h1 align="center">Namik</h1>
 
 <p align="center">Ein lokaler Sprachassistent im Stil von Jarvis: Chat, Websuche mit Quellen, Sprache rein und raus,<br>
 Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und Linux.</p>
@@ -28,15 +28,15 @@ Wetter, Routen und Umrechner. Läuft auf dem eigenen Rechner unter Windows und L
 - **Websuche** (DuckDuckGo und Wikipedia) mit Quellenliste; die besten Seiten werden gelesen
 - **Werkzeuge:** Wetter mit 7-Tage-Vorschau, Rechner, Währungs- und Einheiten-Umrechner (EZB-Kurse),
   Routen mit Karte (OpenStreetMap) und Google-Maps-Link, Timer, Münzwurf und Würfel
-- **Sprache:** Spracheingabe mit Whisper (auf dem Prozessor), Live-Gespräch und "Hey Atlas",
+- **Sprache:** Spracheingabe mit Whisper (auf dem Prozessor), Live-Gespräch und "Hey Namik",
   Sprachausgabe mit Microsoft-Stimmen, ohne Internet lokal mit Piper, optional ElevenLabs
 - Bilder verstehen, PDFs lesen (nur Text-PDFs) und PDFs erstellen
 - Erinnerungen, die du bestätigst und bearbeiten kannst
 - Ruhige Oberfläche mit Begrüßung nach Tageszeit, Vorschlägen und weichen Animationen
 - Passwortschutz und Zugriff vom Handy (z. B. über Tailscale)
 
-## Wie Atlas arbeitet
-Atlas ist ein Agent: Die KI bekommt Werkzeuge (Websuche, Wetter, Nachrichten, Rechner, Umrechner, Weltzeit, Route,
+## Wie Namik arbeitet
+Namik ist ein Agent: Die KI bekommt Werkzeuge (Websuche, Wetter, Nachrichten, Rechner, Umrechner, Weltzeit, Route,
 Timer, Münze, Würfel, Erinnerungen, PDF) und entscheidet selbst, wann sie welches aufruft – wie Claude oder ChatGPT.
 Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funktioniert mit dem lokalen Modell
 (`qwen3.5:9b` über Ollama) und mit Claude (API-Schlüssel in `.env`). `python testliste.py --voll` prüft echte Gespräche.
@@ -51,17 +51,17 @@ Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funk
 <details open><summary><b>Linux (Fedora)</b></summary>
 
 ```bash
-git clone https://github.com/Breitmann177/Atlas.git
-cd Atlas
+git clone https://github.com/Breitmann177/Atlas.git Namik
+cd Namik
 ./install.sh
 ```
 
 Das Skript installiert ein paar Systempakete, legt eine eigene Python-Umgebung an (über `uv`), installiert
-Ollama mit dem offiziellen Skript, lädt das KI-Modell (einmalig etwa 6,6 GB) und trägt Atlas ins App-Menü ein.
-Danach startest du Atlas über das App-Menü → Atlas. Es öffnet sich in einem eigenen Fenster (mit Chromium,
-sonst im normalen Browser). Fenster schließen = Atlas beenden. Atlas startet nicht beim Hochfahren,
+Ollama mit dem offiziellen Skript, lädt das KI-Modell (einmalig etwa 6,6 GB) und trägt Namik ins App-Menü ein.
+Danach startest du Namik über das App-Menü → Namik. Es öffnet sich in einem eigenen Fenster (mit Chromium,
+sonst im normalen Browser). Fenster schließen = Namik beenden. Namik startet nicht beim Hochfahren,
 aber von selbst, sobald es aufgerufen wird (z. B. vom Handy über Tailscale).
-Ausgaben ansehen: `journalctl --user -u hermes -f`.
+Ausgaben ansehen: `journalctl --user -u namik -f`.
 
 **NVIDIA-Treiber:** Fedora bringt ohne Zusatz nur den freien Treiber mit, damit läuft die KI auf dem Prozessor.
 Den NVIDIA-Treiber gibt es über RPM Fusion:
@@ -77,7 +77,7 @@ Danach ein paar Minuten warten (der Treiber wird gebaut), neu starten und `./ins
 <details><summary><b>Windows</b></summary>
 
 1. **Python 3.12 (64-bit)** von [python.org](https://www.python.org/downloads/) und [Ollama](https://ollama.com) installieren.
-2. Im Atlas-Ordner (am besten ein kurzer Pfad wie `C:\Atlas`, Windows erlaubt nur kurze Dateipfade):
+2. Im Namik-Ordner (am besten ein kurzer Pfad wie `C:\Namik`, Windows erlaubt nur kurze Dateipfade):
    ```
    py -3.12 -m venv .venv
    .venv\Scripts\pip install -r requirements.txt
@@ -91,16 +91,16 @@ Die Spracherkennung (Whisper) läuft absichtlich auf dem Prozessor, damit der Gr
 Sprachmodell frei bleibt (ein Satz von 6 s dauert dort etwa 2 s).
 
 ## Einstellungen in `.env`
-Eine Datei `.env` im Atlas-Ordner anlegen. Sie wird nie hochgeladen (steht in `.gitignore`). Alle Zeilen sind optional:
+Eine Datei `.env` im Namik-Ordner anlegen. Sie wird nie hochgeladen (steht in `.gitignore`). Alle Zeilen sind optional:
 ```
-HERMES_PASSWORT=dein-langes-passwort      # empfohlen, sobald andere Geräte zugreifen
-HERMES_HOSTS=mein-laptop.tailnet.ts.net   # weitere Adressen für Zugriff von anderen Geräten, mit Komma getrennt
-ATLAS_NUTZER=Alex                          # dein Name für die Begrüßung ("Guten Morgen, Alex")
+NAMIK_PASSWORT=dein-langes-passwort      # empfohlen, sobald andere Geräte zugreifen
+NAMIK_HOSTS=mein-laptop.tailnet.ts.net   # weitere Adressen für Zugriff von anderen Geräten, mit Komma getrennt
+NAMIK_NUTZER=Alex                          # dein Name für die Begrüßung ("Guten Morgen, Alex")
 ANTHROPIC_API_KEY=...                      # schaltet Claude in den Einstellungen frei
 CLAUDE_MODELL=claude-sonnet-5-5            # Standard; z. B. claude-opus-5-5 für schwierigere Aufgaben
 ELEVENLABS_API_KEY=...                     # schaltet die Stimme "George" frei
 ```
-Ohne Passwort ist Atlas ohne Login erreichbar. Dann sollte der Server nur auf `127.0.0.1` laufen (so starten ihn
+Ohne Passwort ist Namik ohne Login erreichbar. Dann sollte der Server nur auf `127.0.0.1` laufen (so starten ihn
 `start.bat` und `start.sh`).
 
 **Mit Claude** gehen Nachricht, Verlauf, Erinnerungen und Suchergebnisse an Anthropic, und jede Frage kostet etwas.
@@ -136,7 +136,9 @@ python testliste.py --voll   # mit echten Antworten (dauert länger, Ollama muss
 ## Auf dem iPhone (über Tailscale)
 1. Auf dem Laptop einmalig: `tailscale serve --bg --https=443 http://127.0.0.1:8000`
    (beim ersten Mal zeigt Tailscale einen Link, um „Serve“ im Konto freizuschalten).
-2. In `.env`: `HERMES_PASSWORT=...` und `HERMES_HOSTS=<laptop>.<tailnet>.ts.net`, dann Atlas neu starten.
+2. In `.env`: `NAMIK_PASSWORT=...` und `NAMIK_HOSTS=<laptop>.<tailnet>.ts.net`, dann Namik neu starten.
 3. Auf dem iPhone die Tailscale-App installieren, mit demselben Konto anmelden, in Safari
    `https://<laptop>.<tailnet>.ts.net` öffnen, Passwort eingeben, dann Teilen → „Zum Home-Bildschirm“.
-Ist Atlas auf dem Laptop aus, startet es beim Aufruf vom Handy von selbst (Linux, mit install.sh eingerichtet). Über HTTPS funktioniert auch das Mikrofon.
+Ist Namik auf dem Laptop aus, startet es beim Aufruf vom Handy von selbst (Linux, mit install.sh eingerichtet). Über HTTPS funktioniert auch das Mikrofon.
+
+**Namenswechsel:** Bei einer bestehenden Linux-Installation zuerst Namik schließen, im bisherigen Projektordner `git pull` und anschließend `./install.sh` ausführen. Der Installer stellt den bisherigen Dienst und App-Menü-Eintrag um. Alte `.env`-Variablen sowie bestehende Datenbank und Browser-Einstellungen bleiben kompatibel. Der Terminalbefehl heißt `./namik`.

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Atlas im Terminal. Spricht mit demselben Atlas-Server wie App und Handy (gleiche Chats, Erinnerungen, Werkzeuge).
+"""Namik im Terminal. Spricht mit demselben Namik-Server wie App und Handy (gleiche Chats, Erinnerungen, Werkzeuge).
 Terminal-Chats stehen in der App im Ordner "Terminal".
 
-    atlas                 Gespräch starten
-    atlas -c              letzten Terminal-Chat fortsetzen
-    atlas -r              Terminal-Chats auflisten und einen fortsetzen
-    atlas "frage"         eine Frage stellen und fertig
+    namik                 Gespräch starten
+    namik -c              letzten Terminal-Chat fortsetzen
+    namik -r              Terminal-Chats auflisten und einen fortsetzen
+    namik "frage"         eine Frage stellen und fertig
 
 Im Gespräch: /help zeigt alle Befehle. "Wechsel zu Claude" geht auch einfach als Satz.
 Zeile mit \\ beenden = neue Zeile statt Absenden. Strg+C bricht eine Antwort ab.
@@ -28,7 +28,7 @@ import urllib.error
 import urllib.request
 
 ORDNER = os.path.dirname(os.path.realpath(__file__))
-URL = os.environ.get("ATLAS_URL", "http://127.0.0.1:8000")
+URL = os.environ.get("NAMIK_URL", os.environ.get("ATLAS_URL", "http://127.0.0.1:8000"))
 TTY = sys.stdout.isatty()
 
 
@@ -70,8 +70,10 @@ def server_laeuft():
 def server_starten():
     if server_laeuft() is not None:
         return
-    print(f"{DIM}Atlas startet ...{AUS}", flush=True)
-    if subprocess.run(["systemctl", "--user", "cat", "hermes.service"], capture_output=True).returncode == 0:
+    print(f"{DIM}Namik startet ...{AUS}", flush=True)
+    if subprocess.run(["systemctl", "--user", "cat", "namik.service"], capture_output=True).returncode == 0:
+        subprocess.run(["systemctl", "--user", "start", "namik.service"])
+    elif subprocess.run(["systemctl", "--user", "cat", "hermes.service"], capture_output=True).returncode == 0:
         subprocess.run(["systemctl", "--user", "start", "hermes.service"])
     else:
         subprocess.Popen([os.path.join(ORDNER, ".venv/bin/python"), "-m", "uvicorn", "server:app", "--host", "127.0.0.1",
@@ -81,11 +83,11 @@ def server_starten():
         if server_laeuft() is not None:
             return
         time.sleep(0.5)
-    sys.exit(f"{ROT}Atlas-Server startet nicht.{AUS}")
+    sys.exit(f"{ROT}Namik-Server startet nicht.{AUS}")
 
 
 def anmelden():
-    pw = env_wert("HERMES_PASSWORT")
+    pw = env_wert("NAMIK_PASSWORT") or env_wert("HERMES_PASSWORT")
     if pw:
         try:
             anfrage("/login", {"passwort": pw})
@@ -97,7 +99,7 @@ def breite():
     return max(30, min(shutil.get_terminal_size((100, 24)).columns, 110) - 2)
 
 
-# ---------- Wartesymbol, solange Atlas sucht oder nachdenkt ----------
+# ---------- Wartesymbol, solange Namik sucht oder nachdenkt ----------
 class Spinner:
     BILDER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -501,7 +503,7 @@ class Gespraech:
             print(f"  {AKZENT}{b:<14}{AUS} {DIM}{t}{AUS}")
         print(f"\n  {FETT}Sonst noch{AUS}\n  {DIM}Zeile mit \\ beenden  neue Zeile statt Absenden\n"
               f"  Strg+C               Antwort abbrechen\n  Pfeil hoch           frühere Eingaben\n"
-              f"  atlas -c / atlas -r  letzten Chat fortsetzen / Chat auswählen\n"
+              f"  namik -c / namik -r  letzten Chat fortsetzen / Chat auswählen\n"
               f"  Du kannst auch einfach sagen: „Wechsel zu Claude“ oder „Wechsel zur lokalen KI“.{AUS}")
 
     def schluessel(self):
@@ -599,7 +601,7 @@ def eingabe():
 
 
 def augenfarbe():
-    """Augenfarbe aus den App-Einstellungen (Design -> Augen von Atlas), sonst das gedämpfte Weiß der App."""
+    """Augenfarbe aus den App-Einstellungen (Design -> Augen von Namik), sonst das gedämpfte Weiß der App."""
     try:
         f = json.load(anfrage("/farben", timeout=2)).get("auge") or "#d9d7cf"
     except Exception:
@@ -611,10 +613,10 @@ def augenfarbe():
 
 
 def kopf(g):
-    """Begrüßungskasten wie bei Claude Code: Logo (die Augen von Atlas) links, Infos rechts."""
+    """Begrüßungskasten wie bei Claude Code: Logo (die Augen von Namik) links, Infos rechts."""
     ordner = os.getcwd().replace(os.path.expanduser("~"), "~", 1)
     ki = "Claude (online)" if g.ki == "claude" else "lokal"
-    rechts = [(f"{FETT}Atlas{AUS}{DIM} im Terminal{AUS}", "Atlas im Terminal"),
+    rechts = [(f"{FETT}Namik{AUS}{DIM} im Terminal{AUS}", "Namik im Terminal"),
               (f"{DIM}KI: {ki} · Modus: {g.modus}{AUS}", f"KI: {ki} · Modus: {g.modus}"),
               (f"{DIM}{ordner}{AUS}", ordner)]
     a = augenfarbe()

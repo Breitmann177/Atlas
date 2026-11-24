@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atlas – Installer für Linux (Fedora; kennt auch Ubuntu/Debian, Arch, openSUSE)
+# Namik – Installer für Linux (Fedora; kennt auch Ubuntu/Debian, Arch, openSUSE)
 # Ausführen als normaler Nutzer:  ./install.sh   (fragt bei Bedarf nach sudo)
 set -euo pipefail
 
@@ -46,7 +46,7 @@ green "Python-Umgebung anlegen (.venv, Python 3.12)"
 # Keine CUDA-Pakete nötig: Die Spracherkennung läuft auf der CPU, Ollama bringt seine eigenen GPU-Bibliotheken mit.
 if ! (command -v nvidia-smi >/dev/null && nvidia-smi -L >/dev/null 2>&1) \
    && command -v lspci >/dev/null && lspci | grep -qi nvidia; then
-    warn "NVIDIA-Grafikkarte erkannt, aber kein Treiber aktiv (nvidia-smi fehlt). Atlas läuft dann auf dem"
+    warn "NVIDIA-Grafikkarte erkannt, aber kein Treiber aktiv (nvidia-smi fehlt). Namik läuft dann auf dem"
     warn "Prozessor, deutlich langsamer. Treiber für Fedora: siehe README, danach ./install.sh erneut starten."
 fi
 "$UV" pip install --python .venv/bin/python -r requirements.txt
@@ -64,16 +64,22 @@ green "KI-Modell laden (einmalig, etwa 6,6 GB)"
 ollama pull qwen3.5:9b
 
 # --- Hintergrund-Dienst (startet beim Anmelden) und App-Menü-Eintrag ohne Terminal ---------------
-chmod +x "$DIR/start.sh" "$DIR/hermes-app.sh"
+chmod +x "$DIR/start.sh" "$DIR/namik-app.sh"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$APPS"
 if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
-    green "Atlas als Dienst einrichten (startet erst beim ersten Aufruf, vom Laptop oder Handy)"
+    green "Namik als Dienst einrichten (startet erst beim ersten Aufruf, vom Laptop oder Handy)"
     UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
     mkdir -p "$UNIT_DIR"
-    cat > "$UNIT_DIR/hermes.socket" <<EOF
+    # Vorhandene Installation umstellen, ohne Daten oder fremde Dienste anzufassen.
+    if [ -f "$UNIT_DIR/hermes.service" ] && grep -Fxq "WorkingDirectory=$DIR" "$UNIT_DIR/hermes.service"; then
+        systemctl --user disable --now hermes.socket
+        systemctl --user stop hermes.service
+        rm -f "$UNIT_DIR/hermes.socket" "$UNIT_DIR/hermes.service"
+    fi
+    cat > "$UNIT_DIR/namik.socket" <<EOF
 [Unit]
-Description=Atlas: startet Atlas beim ersten Aufruf (Laptop oder Handy)
+Description=Namik: startet Namik beim ersten Aufruf (Laptop oder Handy)
 
 [Socket]
 ListenStream=127.0.0.1:8000
@@ -81,11 +87,11 @@ ListenStream=127.0.0.1:8000
 [Install]
 WantedBy=sockets.target
 EOF
-    cat > "$UNIT_DIR/hermes.service" <<EOF
+    cat > "$UNIT_DIR/namik.service" <<EOF
 [Unit]
-Description=Atlas (lokaler KI-Assistent)
-Requires=hermes.socket
-After=hermes.socket network-online.target
+Description=Namik (lokaler KI-Assistent)
+Requires=namik.socket
+After=namik.socket network-online.target
 
 [Service]
 WorkingDirectory=$DIR
@@ -94,29 +100,32 @@ Restart=on-failure
 RestartSec=3
 EOF
     systemctl --user daemon-reload
-    systemctl --user enable --now hermes.socket
-    EXEC="$DIR/hermes-app.sh"; TERM_APP=false
+    systemctl --user enable --now namik.socket
+    EXEC="$DIR/namik-app.sh"; TERM_APP=false
 else
-    warn "Kein systemd: Atlas startet über ein Terminalfenster (./start.sh)."
+    warn "Kein systemd: Namik startet über ein Terminalfenster (./start.sh)."
     EXEC="$DIR/start.sh"; TERM_APP=true
 fi
 
 green "Eintrag im App-Menü"
-cat > "$APPS/hermes.desktop" <<EOF
+if [ -f "$APPS/hermes.desktop" ] && grep -Fxq "Path=$DIR" "$APPS/hermes.desktop"; then
+    rm -f "$APPS/hermes.desktop"
+fi
+cat > "$APPS/namik.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Atlas
+Name=Namik
 Comment=Lokaler KI-Assistent
 Exec="$EXEC"
 Path=$DIR
-Icon=$DIR/hermes.png
+Icon=$DIR/namik.png
 Terminal=$TERM_APP
 Categories=Utility;
-Keywords=ki;assistent;jarvis;atlas;hermes;
+Keywords=ki;assistent;jarvis;namik;
 StartupWMClass=chrome-localhost__-Default
 EOF
 update-desktop-database "$APPS" 2>/dev/null || true
 
-green "Fertig! Atlas startet jetzt. Später: App-Menü → Atlas. Fenster schließen = Atlas beenden."
+green "Fertig! Namik startet jetzt. Später: App-Menü → Namik. Fenster schließen = Namik beenden."
 warn "Tipp: Ein Passwort kommt in die Datei .env (siehe README), sobald das Handy zugreifen soll."
 exec "$EXEC"

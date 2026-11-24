@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Startet Atlas unter Linux (getestet für Fedora). Das Gegenstück zu start.bat unter Windows.
+# Startet Namik unter Linux (getestet für Fedora). Das Gegenstück zu start.bat unter Windows.
 # Aufruf: ./start.sh   (einmalig vorher: chmod +x start.sh, falls es nicht ausführbar ist)
 cd "$(dirname "$0")" || exit 1
 
@@ -10,13 +10,13 @@ if [ ! -x ".venv/bin/python" ]; then
 fi
 
 # Als Dienst eingerichtet (install.sh)? Dann den Dienst nutzen statt eines zweiten Servers.
-if systemctl --user cat hermes.service >/dev/null 2>&1; then
-  exec "$(pwd)/hermes-app.sh"
+if systemctl --user cat namik.service >/dev/null 2>&1 || systemctl --user cat hermes.service >/dev/null 2>&1; then
+  exec "$(pwd)/namik-app.sh"
 fi
 
-# Läuft Atlas schon? Dann nur den Browser öffnen.
+# Läuft Namik schon? Dann nur den Browser öffnen.
 if curl -s -o /dev/null --max-time 2 http://127.0.0.1:8000/auth-status; then
-  echo "Atlas läuft schon, öffne den Browser ..."
+  echo "Namik läuft schon, öffne den Browser ..."
   xdg-open http://localhost:8000 >/dev/null 2>&1 &
   exit 0
 fi
@@ -41,8 +41,8 @@ fi
 ) &
 
 echo
-echo " ATLAS"
+echo " NAMIK"
 echo " Läuft auf http://localhost:8000"
-echo " Dieses Fenster offen lassen. Strg+C = Atlas beenden."
+echo " Dieses Fenster offen lassen. Strg+C = Namik beenden."
 echo
 exec .venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8000

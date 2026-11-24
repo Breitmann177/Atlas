@@ -1,4 +1,4 @@
-"""Feste Testliste für Atlas. Fängt ab, dass etwas kaputtgeht, das vorher lief.
+"""Feste Testliste für Namik. Fängt ab, dass etwas kaputtgeht, das vorher lief.
 
     python testliste.py          schnell: Werkzeuge und Bausteine, ohne KI (Sekunden)
     python testliste.py --voll   zusätzlich echte Gespräche mit Ollama und Internet (einige Minuten)
@@ -13,13 +13,14 @@ import sys
 import tempfile
 import time
 
-ordner = tempfile.mkdtemp(prefix="atlas-test-")
+ordner = tempfile.mkdtemp(prefix="namik-test-")
 
 import server  # noqa: E402
 
 server.DB = os.path.join(ordner, "test.db")
 server.WURF_SEKUNDEN = 0
 server.STANDARD_ORT = ""
+os.environ.pop("NAMIK_NUTZER", None)
 os.environ.pop("ATLAS_NUTZER", None)
 fehler = []
 
@@ -117,8 +118,8 @@ GESPRAECHE = [
     (["Wirf eine Münze", "nochmal"], "wurf", ["Kopf", "Zahl"], []),
     (["Stell einen Timer auf 5 Minuten"], "timer", ["5 Minuten", "fünf Minuten"], []),
     (["Rechne 100 Euro in Dollar um"], "umrechner", ["Dollar"], []),
-    (["atlas wie gehts dir"], None, ["gut", "danke"], ["Dokument"]),
-    (["atlas wie gehts dir", "welches dokument"], None, ["kein", "nicht"], ["Quellen"]),
+    (["namik wie gehts dir"], None, ["gut", "danke"], ["Dokument"]),
+    (["namik wie gehts dir", "welches dokument"], None, ["kein", "nicht"], ["Quellen"]),
     (["Was kannst du?"], None, ["Wetter", "Internet"], []),
     (["Wer hat dich gebaut?"], None, ["Projekt"], ["Team"]),
     (["Ich bin 25 Jahre alt"], "vorschlag", [""], []),
