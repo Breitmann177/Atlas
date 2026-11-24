@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/hermes.png?v=2">
-<link rel="apple-touch-icon" href="/hermes.png?v=2">
+<link rel="icon" href="/namik.png?v=2">
+<link rel="apple-touch-icon" href="/namik.png?v=2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Atlas">
+<meta name="apple-mobile-web-app-title" content="Namik">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<title>Atlas</title>
+<title>Namik</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.20/index.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
@@ -189,7 +189,7 @@
   .senden:hover:not(:disabled) { transform:scale(1.07); }
   .senden:active:not(:disabled) { transform:scale(.94); }
   .senden:disabled { background:none; color:var(--dim); border-color:var(--rand); cursor:default; }
-  /* Während Atlas antwortet, wird der Pfeil zum Stopp-Knopf */
+  /* Während Namik antwortet, wird der Pfeil zum Stopp-Knopf */
   .senden .ico-stopp { display:none; }
   .senden.stopp .ico-senden { display:none; }
   .senden.stopp .ico-stopp { display:block; }
@@ -707,7 +707,7 @@
   <button type="button" id="menueKnopf" title="Chats und Einstellungen" aria-label="Menü">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
   </button>
-  <div class="logo">Atlas</div>
+  <div class="logo">Namik</div>
   <div id="moduswahl">
     <button type="button" id="modusKnopf" title="Modus wählen" aria-expanded="false" aria-controls="modusmenue"><span id="modusname"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
     <div id="modusmenue" hidden>
@@ -739,7 +739,7 @@
         <b>Bild oder PDF anhängen</b>
       </button>
     </div>
-    <textarea id="eingabe" rows="1" placeholder="Nachricht an Atlas" autocomplete="off" autofocus></textarea>
+    <textarea id="eingabe" rows="1" placeholder="Nachricht an Namik" autocomplete="off" autofocus></textarea>
     <button type="button" class="rund mic" id="mic" title="Sprechen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/>
@@ -747,7 +747,7 @@
         <path d="M12 18v3"/>
       </svg>
     </button>
-    <button type="button" class="rund mic" id="live" title="Live-Gespräch (oder „Hey Atlas“ sagen)">
+    <button type="button" class="rund mic" id="live" title="Live-Gespräch (oder „Hey Namik“ sagen)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 10v4"/><path d="M8 6v12"/><path d="M12 3v18"/><path d="M16 7v10"/><path d="M20 10v4"/>
       </svg>
@@ -759,7 +759,7 @@
       <svg class="ico-stopp" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
     </button>
   </div>
-  <div class="modus" id="modus"><span id="modushinweis" hidden></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Atlas neu starten.">Grafikkarte aus · langsam</span></div>
+  <div class="modus" id="modus"><span id="modushinweis" hidden></span><span id="livestatus" hidden><i></i>Live</span><span id="gpuwarnung" hidden title="In G-Helper den GPU-Modus auf Standard stellen, danach Ollama und Namik neu starten.">Grafikkarte aus · langsam</span></div>
   <div id="vorschlaege">
     <button type="button" data-text="Wie wird das Wetter heute?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Wetter</button>
     <button type="button" data-text="Was gibt es Neues in den Nachrichten?"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Nachrichten</button>
@@ -772,7 +772,7 @@
 <div id="schleier"></div>
 <aside id="seite">
   <div class="seitenkopf">
-    <span class="seitenlogo">Atlas</span>
+    <span class="seitenlogo">Namik</span>
     <div class="kopfknoepfe">
       <div class="umschalter" role="tablist" aria-label="Chats oder Terminal">
         <button type="button" data-liste="app" title="Chats" aria-label="Chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12Z"/></svg></button>
@@ -807,7 +807,7 @@
 
       <section data-bereich="erinnerungen" hidden>
         <h3 class="abschnitt">Erinnerungen</h3>
-        <p class="hinweis">Das weiß Atlas über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
+        <p class="hinweis">Das weiß Namik über Sie (<span id="zaehler">0</span>). Klicken Sie auf einen Eintrag, um ihn zu ändern. Leer lassen löscht ihn.</p>
         <ul class="listen" id="liste"></ul>
         <form id="neu"><input id="neuText" placeholder="Neue Erinnerung ..." autocomplete="off"><button class="leise">+</button></form>
       </section>
@@ -821,7 +821,7 @@
         </div>
         <h5>Eigene Hintergrundfarbe</h5>
         <div class="farbreihe" data-farbe="bg"></div>
-        <h5>Augen von Atlas</h5>
+        <h5>Augen von Namik</h5>
         <div class="farbreihe" data-farbe="auge"></div>
         <h5>Senden-Knopf und Akzent</h5>
         <div class="farbreihe" data-farbe="akzent"></div>
@@ -859,7 +859,7 @@
 
       <section data-bereich="wake" hidden>
         <h3 class="abschnitt">Wake-Word</h3>
-        <p class="hinweis">Sagen Sie „Hey Atlas“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Atlas, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
+        <p class="hinweis">Sagen Sie „Hey Namik“, um ohne Klick ein Live-Gespräch zu starten (z.B. „Hey Namik, wie wird das Wetter?“). Das Mikrofon hört dafür dauerhaft mit, erkannt wird alles lokal. „Stopp“ oder „Danke, das war's“ beendet das Gespräch.</p>
         <div class="schalter-zeile" id="wakeZeile">
           <b id="wakeText">AUS</b>
           <button type="button" class="schalter" id="wakeSchalter" role="switch" aria-checked="false" aria-label="Wake-Word an/aus"></button>
@@ -884,13 +884,13 @@
 </aside>
 
 <script>
-  window.hermesDenkt = false;
-  window.hermesSucht = false;
+  window.namikDenkt = false;
+  window.namikSucht = false;
   let aktuellerChat = null;
   let beschaeftigt = false;
   let abbruch = null;  // AbortController der laufenden Antwort (für den Stopp-Knopf)
   let chatsAlle = [];
-  const STANDARD = "Nachricht an Atlas";  // lang passt aufs Handy nicht
+  const STANDARD = "Nachricht an Namik";  // lang passt aufs Handy nicht
 
   const chat = document.getElementById("chat");
   const fenster = document.getElementById("fenster");
@@ -973,7 +973,7 @@
       const r = await (await fetch("/pdf-lesen", { method: "POST", body: fd })).json();
       if (r.fehler) { platzhalter(r.fehler, 5000); return; }
       pdfs.push(r);
-      platzhalter(r.gekuerzt ? "PDF ist lang: Atlas sieht nur den Anfang (ca. 9000 Zeichen)." : "PDF gelesen.", 4000);
+      platzhalter(r.gekuerzt ? "PDF ist lang: Namik sieht nur den Anfang (ca. 9000 Zeichen)." : "PDF gelesen.", 4000);
     } catch (e) { platzhalter("PDF konnte nicht gelesen werden (läuft der Server?).", 4000); }
     zeichneVorschau();
   }
@@ -1152,7 +1152,7 @@
   document.addEventListener("click", (e) => { if (!plusFeld.contains(e.target) && !plusKnopf.contains(e.target)) plusMenue(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") plusMenue(false); });
 
-  // Merken: Atlas fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
+  // Merken: Namik fragt in einer eigenen Karte; beantworten geht per Knopf, Text oder Stimme ("ja" / "nein")
   const SIE_FORM = { "heißt": "heißen", wohnt: "wohnen", lebt: "leben", studiert: "studieren", hat: "haben", ist: "sind",
     mag: "mögen", spielt: "spielen", arbeitet: "arbeiten", kommt: "kommen", liebt: "lieben", hasst: "hassen",
     isst: "essen", macht: "machen", geht: "gehen", lernt: "lernen", "fährt": "fahren" };
@@ -1278,7 +1278,7 @@
     nein.addEventListener("click", () => vorschlagBeantworten(eintrag, false));
     fenster.scrollTop = fenster.scrollHeight;
   }
-  // Gibt zurück, was Atlas danach sagt, und schreibt es als normale Nachricht weiter
+  // Gibt zurück, was Namik danach sagt, und schreibt es als normale Nachricht weiter
   async function vorschlagBeantworten(eintrag, ja) {
     if (offenerVorschlag === eintrag) offenerVorschlag = null;
     const huelle = eintrag.karte.parentNode;
@@ -1336,7 +1336,7 @@
     inhalt.classList.add("typing");
     inhalt.innerHTML = '<span class="schimmer">Denkt nach</span>';
     const statusText = (t) => { const sp = inhalt.querySelector(".schimmer"); if (sp) sp.textContent = t; };
-    window.hermesDenkt = true; window.hermesSucht = false;
+    window.namikDenkt = true; window.namikSucht = false;
     const warNeu = aktuellerChat === null;
     let roh = "", karte = null, offen = null, schritte = 0, geplant = false, gestoppt = false;
     abbruch = new AbortController();
@@ -1365,9 +1365,9 @@
           if (!zeile.trim()) continue;
           const ev = JSON.parse(zeile);
           if (ev.typ === "start") aktuellerChat = ev.chat_id;
-          else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { window.hermesSkill = ev.text; window.hermesDenkt = false; }  // kein Internet-Suchen: kein Kasten, die Augen zeigen das Werkzeug
+          else if (ev.typ === "status" && (ev.text === "wetter" || ev.text === "rechnet")) { window.namikSkill = ev.text; window.namikDenkt = false; }  // kein Internet-Suchen: kein Kasten, die Augen zeigen das Werkzeug
           else if (ev.typ === "status" && ev.detail !== undefined) {
-            schritte++; window.hermesSucht = true;
+            schritte++; window.namikSucht = true;
             statusText(ev.text === "liest" ? "Liest Seiten" : "Sucht im Internet");
             // Im Gespräch: Die Suche dauert, also sagt er kurz Bescheid, statt still zu bleiben
             if (ev.text === "sucht" && aktiveKette) aktiveKette.ansage("Moment, ich schaue nach.");
@@ -1381,13 +1381,13 @@
             offen.querySelector("span").textContent = ev.detail;
             karte.appendChild(offen);
           } else if (ev.typ === "status") {
-            if (!offen) window.hermesSucht = false;
+            if (!offen) window.namikSucht = false;
           } else if (ev.typ === "ergebnis" && offen) {
-            const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen.querySelector("span").classList.remove("schimmer"); offen = null; window.hermesSucht = false;
+            const z = offen.querySelector("i"); z.className = ""; z.textContent = ev.ok ? "✓" : "✕"; offen.querySelector("span").classList.remove("schimmer"); offen = null; window.namikSucht = false;
             statusText("Denkt nach");
           } else if (ev.typ === "token") {
-            window.hermesDenkt = false; window.hermesSucht = false;
-            if (window.hermesSkill) setTimeout(() => { window.hermesSkill = null; }, 900);  // Symbol kurz stehen lassen
+            window.namikDenkt = false; window.namikSucht = false;
+            if (window.namikSkill) setTimeout(() => { window.namikSkill = null; }, 900);  // Symbol kurz stehen lassen
             roh += ev.text;
             if (aktiveKette) aktiveKette.rein(ev.text);
             else { inhalt.classList.remove("typing"); zeige(); }
@@ -1410,8 +1410,8 @@
     } catch (fehler) {
       if (fehler && fehler.name === "AbortError") gestoppt = true;
       // Ollama-Fehler meldet der Server selbst. Hier ist der Server gar nicht erreichbar oder hat abgelehnt.
-      else if (!roh) roh = fehler && fehler.message === "Serverfehler" ? "Der Atlas-Server hat die Anfrage abgelehnt. Bitte laden Sie die Seite neu."
-        : "Der Atlas-Server ist nicht erreichbar. Bitte starten Sie ihn über „Atlas starten“ im Ordner „Atlas“ auf dem Desktop.";
+      else if (!roh) roh = fehler && fehler.message === "Serverfehler" ? "Der Namik-Server hat die Anfrage abgelehnt. Bitte laden Sie die Seite neu."
+        : "Der Namik-Server ist nicht erreichbar. Bitte starten Sie ihn über „Namik starten“ im Ordner „Namik“ auf dem Desktop.";
     }
     abbruch = null;
     if (gestoppt) roh = roh ? roh + "\n\n*(abgebrochen)*" : "*(abgebrochen)*";
@@ -1420,14 +1420,14 @@
       inhalt.classList.remove("typing");
       if (roh) aktualisiere(huelle, roh); else inhalt.textContent = "";
     }
-    window.hermesDenkt = false; window.hermesSucht = false;
-    if (window.hermesSkill) setTimeout(() => { window.hermesSkill = null; }, 900);
+    window.namikDenkt = false; window.namikSucht = false;
+    if (window.namikSkill) setTimeout(() => { window.namikSkill = null; }, 900);
     beschaeftigt = false;
     sendeStatus();
     eingabe.focus();
     fenster.scrollTop = fenster.scrollHeight;
     if (warNeu) ladeChats();
-    if (roh && !gestoppt) window.hermesFroh = performance.now();
+    if (roh && !gestoppt) window.namikFroh = performance.now();
     if (antwortWarter) { const w = antwortWarter; antwortWarter = null; w(gestoppt ? "" : roh); }
   });
 
@@ -1436,7 +1436,7 @@
 
   async function transkribieren(blob) {
     mic.disabled = true;
-    window.hermesDenkt = true;
+    window.namikDenkt = true;
     platzhalter("Schreibe mit ...");
     try {
       const daten = new FormData();
@@ -1456,7 +1456,7 @@
     } catch (e) {
       platzhalter("Fehler: Server nicht erreichbar.", 5000);
     }
-    window.hermesDenkt = false;
+    window.namikDenkt = false;
     mic.disabled = false;
     eingabe.focus();
   }
@@ -1526,7 +1526,7 @@
   let sprecher = null;         // gerade spielendes Audio
   let lauschLauf = 0;          // wird hochgezählt, um laufende Schleifen zu beenden
   let antwortWarter = null;    // wartet auf das Ende einer Antwort (siehe form submit)
-  const WAKE = /\b(?:(?:hey|hi|hallo|okay|ok|he|ey)[\s,.!]*)?(?:atlas+|adlas+|attlas)\b/i;
+  const WAKE = /\b(?:(?:hey|hi|hallo|okay|ok|he|ey)[\s,.!]*)?(?:namik|namık)\b/i;
   const ENDE = /^\s*(stopp?|ende|beenden|tschüss|danke,? das war'?s|das war'?s)\W*$/i;
 
   async function ohrOeffnen() {
@@ -1580,7 +1580,7 @@
     try {
       const daten = new FormData();
       daten.append("datei", blob, "aufnahme.webm");
-      if (schnell) daten.append("schnell", "true");  // kleines Modell: nur fürs Lauschen auf "Hey Atlas"
+      if (schnell) daten.append("schnell", "true");  // kleines Modell: nur fürs Lauschen auf "Hey Namik"
       const antwort = await (await fetch("/stt", { method: "POST", body: daten })).json();
       return (antwort.text || "").trim();
     } catch (e) { return ""; }
@@ -1596,7 +1596,7 @@
   }
   function abspielen(quelle, beimStart) {  // URL oder schon vorgeladenes Audio; beimStart läuft, sobald man wirklich etwas hört
     return new Promise((fertig) => {
-      sprecher = typeof quelle === "string" ? new Audio(quelle) : quelle; window.hermesSpricht = true;
+      sprecher = typeof quelle === "string" ? new Audio(quelle) : quelle; window.namikSpricht = true;
       const start = () => { clearTimeout(sicherung); if (beimStart) { beimStart(); beimStart = null; } };
       // Kommt gar kein Ton an, darf das Gespräch nicht hängen bleiben: Text zeigen und weitermachen
       const sicherung = setTimeout(() => { start(); fertig(); }, 15000);
@@ -1609,7 +1609,7 @@
       }).catch(() => {});
     }).finally(() => {
       if (sprecher) sprecher.removeAttribute("src");  // laufenden Download abbrechen
-      sprecher = null; window.hermesSpricht = false;
+      sprecher = null; window.namikSpricht = false;
     });
   }
   async function sagen(text, lauf) {
@@ -1617,7 +1617,7 @@
     if (url && lauf === lauschLauf) await abspielen(url);
   }
 
-  // Live: Atlas fängt schon an zu sprechen, während die Antwort noch entsteht. Der erste Satz geht sofort los,
+  // Live: Namik fängt schon an zu sprechen, während die Antwort noch entsteht. Der erste Satz geht sofort los,
   // danach werden die Sätze zu längeren Stücken gebündelt und vorgeladen, damit zwischen ihnen keine Lücke entsteht.
   let aktiveKette = null;
   function satzGrenze(t, min) {
@@ -1706,7 +1706,7 @@
     stimmeAnzeigen();
     if (sprecher) sprecher.pause();
     b.classList.add("spielt");
-    const url = await holeAudio("Guten Abend. Ich bin Atlas. So klinge ich, wenn ich Ihnen antworte.");
+    const url = await holeAudio("Guten Abend. Ich bin Namik. So klinge ich, wenn ich Ihnen antworte.");
     if (url) await abspielen(url);
     b.classList.remove("spielt");
   }));
@@ -1746,11 +1746,11 @@
       if (!r.ok) { meldung.textContent = d.detail || "Fehler beim Speichern."; return; }
       feld.value = ""; meldung.hidden = true;
       claudeDa = true; setzeKi("claude");
-    } catch (err) { meldung.textContent = "Atlas ist nicht erreichbar."; }
+    } catch (err) { meldung.textContent = "Namik ist nicht erreichbar."; }
     finally { knopf.disabled = false; }
   });
   document.getElementById("schluesselWeg").addEventListener("click", async () => {
-    if (!confirm("API-Schlüssel entfernen? Atlas nutzt dann wieder nur die lokale KI.")) return;
+    if (!confirm("API-Schlüssel entfernen? Namik nutzt dann wieder nur die lokale KI.")) return;
     await fetch("/claude-schluessel", { method: "DELETE" });
     claudeDa = false; setzeKi("lokal");
   });
@@ -1761,12 +1761,12 @@
   let wurfUhr = [];
   function wurfStarten(art, ergebnis) {
     wurfUhr.forEach(clearTimeout);
-    window.hermesWurf = { art, ergebnis, start: performance.now(), dauer: WURF_DAUER };
+    window.namikWurf = { art, ergebnis, start: performance.now(), dauer: WURF_DAUER };
     document.body.classList.add("wurf");
     wurfAnzeige.hidden = false; wurfAnzeige.textContent = "";
     wurfUhr = [
       setTimeout(() => { wurfAnzeige.textContent = String(ergebnis); }, WURF_DAUER),
-      setTimeout(() => { window.hermesWurf = null; wurfAnzeige.hidden = true; document.body.classList.remove("wurf"); }, WURF_DAUER + WURF_ZEIGEN),
+      setTimeout(() => { window.namikWurf = null; wurfAnzeige.hidden = true; document.body.classList.remove("wurf"); }, WURF_DAUER + WURF_ZEIGEN),
     ];
   }
 
@@ -1777,10 +1777,10 @@
   function timerStarten(sekunden) {
     timerStoppen();
     if (!sekunden) return;  // 0 = "Timer stopp"
-    window.hermesTimer = { ende: Date.now() + sekunden * 1000, dauer: sekunden * 1000 };
+    window.namikTimer = { ende: Date.now() + sekunden * 1000, dauer: sekunden * 1000 };
     timerAnzeige.hidden = false; document.body.classList.add("timer");
     const tick = () => {
-      const rest = window.hermesTimer.ende - Date.now();
+      const rest = window.namikTimer.ende - Date.now();
       if (rest <= 0) { timerAbgelaufen(); return; }
       const s = Math.ceil(rest / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
       timerAnzeige.textContent = (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s % 60).padStart(2, "0");
@@ -1790,11 +1790,11 @@
   }
   function timerStoppen() {
     clearInterval(timerUhr); timerUhr = null;
-    window.hermesTimer = null; timerAnzeige.hidden = true; document.body.classList.remove("timer");
+    window.namikTimer = null; timerAnzeige.hidden = true; document.body.classList.remove("timer");
   }
   function timerAbgelaufen() {
     timerStoppen();
-    window.hermesFroh = performance.now();
+    window.namikFroh = performance.now();
     platzhalter("Timer abgelaufen", 6000);
     piepen();
     setTimeout(() => sagen("Ihr Timer ist abgelaufen.", lauschLauf), 1300);
@@ -1824,7 +1824,7 @@
     });
   }
 
-  // Kurzer, weicher Ton nach "Hey Atlas": Ich höre jetzt zu. Zwei leise Töne, schnell ausklingend.
+  // Kurzer, weicher Ton nach "Hey Namik": Ich höre jetzt zu. Zwei leise Töne, schnell ausklingend.
   function hoerTon() {
     try {
       const ctx = new AudioContext(), t0 = ctx.currentTime + 0.02;
@@ -1839,12 +1839,12 @@
     } catch (e) {}
   }
 
-  // Reinreden: Solange Atlas spricht, wird das Mikrofon beobachtet. Bleibt der Pegel kurz deutlich über dem,
+  // Reinreden: Solange Namik spricht, wird das Mikrofon beobachtet. Bleibt der Pegel kurz deutlich über dem,
   // was gerade als Echo der eigenen Stimme ankommt, hört er auf und lauscht. (Das Mikrofon läuft mit Echounterdrückung.)
   function reinredenWaechter(beiReinreden) {
     let boden = 0.01, laut = 0, ausgeloest = false;
     const uhr = setInterval(() => {
-      if (!ohr || !window.hermesSpricht) { laut = 0; return; }
+      if (!ohr || !window.namikSpricht) { laut = 0; return; }
       const v = pegel();
       if (v > Math.max(0.05, boden * 3)) laut += 50;
       else { laut = 0; boden = boden * 0.97 + v * 0.03; }
@@ -1865,15 +1865,15 @@
     while (liveAn && lauf === lauschLauf) {
       if (!frage) {
         platzhalter("Live · Ich höre zu ... (Knopf beendet)");
-        window.hermesHoert = true;
+        window.namikHoert = true;
         const blob = await aeusserung(lauf, { maxWarten: 15000 });
-        window.hermesHoert = false;
+        window.namikHoert = false;
         if (!liveAn || lauf !== lauschLauf) break;
         if (!blob) { if (++leer >= 2) break; continue; }  // 30 s Ruhe: Gespräch endet von selbst
         platzhalter("Live · Schreibe mit ...");
-        window.hermesDenkt = true;
+        window.namikDenkt = true;
         frage = await erkennen(blob);
-        window.hermesDenkt = false;
+        window.namikDenkt = false;
         if (!frage) continue;
       }
       leer = 0;
@@ -1903,14 +1903,14 @@
     if (sprecher) sprecher.pause();
     if (antwortWarter && abbruch) abbruch.abort();
     liveAnzeige(false);
-    window.hermesDenkt = false; window.hermesHoert = false;
+    window.namikDenkt = false; window.namikHoert = false;
     platzhalter(STANDARD);
     if (wache) wachLauschen(); else ohrSchliessen();
   }
 
   function liveAnzeige(an) {
     liveKnopf.classList.toggle("an", an);
-    liveKnopf.title = an ? "Live-Gespräch beenden" : "Live-Gespräch starten (oder „Hey Atlas“ sagen)";
+    liveKnopf.title = an ? "Live-Gespräch beenden" : "Live-Gespräch starten (oder „Hey Namik“ sagen)";
     document.getElementById("livestatus").hidden = !an;
   }
   liveKnopf.addEventListener("click", () => { if (liveAn) liveBeenden(); else liveStarten(""); });
@@ -1921,7 +1921,7 @@
       platzhalter("Mikrofon nicht erlaubt: Wake-Word geht nicht.", 6000); wakeSetzen(false); return;
     }
     while (wache && !liveAn && lauf === lauschLauf) {
-      // kurze Stücke: "Hey Atlas" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
+      // kurze Stücke: "Hey Namik" dauert nur eine Sekunde, lange Aufnahmen kosten unnötig Rechenzeit
       const blob = await aeusserung(lauf, { maxWarten: 10000, maxDauer: 7000, stille: 700 });
       if (!blob || beschaeftigt || lauf !== lauschLauf) continue;
       const text = await erkennen(blob, true);
@@ -1930,7 +1930,7 @@
         hoerTon();
         let rest = text.slice(m.index + m[0].length).replace(/^[\s,.!?]+/, "");
         if (rest.length > 3) {
-          // Frage direkt hinterher ("Hey Atlas, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen
+          // Frage direkt hinterher ("Hey Namik, wie wird das Wetter?"): mit dem genauen Modell nochmal erkennen
           const genau = await erkennen(blob, false);
           const m2 = genau.match(WAKE);
           if (m2) rest = genau.slice(m2.index + m2[0].length).replace(/^[\s,.!?]+/, "") || rest;
@@ -1946,7 +1946,7 @@
     try { localStorage.setItem("hermes-wake", an ? "an" : "aus"); } catch (e) {}
     document.getElementById("wakeSchalter").setAttribute("aria-checked", an ? "true" : "false");
     document.getElementById("wakeZeile").classList.toggle("an", an);
-    document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY ATLAS“" : "AUS";
+    document.getElementById("wakeText").textContent = an ? "AN · HÖRT AUF „HEY NAMIK“" : "AUS";
     if (liveAn) return;
     if (an) wachLauschen(); else { lauschLauf++; ohrSchliessen(); }
   }
@@ -2051,7 +2051,7 @@
     if (!treffer.length) {
       const leer = document.createElement("li");
       leer.className = "leer";
-      leer.textContent = filter ? "Nichts gefunden." : listeArt === "terminal" ? "Noch keine Terminal-Chats. Im Terminal: atlas" : "Noch keine Chats.";
+      leer.textContent = filter ? "Nichts gefunden." : listeArt === "terminal" ? "Noch keine Terminal-Chats. Im Terminal: namik" : "Noch keine Chats.";
       chatListe.appendChild(leer);
       return;
     }
@@ -2207,7 +2207,7 @@
     });
     if (window.augeFarbe) window.augeFarbe();
   }
-  window.atlasFarben = () => farben;
+  window.namikFarben = () => farben;
   document.querySelectorAll(".farbreihe").forEach((reihe) => {
     const art = reihe.dataset.farbe;
     VORLAGEN[art].forEach((wert) => {
@@ -2228,7 +2228,7 @@
   });
 
   // ---------- Roboter-Augen ----------
-  // Zwei schlichte Augen als "Gesicht" von Atlas (in der App und später vorne auf der Box). Stimmungen:
+  // Zwei schlichte Augen als "Gesicht" von Namik (in der App und später vorne auf der Box). Stimmungen:
   //   ruhe    – blinzelt ab und zu, schaut kurz umher, freut sich manchmal ("^ ^")
   //   hoert   – Augen groß und wach        denkt  – schauen nach oben zur Seite, etwas schmaler
   //   sucht   – schauen schnell umher       spricht – wippen leicht
@@ -2261,7 +2261,7 @@
     window.augeFarbe = () => {
       const hell = document.documentElement.dataset.theme === "hell";
       farbe = hell ? "#2b2a26" : "#d9d7cf"; schein = hell ? "transparent" : "rgba(255,255,255,.16)";
-      const eigen = window.atlasFarben && window.atlasFarben().auge;
+      const eigen = window.namikFarben && window.namikFarben().auge;
       if (eigen) { farbe = eigen; schein = hell ? "transparent" : eigen + "40"; }
     };
     window.augeFarbe();
@@ -2277,15 +2277,15 @@
     const weich = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;  // langsam - schnell - langsam
 
     function stimmung(t) {
-      if (window.hermesWurf) return "wurf";
-      if (window.hermesSkill === "wetter") return "wetter";
-      if (window.hermesSkill === "rechnet") return "rechnet";
-      if (window.hermesSucht) return "sucht";
-      if (window.hermesSpricht) return "spricht";
-      if (window.hermesDenkt) return "denkt";
-      if (window.hermesHoert) return "hoert";
-      if (window.hermesTimer) return "timer";
-      if (window.hermesFroh && t - window.hermesFroh < 1500) return "froh";
+      if (window.namikWurf) return "wurf";
+      if (window.namikSkill === "wetter") return "wetter";
+      if (window.namikSkill === "rechnet") return "rechnet";
+      if (window.namikSucht) return "sucht";
+      if (window.namikSpricht) return "spricht";
+      if (window.namikDenkt) return "denkt";
+      if (window.namikHoert) return "hoert";
+      if (window.namikTimer) return "timer";
+      if (window.namikFroh && t - window.namikFroh < 1500) return "froh";
       return "ruhe";
     }
 
@@ -2301,7 +2301,7 @@
     }
 
     function wurfZeichnen(t, cx, cy) {
-      const w = window.hermesWurf, flug = w.dauer - REIN;
+      const w = window.namikWurf, flug = w.dauer - REIN;
       const p = Math.min(1, Math.max(0, (t - w.start - REIN) / flug));
       const brems = 1 - Math.pow(1 - p, 3);
       const hoehe = -Math.sin(Math.min(1, p / 0.8) * Math.PI) * 42;          // hoch und wieder runter
@@ -2341,7 +2341,7 @@
       c.save(); c.translate(cx, cy); c.scale(sk, sk); c.globalAlpha = auf;
       c.fillStyle = farbe; c.strokeStyle = farbe; c.lineCap = "round";
       if (art === "timer") {
-        const tm = window.hermesTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
+        const tm = window.namikTimer, rest = tm ? Math.max(0, (tm.ende - Date.now()) / tm.dauer) : 0;
         c.lineWidth = 5; c.beginPath(); c.arc(0, 0, 46, 0, Math.PI * 2); c.stroke();
         if (rest > 0) { c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 36, -Math.PI / 2, -Math.PI / 2 + rest * Math.PI * 2); c.closePath(); c.fill(); }
       } else if (art === "wetter") {
@@ -2408,7 +2408,7 @@
       const cx = W / 2, cy = H / 2;
       const EW = 58, EH = 78, ABST = 52;  // Augenbreite, -höhe, halber Abstand
       // Zielform der Kugel: Würfel eckiger, sonst rund
-      const wuerfel = form === "wurf" && window.hermesWurf && window.hermesWurf.art !== "muenze";
+      const wuerfel = form === "wurf" && window.namikWurf && window.namikWurf.art !== "muenze";
       const D = wuerfel ? 80 : form === "wurf" ? 92 : 84, DR = wuerfel ? 16 : D / 2;
 
       if (f >= 1 && s === "wurf") wurfZeichnen(t, cx, cy);

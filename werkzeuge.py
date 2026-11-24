@@ -1,9 +1,9 @@
-"""Werkzeuge, die Hermes benutzen darf: Websuche, Seiten lesen, Wetter, Rechner, Umrechner, Route, PDF erstellen.
+"""Werkzeuge, die Namik benutzen darf: Websuche, Seiten lesen, Wetter, Rechner, Umrechner, Route, PDF erstellen.
 
 Alles, was aus dem Internet kommt, ist UNVERTRAUTE Eingabe. Deshalb:
 - nur http/https
 - keine internen Adressen (localhost, 192.168.x.x, ...) -> sonst könnte eine
-  Webseite Hermes dazu bringen, dein Heimnetz oder Ollama abzufragen
+  Webseite Namik dazu bringen, dein Heimnetz oder Ollama abzufragen
 - Größen- und Zeitlimit
 - PDFs werden nur in einen festen Ordner geschrieben, Dateiname wird bereinigt
 """
@@ -27,7 +27,7 @@ from fpdf import FPDF
 
 MAX_BYTES = 2_000_000
 MAX_SEKUNDEN = 20  # Gesamtzeit pro Seite
-HEADERS = {"User-Agent": "Mozilla/5.0 (HermesBox; +lokal)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (NamikBox; +lokal)"}
 
 PDF_ORDNER = Path("pdfs")
 WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
@@ -226,7 +226,7 @@ def wetter(ort: str) -> str:
 # ---------- Wikipedia direkt: ganzer Artikelanfang statt Schnipsel aus der Websuche ----------
 WIKIPEDIA_API = "https://de.wikipedia.org/w/api.php"
 # Wikipedia verlangt eine Kennung mit Kontakt. Ohne Link kam nach wenigen Anfragen Fehler 429
-WIKIPEDIA_KOPF = {"User-Agent": "Atlas/1.0 (https://github.com/Breitmann177/Atlas) python-requests"}
+WIKIPEDIA_KOPF = {"User-Agent": "Namik/1.0 (https://github.com/Breitmann177/Atlas) python-requests"}
 
 
 def _wiki_titel(suchwort: str) -> list[str]:
