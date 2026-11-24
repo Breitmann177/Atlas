@@ -2027,8 +2027,9 @@
       const labels = { aus: "GPU aus", schlaf: "GPU im Ruhezustand", aktiv: "GPU aktiv", bereit: "GPU bereit",
         treiber: "NVIDIA-Treiber fehlt", nicht_erkannt: "GPU nicht erkannt", unbekannt: "GPU-Status unbekannt" };
       const cpu = gpu.ollama === "cpu";
-      warn.textContent = cpu ? "Ollama nutzt CPU" : gpu.ollama === "gpu" ? "Ollama nutzt GPU" : (labels[gpu.hardware] || "GPU-Status unbekannt");
-      warn.title = (labels[gpu.hardware] || "GPU-Status unbekannt") + (cpu ? " · Modell ggf. neu laden, wenn die GPU wieder bereit ist." : "");
+      const gpuInfo = gpu.cardwire === "eco" ? "RTX-Zugriff durch Cardwire gesperrt" : (labels[gpu.hardware] || "GPU-Status unbekannt");
+      warn.textContent = cpu ? "Ollama nutzt CPU" : gpu.ollama === "gpu" ? "Ollama nutzt GPU" : gpuInfo;
+      warn.title = gpuInfo + (cpu ? " · Modell ggf. neu laden, wenn die GPU wieder bereit ist." : "");
       warn.style.color = cpu || ["aus", "treiber", "nicht_erkannt"].includes(gpu.hardware) ? "var(--rot)" : "var(--dim)";
       warn.hidden = kiAktiv() === "claude" || !s.ollama;
       document.getElementById("stimmeGeorge").hidden = !s.elevenlabs;

@@ -687,7 +687,8 @@ def gpu_status():
             return None
 
     hardware = "unbekannt"
-    if sys.platform.startswith("linux"):
+    cardwire = _cardwire_modus()
+    if sys.platform.startswith("linux") and cardwire != "eco":
         schalter = next((v for p in (
             "/sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value",
             "/sys/devices/platform/asus-nb-wmi/dgpu_disable",
@@ -718,7 +719,21 @@ def gpu_status():
         nutzung = "gpu" if vram > 0 else "cpu" if relevant else "leer"
     except (requests.RequestException, ValueError, TypeError):
         nutzung = "unbekannt"
-    return {"hardware": hardware, "ollama": nutzung}
+    return {"hardware": hardware, "ollama": nutzung, "cardwire": cardwire}
+
+
+def _cardwire_modus():
+    """Liest die Sperre ohne Dienstaktivierung oder GPU-Abfrage."""
+    try:
+        result = subprocess.run(
+            ["/usr/bin/busctl", "--system", "--auto-start=no", "get-property",
+             "org.opengamingcollective.cardwire", "/org/opengamingcollective/cardwire",
+             "org.opengamingcollective.cardwire.Mode", "Mode"],
+            capture_output=True, text=True, timeout=2, check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {"u 0": "eco", "u 1": "standard"}.get(result.stdout.strip())
 
 
 def _ollama_modelle():
@@ -732,7 +747,10 @@ def _modellname(name):
 
 
 def _nvidia_generation():
-    """Sysfs und Gerätedateien abfragen, ohne eine schlafende GPU aufzuwecken."""
+    """Verfügbarkeit erfassen, ohne eine schlafende GPU aufzuwecken."""
+    cardwire = _cardwire_modus()
+    if cardwire == "eco":
+        return None
     try:
         ctl = Path("/dev/nvidiactl").stat()
         uvm = Path("/dev/nvidia-uvm").stat()
@@ -740,7 +758,7 @@ def _nvidia_generation():
             try:
                 if ((p / "driver").resolve().name == "nvidia"
                         and (p / "class").read_text().startswith("0x03")):
-                    return (p.name, p.stat().st_ino, ctl.st_ino, ctl.st_ctime_ns,
+                    return (cardwire, p.name, p.stat().st_ino, ctl.st_ino, ctl.st_ctime_ns,
                             uvm.st_ino, uvm.st_ctime_ns)
             except OSError:
                 continue
