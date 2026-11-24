@@ -71,7 +71,9 @@ def server_starten():
     if server_laeuft() is not None:
         return
     print(f"{DIM}Namik startet ...{AUS}", flush=True)
-    if subprocess.run(["systemctl", "--user", "cat", "hermes.service"], capture_output=True).returncode == 0:
+    if subprocess.run(["systemctl", "--user", "cat", "namik.service"], capture_output=True).returncode == 0:
+        subprocess.run(["systemctl", "--user", "start", "namik.service"])
+    elif subprocess.run(["systemctl", "--user", "cat", "hermes.service"], capture_output=True).returncode == 0:
         subprocess.run(["systemctl", "--user", "start", "hermes.service"])
     else:
         subprocess.Popen([os.path.join(ORDNER, ".venv/bin/python"), "-m", "uvicorn", "server:app", "--host", "127.0.0.1",

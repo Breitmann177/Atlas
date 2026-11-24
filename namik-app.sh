@@ -4,9 +4,14 @@
 cd "$(dirname "$0")" || exit 1
 URL=http://localhost:8000
 
-if systemctl --user cat hermes.service >/dev/null 2>&1; then
-  systemctl --user start hermes.service
-  DIENST=1
+DIENST=""
+if systemctl --user cat namik.service >/dev/null 2>&1; then
+  DIENST=namik.service
+elif systemctl --user cat hermes.service >/dev/null 2>&1; then
+  DIENST=hermes.service
+fi
+if [ -n "$DIENST" ]; then
+  systemctl --user start "$DIENST"
 else
   .venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8000 &
   SERVER_PID=$!
@@ -29,8 +34,8 @@ if pgrep -f -- "--user-data-dir=$PROFIL" >/dev/null; then exit 0; fi
 if [ -n "$BROWSER" ]; then
   # Eigenes Profil: Das Fenster ist ein eigener Prozess, das Skript wartet, bis es geschlossen wird.
   "$BROWSER" --app="$URL" --user-data-dir="$PROFIL" \
-             --class=hermes --no-first-run --no-default-browser-check >/dev/null 2>&1
-  if [ -n "$DIENST" ]; then systemctl --user stop hermes.service; else kill "$SERVER_PID" 2>/dev/null; fi
+             --class=namik --no-first-run --no-default-browser-check >/dev/null 2>&1
+  if [ -n "$DIENST" ]; then systemctl --user stop "$DIENST"; else kill "$SERVER_PID" 2>/dev/null; fi
 else
   # Kein Chromium-Browser: normaler Browser-Tab, Namik läuft weiter bis zur Abmeldung.
   xdg-open "$URL"

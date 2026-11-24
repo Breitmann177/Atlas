@@ -51,8 +51,8 @@ Der Code führt die Werkzeuge nur aus und zeigt sie in der Oberfläche. Das funk
 <details open><summary><b>Linux (Fedora)</b></summary>
 
 ```bash
-git clone https://github.com/Breitmann177/Atlas.git
-cd Atlas
+git clone https://github.com/Breitmann177/Atlas.git Namik
+cd Namik
 ./install.sh
 ```
 
@@ -77,7 +77,7 @@ Danach ein paar Minuten warten (der Treiber wird gebaut), neu starten und `./ins
 <details><summary><b>Windows</b></summary>
 
 1. **Python 3.12 (64-bit)** von [python.org](https://www.python.org/downloads/) und [Ollama](https://ollama.com) installieren.
-2. Im Namik-Ordner (am besten ein kurzer Pfad wie `C:\Atlas`, Windows erlaubt nur kurze Dateipfade):
+2. Im Namik-Ordner (am besten ein kurzer Pfad wie `C:\Namik`, Windows erlaubt nur kurze Dateipfade):
    ```
    py -3.12 -m venv .venv
    .venv\Scripts\pip install -r requirements.txt
@@ -141,4 +141,4 @@ python testliste.py --voll   # mit echten Antworten (dauert länger, Ollama muss
    `https://<laptop>.<tailnet>.ts.net` öffnen, Passwort eingeben, dann Teilen → „Zum Home-Bildschirm“.
 Ist Namik auf dem Laptop aus, startet es beim Aufruf vom Handy von selbst (Linux, mit install.sh eingerichtet). Über HTTPS funktioniert auch das Mikrofon.
 
-**Namenswechsel:** Namik ist der neue Name. Der GitHub-Ordner bleibt `Atlas`. Alte `.env`-Variablen werden weiterhin unterstützt; bestehende Datenbank, Browser-Einstellungen und systemd-Dienstnamen bleiben aus Kompatibilitätsgründen erhalten. Der Terminalbefehl heißt jetzt `./namik` (`./atlas` funktioniert weiterhin).
+**Namenswechsel:** Bei einer bestehenden Linux-Installation zuerst Namik schließen, im bisherigen Projektordner `git pull` und anschließend `./install.sh` ausführen. Der Installer stellt den bisherigen Dienst und App-Menü-Eintrag um. Alte `.env`-Variablen sowie bestehende Datenbank und Browser-Einstellungen bleiben kompatibel. Der Terminalbefehl heißt `./namik`.

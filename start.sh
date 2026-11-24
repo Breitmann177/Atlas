@@ -10,7 +10,7 @@ if [ ! -x ".venv/bin/python" ]; then
 fi
 
 # Als Dienst eingerichtet (install.sh)? Dann den Dienst nutzen statt eines zweiten Servers.
-if systemctl --user cat hermes.service >/dev/null 2>&1; then
+if systemctl --user cat namik.service >/dev/null 2>&1 || systemctl --user cat hermes.service >/dev/null 2>&1; then
   exec "$(pwd)/namik-app.sh"
 fi
 

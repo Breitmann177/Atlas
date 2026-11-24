@@ -1,5 +1,0 @@
-#!/usr/bin/env python3
-# Compatibility launcher for existing installations.
-import os
-import runpy
-runpy.run_path(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'namik'), run_name='__main__')
