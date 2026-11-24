@@ -14,7 +14,6 @@ import http.cookiejar
 import itertools
 import base64
 import getpass
-import mimetypes
 import uuid
 import json
 import os
@@ -145,7 +144,7 @@ class Schreiber:
 
     def _link_raus(self, text, adresse):
         self.links.append(adresse)
-        alt, self.link = self.link, None
+        self.link = None
         for c in text:
             self._zeichen(c)
         ziel = re.sub(r"^https?://(www\.)?", "", adresse).split("/")[0] if adresse.startswith("http") else ""
